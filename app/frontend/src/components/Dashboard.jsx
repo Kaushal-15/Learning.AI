@@ -10,12 +10,12 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("http://localhost:3000/api/profile", {
+        const res = await fetch("http://localhost:3000/api/profile/me", {
           method: "GET",
           credentials: "include", // sends JWT cookies
         });
         const data = await res.json();
-        if (res.ok && data.user) {
+        if (res.ok && data.success && data.user) {
           setUser(data.user);
         } else {
           console.warn("Not logged in:", data.message);

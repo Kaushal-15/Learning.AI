@@ -491,9 +491,24 @@ const authMiddleware = require("../middleware/authMiddleware");
 // ✅ Protected route to fetch current user profile
 router.get("/me", authMiddleware, async (req, res) => {
   try {
+    // Fetch full user data from database
+    const User = require("../models/User");
+    const user = await User.findById(req.user.id).select('-passwordHash -salt -refreshToken');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     res.status(200).json({
       success: true,
-      user: req.user, // comes from decoded JWT in middleware
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
     });
   } catch (error) {
     console.error("Profile fetch error:", error);
