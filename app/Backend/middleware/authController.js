@@ -28,9 +28,8 @@ exports.loginUser = async (req, res) => {
     const accessToken = signAccessToken({ id: user._id, email: user.email });
     const refreshToken = signRefreshToken({ id: user._id, email: user.email });
 
-    // Store refresh token in user document
-    user.refreshToken = refreshToken;
-    await user.save();
+    // Store refresh token in user document using findByIdAndUpdate to avoid validation issues
+    await User.findByIdAndUpdate(user._id, { refreshToken }, { runValidators: false });
 
 // SET "accessToken" COOKIE (matching middleware expectation)
 res.cookie("accessToken", accessToken, {
