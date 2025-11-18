@@ -6,6 +6,9 @@ import Result from "./components/Result";
 import Dashboard from "./components/Dashboard";
 import ProtectedLayout from "./components/ProtectedLayout";
 import Profile from "./components/Profile";
+import Roadmap from "./components/Roadmap";
+import Learn from "./components/Learn";
+import Test from "./components/Test";
 
 export default function App() {
   return (
@@ -21,7 +24,9 @@ export default function App() {
         <Route path="/result" element={<Result />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
-        
+        <Route path="/roadmap" element={<Roadmap />} />
+        <Route path="/learn" element={<Learn />} />
+        <Route path="/test" element={<Test />} />
       </Route>
     </Routes>
     ,</BrowserRouter>

@@ -23,21 +23,66 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null); // { type: 'error'|'success', text: string }
   const [errors, setErrors] = useState({});
+  const [nameStatus, setNameStatus] = useState(null); // { available: boolean, message: string }
+  const [checkingName, setCheckingName] = useState(false);
 
   const handleChange = (e) => {
     const { id, value } = e.target;
     setForm((s) => ({ ...s, [id]: value }));
     setErrors((prev) => ({ ...prev, [id]: null }));
     setMessage(null);
+    
+    // Check name availability when name changes
+    if (id === 'name') {
+      setNameStatus(null);
+      if (value.trim().length >= 2) {
+        checkNameAvailability(value.trim());
+      }
+    }
+  };
+
+  const checkNameAvailability = async (name) => {
+    if (name.length < 2) return;
+    
+    setCheckingName(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/check-name/${encodeURIComponent(name)}`, {
+        method: "GET",
+      });
+      const data = await res.json();
+      setNameStatus(data);
+    } catch (err) {
+      console.error("Name check error:", err);
+      setNameStatus({ available: false, message: "Error checking name availability" });
+    } finally {
+      setCheckingName(false);
+    }
   };
 
   const clientValidate = () => {
     const err = {};
-    if (!form.name.trim()) err.name = "Username is required";
-    if (!form.email.trim()) err.email = "Email is required";
-    else if (!validateEmail(form.email)) err.email = "Invalid email address";
-    if (!form.password) err.password = "Password is required";
-    else if (form.password.length < 8) err.password = "Password must be at least 8 characters";
+    if (!form.name.trim()) {
+      err.name = "Username is required";
+    } else if (form.name.trim().length < 2) {
+      err.name = "Username must be at least 2 characters long";
+    } else if (form.name.trim().length > 50) {
+      err.name = "Username cannot exceed 50 characters";
+    } else if (!/^[a-zA-Z0-9_\s-]+$/.test(form.name.trim())) {
+      err.name = "Username can only contain letters, numbers, spaces, hyphens, and underscores";
+    }
+    
+    if (!form.email.trim()) {
+      err.email = "Email is required";
+    } else if (!validateEmail(form.email)) {
+      err.email = "Invalid email address";
+    }
+    
+    if (!form.password) {
+      err.password = "Password is required";
+    } else if (form.password.length < 8) {
+      err.password = "Password must be at least 8 characters";
+    }
+    
     return err;
   };
 
@@ -62,11 +107,21 @@ export default function Signup() {
       const data = await res.json();
 
       if (res.ok) {
-        setMessage({ type: "success", text: "Account created — redirecting to login..." });
+        setMessage({ 
+          type: "success", 
+          text: `Account created successfully! Your Learner ID: ${data.learnerId}. Redirecting to login...` 
+        });
         setForm({ name: "", email: "", password: "" });
-        setTimeout(() => navigate("/login"), 1400);
+        setTimeout(() => navigate("/login"), 2000);
       } else {
-        setMessage({ type: "error", text: data.message || "Registration failed" });
+        // Handle specific error messages
+        if (data.message.includes('Username already taken')) {
+          setErrors({ name: data.message });
+        } else if (data.message.includes('Email already registered')) {
+          setErrors({ email: data.message });
+        } else {
+          setMessage({ type: "error", text: data.message || "Registration failed" });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -92,16 +147,32 @@ export default function Signup() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-md font-semibold mb-2 text-color1">Username</label>
-              <input
-                id="name"
-                type="text"
-                value={form.name}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-color4 transition ${errors.name ? "border-red-400" : "border-gray-300"}`}
-                placeholder="Choose a username"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="name"
+                  type="text"
+                  value={form.name}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-color4 transition ${
+                    errors.name ? "border-red-400" : 
+                    nameStatus?.available === false ? "border-red-400" :
+                    nameStatus?.available === true ? "border-green-400" : "border-gray-300"
+                  }`}
+                  placeholder="Choose a username"
+                  required
+                />
+                {checkingName && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-color1"></div>
+                  </div>
+                )}
+              </div>
               {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
+              {!errors.name && nameStatus && (
+                <p className={`text-sm mt-1 ${nameStatus.available ? "text-green-600" : "text-red-600"}`}>
+                  {nameStatus.message}
+                </p>
+              )}
             </div>
 
             <div>
