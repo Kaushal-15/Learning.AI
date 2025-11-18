@@ -54,7 +54,7 @@
 //     }
 
 //     const learner = await Learner.findById(req.params.learnerId).select('-__v');
-    
+
 //     if (!learner) {
 //       return res.status(404).json({
 //         success: false,
@@ -94,7 +94,7 @@
 
 //   } catch (error) {
 //     console.error('Error retrieving learner profile:', error);
-    
+
 //     res.status(500).json({
 //       success: false,
 //       message: 'Failed to retrieve learner profile',
@@ -186,7 +186,7 @@
 
 //   } catch (error) {
 //     console.error('Error updating learner profile:', error);
-    
+
 //     // Handle validation errors
 //     if (error.name === 'ValidationError') {
 //       return res.status(400).json({
@@ -237,11 +237,11 @@
 
 //     // Get performance analytics
 //     const performanceAnalytics = await Performance.getLearnerAnalytics(req.params.learnerId, timeRange);
-    
+
 //     // Get category trends for each category
 //     const categoryTrends = {};
 //     const categories = includeCategories || Array.from(learner.categoryMastery.keys());
-    
+
 //     for (const category of categories.slice(0, 10)) { // Limit to 10 categories for performance
 //       try {
 //         const trends = await Performance.getCategoryTrends(req.params.learnerId, category, timeRange);
@@ -255,7 +255,7 @@
 //     // Calculate progress metrics
 //     const currentDate = new Date();
 //     const startDate = new Date(currentDate.getTime() - (timeRange * 24 * 60 * 60 * 1000));
-    
+
 //     // Get recent performance data
 //     const recentPerformance = await Performance.find({
 //       learnerId: req.params.learnerId,
@@ -264,7 +264,7 @@
 
 //     // Calculate improvement trends
 //     const improvementTrends = calculateImprovementTrends(recentPerformance);
-    
+
 //     // Calculate mastery progression
 //     const masteryProgression = calculateMasteryProgression(learner.categoryMastery);
 
@@ -325,7 +325,7 @@
 
 //   } catch (error) {
 //     console.error('Error retrieving learner analytics:', error);
-    
+
 //     res.status(500).json({
 //       success: false,
 //       message: 'Failed to retrieve learner analytics',
@@ -409,7 +409,7 @@
 //   // Calculate consistency based on streak variance
 //   const avgStreak = streaks.reduce((sum, s) => sum + s, 0) / streaks.length;
 //   const variance = streaks.reduce((sum, s) => sum + Math.pow(s - avgStreak, 2), 0) / streaks.length;
-  
+
 //   return Math.max(0, 1 - (variance / (avgStreak * avgStreak)));
 // }
 
@@ -494,7 +494,7 @@ router.get("/me", authMiddleware, async (req, res) => {
     // Fetch full user data from database
     const User = require("../models/User");
     const user = await User.findById(req.user.id).select('-passwordHash -salt -refreshToken');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -508,6 +508,11 @@ router.get("/me", authMiddleware, async (req, res) => {
         id: user._id,
         email: user.email,
         name: user.name,
+        learnerId: user.learnerId,
+        hasCompletedOnboarding: user.hasCompletedOnboarding,
+        selectedRoadmap: user.selectedRoadmap,
+        skillLevel: user.skillLevel,
+        learningTimeline: user.learningTimeline,
       },
     });
   } catch (error) {
@@ -515,6 +520,144 @@ router.get("/me", authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching profile",
+    });
+  }
+});
+
+// ✅ Onboarding endpoint to save user preferences
+router.post("/onboarding", authMiddleware, async (req, res) => {
+  try {
+    const { selectedRoadmap, skillLevel, learningTimeline } = req.body;
+    
+    if (!selectedRoadmap || !skillLevel || !learningTimeline) {
+      return res.status(400).json({
+        success: false,
+        message: "All onboarding fields are required",
+      });
+    }
+
+    // Validate enum values
+    const validRoadmaps = ['full-stack', 'frontend', 'backend', 'mobile', 'database', 'cybersecurity', 'devops', 'ai-ml'];
+    const validSkillLevels = ['beginner', 'intermediate', 'expert'];
+    const validTimelines = ['1-month', '3-months', '6-months', '1-year'];
+
+    if (!validRoadmaps.includes(selectedRoadmap)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid roadmap selection",
+      });
+    }
+
+    if (!validSkillLevels.includes(skillLevel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid skill level",
+      });
+    }
+
+    if (!validTimelines.includes(learningTimeline)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid learning timeline",
+      });
+    }
+
+    const User = require("../models/User");
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        selectedRoadmap,
+        skillLevel,
+        learningTimeline,
+        hasCompletedOnboarding: true,
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update the corresponding learner profile
+    const Learner = require("../models/Learner");
+    await Learner.findOneAndUpdate(
+      { email: user.email },
+      {
+        difficultyPreference: skillLevel === 'beginner' ? 3 : skillLevel === 'intermediate' ? 5 : 7,
+        learningVelocity: learningTimeline === '1-month' ? 2.0 : learningTimeline === '3-months' ? 1.5 : 1.0,
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Onboarding completed successfully",
+      user: {
+        id: user._id,
+        selectedRoadmap: user.selectedRoadmap,
+        skillLevel: user.skillLevel,
+        learningTimeline: user.learningTimeline,
+        hasCompletedOnboarding: user.hasCompletedOnboarding,
+      },
+    });
+  } catch (error) {
+    console.error("Onboarding error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error saving onboarding preferences",
+    });
+  }
+});
+
+// ✅ Reset progress endpoint for roadmap change
+router.post("/reset-progress", authMiddleware, async (req, res) => {
+  try {
+    const User = require("../models/User");
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Reset user onboarding status
+    await User.findByIdAndUpdate(req.user.id, {
+      hasCompletedOnboarding: false,
+      selectedRoadmap: null,
+      skillLevel: null,
+      learningTimeline: null,
+    });
+
+    // Reset learner progress
+    const Learner = require("../models/Learner");
+    await Learner.findOneAndUpdate(
+      { email: user.email },
+      {
+        categoryMastery: new Map(),
+        totalQuestionsAnswered: 0,
+        totalTimeSpent: 0,
+        overallAccuracy: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        difficultyPreference: 5,
+        learningVelocity: 1.0,
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Progress reset successfully",
+    });
+  } catch (error) {
+    console.error("Reset progress error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error resetting progress",
     });
   }
 });

@@ -11,20 +11,86 @@ const PEPPER = process.env.PEPPER || '';
 router.post('/register', async (req, res) => {
   try {
     const { email, password, name } = req.body;
-    if (!email || !password) return res.status(400).json({ message: 'Missing credentials' });
+    
+    // Validate required fields
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: 'Email, password, and name are required' });
+    }
 
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(409).json({ message: 'User already exists' });
+    // Validate name length
+    if (name.trim().length < 2) {
+      return res.status(400).json({ message: 'Name must be at least 2 characters long' });
+    }
 
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(409).json({ message: 'Email already registered' });
+    }
+
+    // Check if name already exists (case-insensitive)
+    const existingName = await User.findOne({ 
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } 
+    });
+    if (existingName) {
+      return res.status(409).json({ message: 'Username already taken. Please choose a different name.' });
+    }
+
+    // Generate unique learner ID
+    let learnerId;
+    let isUnique = false;
+    let attempts = 0;
+    
+    while (!isUnique && attempts < 5) {
+      learnerId = User.generateLearnerId();
+      const existingLearnerId = await User.findOne({ learnerId });
+      if (!existingLearnerId) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+
+    if (!isUnique) {
+      return res.status(500).json({ message: 'Failed to generate unique learner ID. Please try again.' });
+    }
+
+    // Create user
     const salt = generateSalt();
     const passwordHash = sha256Hash(password, salt, PEPPER);
-    const newUser = new User({ email, name, salt, passwordHash });
+    const newUser = new User({ 
+      email, 
+      name: name.trim(), 
+      learnerId,
+      salt, 
+      passwordHash 
+    });
     await newUser.save();
 
-    res.status(201).json({ message: 'User registered successfully' });
+    // Create corresponding learner profile
+    const Learner = require('../models/Learner');
+    const newLearner = new Learner({
+      email,
+      name: name.trim()
+    });
+    await newLearner.save();
+
+    res.status(201).json({ 
+      message: 'Account created successfully',
+      learnerId: learnerId
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Registration error:', error);
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      const message = field === 'email' ? 'Email already registered' : 
+                     field === 'name' ? 'Username already taken' : 
+                     'Account already exists';
+      return res.status(409).json({ message });
+    }
+    
+    res.status(500).json({ message: 'Server error during registration' });
   }
 });
 
@@ -59,5 +125,34 @@ router.post('/refresh', async (req, res) => {
 
 // Use the authController for logout  
 router.post('/logout', logoutUser);
+
+// Check name availability
+router.get('/check-name/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ 
+        available: false, 
+        message: 'Name must be at least 2 characters long' 
+      });
+    }
+
+    const existingUser = await User.findOne({ 
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } 
+    });
+
+    res.json({
+      available: !existingUser,
+      message: existingUser ? 'Username already taken' : 'Username available'
+    });
+  } catch (error) {
+    console.error('Name check error:', error);
+    res.status(500).json({ 
+      available: false, 
+      message: 'Error checking name availability' 
+    });
+  }
+});
 
 module.exports = router;

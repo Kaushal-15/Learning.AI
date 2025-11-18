@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Learner = require('../models/Learner');
 const Performance = require('../models/Performance');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // Create a new learner
 router.post('/', async (req, res) => {
@@ -32,6 +33,57 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Get current user's learner data
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const learner = await Learner.findOne({ email: user.email }).select('-__v');
+    
+    if (!learner) {
+      return res.status(404).json({
+        success: false,
+        message: 'Learner profile not found'
+      });
+    }
+
+    // Get recent performance data
+    const recentPerformance = await Performance.find({ 
+      learnerId: learner._id 
+    })
+    .sort({ createdAt: -1 })
+    .limit(10);
+
+    res.json({
+      success: true,
+      data: {
+        ...learner.toObject(),
+        weakAreas: learner.weakAreas,
+        strongAreas: learner.strongAreas,
+        categoryMastery: Object.fromEntries(learner.categoryMastery),
+        recentPerformance,
+        roadmap: user.selectedRoadmap,
+        skillLevel: user.skillLevel,
+        learningTimeline: user.learningTimeline
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching learner data:', error);
+    res.status(500).json({
       success: false,
       message: error.message
     });
