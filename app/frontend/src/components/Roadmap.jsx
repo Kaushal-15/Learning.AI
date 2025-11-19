@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Code, Database, Shield, Smartphone, Globe, Server, Layers, Brain } from "lucide-react";
+import AnimatedBackground from "./AnimatedBackground";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -158,7 +159,8 @@ export default function Roadmap() {
   };
 
   return (
-    <section className="min-h-screen w-full flex flex-col items-center bg-gradient-to-br from-[#FFECC0] via-[#f9f4e3] to-[#344F1F] px-6 py-8">
+    <section className="min-h-screen w-full flex flex-col items-center bg-gray-50 relative px-6 py-8">
+      <AnimatedBackground />
       {/* Header */}
       <div className="w-full max-w-6xl mb-8">
         <div className="text-center mb-6">
