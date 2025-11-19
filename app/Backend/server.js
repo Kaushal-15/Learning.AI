@@ -18,12 +18,15 @@ const authMiddleware = require('./middleware/authMiddleware');
 // Import routes
 // ===============================
 const questionRoutes = require('./routes/questionRoutes');
+const testResultRoutes = require('./routes/testResultRoutes');
 const assessmentRoutes = require('./routes/assessmentRoutes');
 const learnerRoutes = require('./routes/learnerRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const performanceRoutes = require('./routes/performanceRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const authRoutes = require('./routes/auth');
+const roadmapRoutes = require('./routes/roadmapRoutes');
+const progressRoutes = require('./routes/progressRoutes');
 
 // ===============================
 // Initialize App
@@ -107,7 +110,10 @@ app.use('/api/auth', authRoutes); // signup/login/logout
 app.use(authMiddleware); // ✅ All routes below require valid token cookie
 
 app.use('/api/profile', profileRoutes);
+app.use('/api/roadmaps', roadmapRoutes);
+app.use('/api/progress', progressRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/test-results', testResultRoutes);
 app.use('/api/assessment', assessmentRoutes);
 app.use('/api/learners', learnerRoutes);
 app.use('/api/performance', performanceRoutes);
