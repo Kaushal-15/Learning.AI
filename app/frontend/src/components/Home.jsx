@@ -41,19 +41,16 @@ export default function Home() {
             onClick={() => setIsOpen(!isOpen)}
           >
             <span
-              className={`block h-1 rounded-md bg-color1 transition-all duration-300 ${
-                isOpen ? "rotate-45 translate-y-2.5" : ""
-              }`}
+              className={`block h-1 rounded-md bg-color1 transition-all duration-300 ${isOpen ? "rotate-45 translate-y-2.5" : ""
+                }`}
             ></span>
             <span
-              className={`block h-1 rounded-md bg-color1 transition-all duration-300 ${
-                isOpen ? "opacity-0" : ""
-              }`}
+              className={`block h-1 rounded-md bg-color1 transition-all duration-300 ${isOpen ? "opacity-0" : ""
+                }`}
             ></span>
             <span
-              className={`block h-1 rounded-md bg-color1 transition-all duration-300 ${
-                isOpen ? "-rotate-45 -translate-y-2.5" : ""
-              }`}
+              className={`block h-1 rounded-md bg-color1 transition-all duration-300 ${isOpen ? "-rotate-45 -translate-y-2.5" : ""
+                }`}
             ></span>
           </div>
 

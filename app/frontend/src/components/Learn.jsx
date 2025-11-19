@@ -21,6 +21,7 @@ import {
   Layers,
   Brain
 } from "lucide-react";
+import AnimatedBackground from "./AnimatedBackground";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -46,9 +47,25 @@ const roadmapColors = {
   'ai-ml': 'from-purple-500 to-violet-600'
 };
 
-// Sample learning roadmap data - this would come from your backend
-const getLearningRoadmap = (roadmapType, timeline, skillLevel) => {
-  const baseRoadmaps = {
+// Fetch learning roadmap data from backend
+const fetchLearningRoadmap = async (roadmapType) => {
+  try {
+    const res = await fetch(`${API_BASE}/roadmaps/${roadmapType}`, {
+      credentials: "include"
+    });
+    const data = await res.json();
+    
+    if (res.ok && data.success) {
+      return data.data;
+    }
+    return null;
+  } catch (err) {
+    console.error("Error fetching roadmap:", err);
+    return null;
+  }
+};
+
+const baseRoadmaps = {
     'full-stack': {
       title: 'Full-Stack Development',
       description: 'Master both frontend and backend development',
@@ -133,9 +150,6 @@ const getLearningRoadmap = (roadmapType, timeline, skillLevel) => {
     }
   };
 
-  return baseRoadmaps[roadmapType] || baseRoadmaps['full-stack'];
-};
-
 const getTypeIcon = (type) => {
   switch (type) {
     case 'theory': return <Book className="w-4 h-4" />;
@@ -181,12 +195,8 @@ export default function Learn() {
             return;
           }
           
-          // Generate roadmap based on user preferences
-          const roadmap = getLearningRoadmap(
-            data.user.selectedRoadmap,
-            data.user.learningTimeline,
-            data.user.skillLevel
-          );
+          // Fetch roadmap data from backend
+          const roadmap = await fetchLearningRoadmap(data.user.selectedRoadmap);
           setRoadmapData(roadmap);
         } else {
           navigate("/login");
@@ -235,7 +245,8 @@ export default function Learn() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 relative flex items-center justify-center">
+        <AnimatedBackground />
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your learning path...</p>
@@ -261,7 +272,8 @@ export default function Learn() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      <AnimatedBackground />
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
