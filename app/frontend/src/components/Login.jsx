@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
@@ -8,6 +8,16 @@ export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null); // { type: "error" | "success", text: string }
+
+  // Enforce Light Mode
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    // Optional: Re-add dark mode if user navigates away (handled by other components usually)
+    return () => {
+      // We don't necessarily need to re-add it here, as other components like Dashboard 
+      // will check local storage and add it back if needed.
+    };
+  }, []);
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -135,9 +145,8 @@ export default function Login() {
         {/* Status Message */}
         {message && (
           <p
-            className={`text-center text-sm mt-4 ${
-              message.type === "error" ? "text-red-600" : "text-green-700"
-            }`}
+            className={`text-center text-sm mt-4 ${message.type === "error" ? "text-red-600" : "text-green-700"
+              }`}
           >
             {message.text}
           </p>

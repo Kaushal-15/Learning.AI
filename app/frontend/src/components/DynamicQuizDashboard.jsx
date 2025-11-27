@@ -8,9 +8,10 @@ import {
   Zap,
   BookOpen,
   BarChart3,
-  Flame,
-  Calendar
+  Flame
 } from "lucide-react";
+import AnimatedBackground from "./AnimatedBackground";
+import ThemeToggle from "./ThemeToggle";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -51,13 +52,14 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-        <div className="max-w-6xl mx-auto">
+      <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative p-6">
+        <AnimatedBackground />
+        <div className="max-w-6xl mx-auto relative z-10">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-300 rounded w-1/3"></div>
+            <div className="h-8 bg-gray-300 dark:bg-dark-300 rounded w-1/3"></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-32 bg-gray-300 rounded-lg"></div>
+                <div key={i} className="h-32 bg-gray-300 dark:bg-dark-300 rounded-lg"></div>
               ))}
             </div>
           </div>
@@ -67,15 +69,19 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative p-6">
+      <AnimatedBackground />
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-cream-100 mb-2">
             Dynamic MCQ Dashboard
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-cream-200">
             Personalized learning experience for {roadmapType.charAt(0).toUpperCase() + roadmapType.slice(1)}
           </p>
         </div>
@@ -84,10 +90,10 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           
           {/* Streak Card */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 border-l-4 border-orange-500 dark:border-orange-400">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Current Streak</p>
+                <p className="text-sm text-gray-600 dark:text-cream-200">Current Streak</p>
                 <p className="text-3xl font-bold text-orange-600">
                   {insights?.streak?.current || 0}
                 </p>
@@ -100,10 +106,10 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
           </div>
 
           {/* Daily Progress */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 border-l-4 border-green-500 dark:border-green-400">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Daily Progress</p>
+                <p className="text-sm text-gray-600 dark:text-cream-200">Daily Progress</p>
                 <p className="text-3xl font-bold text-green-600">
                   {insights?.dailyProgress?.percentage || 0}%
                 </p>
@@ -116,10 +122,10 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
           </div>
 
           {/* Accuracy */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 border-l-4 border-blue-500 dark:border-blue-400">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Accuracy</p>
+                <p className="text-sm text-gray-600 dark:text-cream-200">Accuracy</p>
                 <p className="text-3xl font-bold text-blue-600">
                   {insights?.accuracy || 0}%
                 </p>
@@ -132,10 +138,10 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
           </div>
 
           {/* Adaptive Level */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 border-l-4 border-purple-500 dark:border-purple-400">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Current Level</p>
+                <p className="text-sm text-gray-600 dark:text-cream-200">Current Level</p>
                 <p className="text-2xl font-bold text-purple-600 capitalize">
                   {insights?.adaptiveLevel || 'Easy'}
                 </p>
@@ -152,8 +158,8 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Question Distribution */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-cream-100 mb-4 flex items-center">
               <BookOpen className="h-5 w-5 mr-2 text-blue-500" />
               Question Bank Status
             </h3>
@@ -173,9 +179,9 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
                 </span>
               </div>
               
-              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="text-sm font-medium text-gray-800">Total Available</span>
-                <span className="text-lg font-bold text-gray-600">
+              <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-dark-300/50 rounded-lg">
+                <span className="text-sm font-medium text-gray-800 dark:text-cream-100">Total Available</span>
+                <span className="text-lg font-bold text-gray-600 dark:text-cream-200">
                   {preview?.totalAvailable || 0}
                 </span>
               </div>
@@ -183,8 +189,8 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
           </div>
 
           {/* Personalized Recommendations */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-cream-100 mb-4 flex items-center">
               <Zap className="h-5 w-5 mr-2 text-yellow-500" />
               Smart Recommendations
             </h3>
@@ -210,20 +216,20 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
 
         {/* Topic Performance */}
         {preview?.topicDistribution && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-cream-100 mb-4 flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
               Topic Distribution
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(preview.topicDistribution).map(([topic, stats]) => (
-                <div key={topic} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                  <h4 className="font-medium text-gray-800 mb-2">{topic}</h4>
+                <div key={topic} className="p-4 border border-gray-200 dark:border-dark-300 rounded-lg hover:shadow-md transition-shadow">
+                  <h4 className="font-medium text-gray-800 dark:text-cream-100 mb-2">{topic}</h4>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Total:</span>
-                      <span className="font-medium">{stats.total}</span>
+                      <span className="text-gray-600 dark:text-cream-200">Total:</span>
+                      <span className="font-medium text-gray-900 dark:text-cream-100">{stats.total}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-green-600">Fresh:</span>

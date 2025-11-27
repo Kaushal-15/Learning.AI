@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   ArrowLeft,
-  Clock,
   Target,
   Brain,
   Play,
@@ -13,7 +13,10 @@ import {
 import AnimatedBackground from "./AnimatedBackground";
 import ThemeToggle from "./ThemeToggle";
 
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+
 
 const quizTypes = [
   {
@@ -198,6 +201,9 @@ export default function QuizSelection() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
       <AnimatedBackground />
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
 
       {/* Header */}
       <header className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-dark-300">
@@ -205,13 +211,13 @@ export default function QuizSelection() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate("/dashboard")}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-2 text-gray-400 dark:text-cream-200 hover:text-gray-600 dark:hover:text-cream-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Interactive Quiz</h1>
-              <p className="text-gray-600">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-cream-100">Interactive Quiz</h1>
+              <p className="text-gray-600 dark:text-cream-200">
                 Test your knowledge in {getRoadmapTitle(user?.selectedRoadmap)}
               </p>
             </div>
@@ -219,35 +225,39 @@ export default function QuizSelection() {
         </div>
       </header>
 
+
+
+
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Quiz Types */}
           <div className="lg:col-span-2">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Choose Your Quiz Type</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-cream-100 mb-6">Choose Your Quiz Type</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {quizTypes.map((quiz) => (
                 <div
                   key={quiz.id}
-                  className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-200"
+                  className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 hover:shadow-xl transition-all duration-200"
                 >
                   <div className={`w-16 h-16 bg-gradient-to-r ${quiz.color} rounded-lg flex items-center justify-center text-white mb-4`}>
                     {quiz.icon}
                   </div>
 
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{quiz.name}</h3>
-                  <p className="text-gray-600 text-sm mb-4">{quiz.description}</p>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-cream-100 mb-2">{quiz.name}</h3>
+                  <p className="text-gray-600 dark:text-cream-200 text-sm mb-4">{quiz.description}</p>
 
                   <div className="space-y-2 mb-6">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Questions:</span>
-                      <span className="font-semibold">{quiz.questions}</span>
+                      <span className="text-gray-600 dark:text-cream-200">Questions:</span>
+                      <span className="font-semibold text-gray-900 dark:text-cream-100">{quiz.questions}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Time Limit:</span>
-                      <span className="font-semibold">{quiz.time} minutes</span>
+                      <span className="text-gray-600 dark:text-cream-200">Time Limit:</span>
+                      <span className="font-semibold text-gray-900 dark:text-cream-100">{quiz.time} minutes</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Difficulty:</span>
+                      <span className="text-gray-600 dark:text-cream-200">Difficulty:</span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${quiz.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
                           quiz.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                             quiz.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
@@ -274,8 +284,8 @@ export default function QuizSelection() {
 
           {/* Recent Quizzes */}
           <div className="lg:col-span-1">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Quizzes</h2>
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-cream-100 mb-6">Recent Quizzes</h2>
+            <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6">
               {recentQuizzes.length > 0 ? (
                 <div className="space-y-4">
                   {recentQuizzes.map((quiz) => (

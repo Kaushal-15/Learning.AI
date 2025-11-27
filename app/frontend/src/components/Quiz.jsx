@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
 import {
   ArrowLeft,
   Clock,
@@ -15,7 +16,10 @@ import {
 import AnimatedBackground from "./AnimatedBackground";
 import ThemeToggle from "./ThemeToggle";
 
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+
 
 export default function Quiz() {
   const navigate = useNavigate();
@@ -316,47 +320,49 @@ export default function Quiz() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
         <AnimatedBackground />
-
-        {/* Results Header */}
-        <div className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-dark-300 p-6">
+        <div className="absolute top-4 right-4 z-10">
+          <ThemeToggle />
+        </div>
+        {/* Professional Results Header */}
+        <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm border-b border-gray-200 dark:border-dark-300 p-6 relative z-10">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-gray-400 dark:text-cream-200 hover:text-gray-600 dark:hover:text-cream-100 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-dark-300/50"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{quiz.title}</h1>
-                  <p className="text-gray-600">Quiz Results</p>
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-cream-100">{quiz.title}</h1>
+                  <p className="text-gray-600 dark:text-cream-200">Quiz Results</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{quiz.accuracy}%</div>
-                  <div className="text-sm text-gray-500">Accuracy</div>
+                <div className="text-center bg-amber-50 dark:bg-amber-400/20 border border-amber-200 dark:border-amber-400/30 rounded-lg p-4">
+                  <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{quiz.accuracy}%</div>
+                  <div className="text-sm text-gray-600 dark:text-cream-200">Accuracy</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{quiz.points}</div>
-                  <div className="text-sm text-gray-500">Points</div>
+                <div className="text-center bg-blue-50 dark:bg-blue-400/20 border border-blue-200 dark:border-blue-400/30 rounded-lg p-4">
+                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{quiz.points}</div>
+                  <div className="text-sm text-gray-600 dark:text-cream-200">Points</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-600">{quiz.correctAnswers}/{quiz.totalQuestions}</div>
-                  <div className="text-sm text-gray-500">Answered</div>
+                <div className="text-center bg-purple-50 dark:bg-purple-400/20 border border-purple-200 dark:border-purple-400/30 rounded-lg p-4">
+                  <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{quiz.correctAnswers}/{quiz.totalQuestions}</div>
+                  <div className="text-sm text-gray-600 dark:text-cream-200">Answered</div>
                 </div>
               </div>
             </div>
 
             {/* Question Grid */}
-            <div className="grid grid-cols-10 gap-2 mb-6">
+            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2 mb-6">
               {quiz.questions.map((question, index) => (
                 <button
                   key={index}
                   onClick={() => goToQuestion(index)}
-                  className={`w-10 h-10 rounded-lg border-2 text-sm font-medium transition-all duration-200 flex items-center justify-center ${getQuestionStatusColor(question, index)}`}
+                  className={`w-10 h-10 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center justify-center ${getQuestionStatusColor(question, index)}`}
                 >
                   {getQuestionStatusIcon(question) || (index + 1)}
                 </button>
@@ -364,30 +370,30 @@ export default function Quiz() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 text-sm">
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-dark-300/50 rounded-lg p-3">
                 <div className="w-4 h-4 bg-green-500 rounded"></div>
-                <span>Correct: {quiz.questions.filter(q => q.isCorrect).length}</span>
+                <span className="text-gray-700 dark:text-cream-200">Correct: {quiz.questions.filter(q => q.isCorrect).length}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-dark-300/50 rounded-lg p-3">
                 <div className="w-4 h-4 bg-red-500 rounded"></div>
-                <span>Incorrect: {quiz.questions.filter(q => q.status === 'answered' && !q.isCorrect).length}</span>
+                <span className="text-gray-700 dark:text-cream-200">Incorrect: {quiz.questions.filter(q => q.status === 'answered' && !q.isCorrect).length}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-dark-300/50 rounded-lg p-3">
                 <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-                <span>Skipped: {quiz.questions.filter(q => q.status === 'skipped').length}</span>
+                <span className="text-gray-700 dark:text-cream-200">Skipped: {quiz.questions.filter(q => q.status === 'skipped').length}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-dark-300/50 rounded-lg p-3">
                 <div className="w-4 h-4 bg-gray-400 rounded"></div>
-                <span>Unanswered: {quiz.questions.filter(q => q.status === 'unanswered').length}</span>
+                <span className="text-gray-700 dark:text-cream-200">Unanswered: {quiz.questions.filter(q => q.status === 'unanswered').length}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Question Review */}
-        <div className="max-w-6xl mx-auto p-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="max-w-6xl mx-auto p-6 relative z-10">
+          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-dark-300 p-6">
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-semibold">Question {currentQuestionIndex + 1}</h3>
@@ -404,7 +410,7 @@ export default function Quiz() {
                   </span>
                 </div>
               </div>
-              <p className="text-gray-800 mb-4">{quiz.questions[currentQuestionIndex].question}</p>
+              <p className="text-gray-900 dark:text-cream-100 mb-4">{quiz.questions[currentQuestionIndex].question}</p>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -415,11 +421,11 @@ export default function Quiz() {
                 return (
                   <div
                     key={index}
-                    className={`p-4 rounded-lg border-2 ${isCorrect
-                      ? 'border-green-500 bg-green-50'
+                    className={`p-4 rounded-lg border ${isCorrect
+                      ? 'border-green-500 bg-green-500/10'
                       : isUserAnswer && !isCorrect
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-200 bg-gray-50'
+                        ? 'border-red-500 bg-red-500/10'
+                        : 'border-gray-600 bg-gray-700/50'
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -433,7 +439,7 @@ export default function Quiz() {
                           isUserAnswer && !isCorrect ? <X className="w-4 h-4" /> :
                             String.fromCharCode(65 + index)}
                       </div>
-                      <span className="font-medium">{option}</span>
+                      <span className="font-medium text-gray-900 dark:text-cream-100">{option}</span>
                     </div>
                   </div>
                 );
@@ -441,9 +447,9 @@ export default function Quiz() {
             </div>
 
             {quiz.questions[currentQuestionIndex].explanation && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">Explanation:</h4>
-                <p className="text-blue-700 text-sm">{quiz.questions[currentQuestionIndex].explanation}</p>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-400 mb-2">Explanation:</h4>
+                <p className="text-blue-300 text-sm">{quiz.questions[currentQuestionIndex].explanation}</p>
               </div>
             )}
 
@@ -452,14 +458,14 @@ export default function Quiz() {
               <button
                 onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
                 disabled={currentQuestionIndex === 0}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 border border-gray-300 dark:border-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-300/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Previous
               </button>
               <button
                 onClick={() => setCurrentQuestionIndex(Math.min(quiz.questions.length - 1, currentQuestionIndex + 1))}
                 disabled={currentQuestionIndex === quiz.questions.length - 1}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-amber-500 dark:bg-amber-600 text-white rounded-lg hover:bg-amber-600 dark:hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>
@@ -475,37 +481,39 @@ export default function Quiz() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
       <AnimatedBackground />
-
-      {/* Quiz Header */}
-      <div className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-dark-300 p-6">
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
+      {/* Professional Quiz Header */}
+      <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm border-b border-gray-200 dark:border-dark-300 p-6 relative z-10">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="p-2 text-gray-400 dark:text-cream-200 hover:text-gray-600 dark:hover:text-cream-100 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-dark-300/50"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-xl font-bold text-gray-900">{quiz.title}</h1>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-cream-100">{quiz.title}</h1>
                   {quiz.isAdaptive && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full flex items-center gap-1">
+                    <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full flex items-center gap-1 border border-purple-500/30">
                       <Brain className="w-3 h-3" />
                       Adaptive
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-gray-600">Question {currentQuestionIndex + 1} of {quiz.totalQuestions}</p>
+                  <p className="text-gray-600 dark:text-cream-200">Question {currentQuestionIndex + 1} of {quiz.totalQuestions}</p>
                   {quiz.isAdaptive && (
                     <div className="flex items-center gap-4">
-                      <p className="text-sm text-purple-600">
-                        Current Level: <span className="font-semibold capitalize">{quiz.adaptiveSettings?.currentDifficulty || 'Easy'}</span>
+                      <p className="text-sm text-purple-400">
+                        Current Level: <span className="font-semibold capitalize text-purple-300">{quiz.adaptiveSettings?.currentDifficulty || 'Easy'}</span>
                       </p>
                       {currentQuestion?.wasAdaptivelySelected && (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                        <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full border border-green-500/30">
                           ✨ Adapted
                         </span>
                       )}
@@ -516,27 +524,27 @@ export default function Quiz() {
             </div>
 
             <div className="flex items-center gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{quiz.accuracy}%</div>
-                <div className="text-xs text-gray-500">Accuracy</div>
+              <div className="text-center bg-amber-50 dark:bg-amber-400/20 border border-amber-200 dark:border-amber-400/30 rounded-lg p-3">
+                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{quiz.accuracy}%</div>
+                <div className="text-xs text-gray-600 dark:text-cream-200">Accuracy</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{quiz.points}</div>
-                <div className="text-xs text-gray-500">Points</div>
+              <div className="text-center bg-blue-50 dark:bg-blue-400/20 border border-blue-200 dark:border-blue-400/30 rounded-lg p-3">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{quiz.points}</div>
+                <div className="text-xs text-gray-600 dark:text-cream-200">Points</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{quiz.correctAnswers}/{quiz.totalQuestions}</div>
-                <div className="text-xs text-gray-500">Answered</div>
+              <div className="text-center bg-purple-50 dark:bg-purple-400/20 border border-purple-200 dark:border-purple-400/30 rounded-lg p-3">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{quiz.correctAnswers}/{quiz.totalQuestions}</div>
+                <div className="text-xs text-gray-600 dark:text-cream-200">Answered</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{formatTime(timeLeft)}</div>
-                <div className="text-xs text-gray-500">Time Left</div>
+              <div className="text-center bg-red-50 dark:bg-red-400/20 border border-red-200 dark:border-red-400/30 rounded-lg p-3">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{formatTime(timeLeft)}</div>
+                <div className="text-xs text-gray-600 dark:text-cream-200">Time Left</div>
               </div>
             </div>
           </div>
 
           {/* Question Grid */}
-          <div className="grid grid-cols-10 gap-2">
+          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
             {quiz.questions.map((question, index) => (
               <button
                 key={index}
@@ -554,25 +562,25 @@ export default function Quiz() {
       {adaptiveNotification && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
           <div className={`p-4 rounded-lg shadow-lg border-l-4 ${adaptiveNotification.type === 'increase'
-            ? 'bg-blue-50 border-blue-400'
-            : 'bg-orange-50 border-orange-400'
+            ? 'bg-blue-50 dark:bg-blue-400/20 border-blue-400 dark:border-blue-500'
+            : 'bg-orange-50 dark:bg-orange-400/20 border-orange-400 dark:border-orange-500'
             } max-w-sm`}>
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${adaptiveNotification.type === 'increase'
-                ? 'bg-blue-100 text-blue-600'
-                : 'bg-orange-100 text-orange-600'
+                ? 'bg-blue-100 dark:bg-blue-400/30 text-blue-600 dark:text-blue-400'
+                : 'bg-orange-100 dark:bg-orange-400/30 text-orange-600 dark:text-orange-400'
                 }`}>
                 {adaptiveNotification.type === 'increase' ? '⬆️' : '⬇️'}
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900">
+                <h4 className="font-semibold text-gray-900 dark:text-cream-100">
                   Difficulty {adaptiveNotification.type === 'increase' ? 'Increased!' : 'Adjusted'}
                 </h4>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-cream-200">
                   {adaptiveNotification.from} → {adaptiveNotification.to}
                 </p>
                 {adaptiveNotification.type === 'increase' && (
-                  <p className="text-xs text-blue-600 mt-1">
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     Great job! {adaptiveNotification.timeSpent}s response time
                   </p>
                 )}
@@ -580,7 +588,7 @@ export default function Quiz() {
             </div>
             <button
               onClick={() => setAdaptiveNotification(null)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              className="absolute top-2 right-2 text-gray-400 dark:text-cream-300 hover:text-gray-600 dark:hover:text-cream-100"
             >
               ×
             </button>
@@ -588,9 +596,13 @@ export default function Quiz() {
         </div>
       )}
 
+
+
+
+
       {/* Question Content */}
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+      <div className="max-w-4xl mx-auto p-6 relative z-10">
+        <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-dark-300 p-8">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -611,22 +623,22 @@ export default function Quiz() {
               </div>
             </div>
 
-            <h2 className="text-xl font-bold text-gray-800 mb-6">{currentQuestion.question}</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-cream-100 mb-6">{currentQuestion.question}</h2>
 
             <div className="space-y-3 mb-8">
               {currentQuestion.options.map((option, index) => (
                 <button
                   key={index}
                   onClick={() => handleAnswerSelect(option)}
-                  className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${selectedAnswer === option
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  className={`w-full p-4 text-left rounded-lg border transition-all duration-200 ${selectedAnswer === option
+                    ? 'border-amber-500 dark:border-amber-400 bg-amber-500/10 dark:bg-amber-400/20 text-amber-700 dark:text-amber-300'
+                    : 'border-gray-300 dark:border-dark-300 hover:border-gray-400 dark:hover:border-dark-200 hover:bg-gray-50 dark:hover:bg-dark-300/50 text-gray-900 dark:text-cream-100'
                     }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedAnswer === option
-                      ? 'border-blue-500 bg-blue-500 text-white'
-                      : 'border-gray-300'
+                    <div className={`w-6 h-6 rounded-full border flex items-center justify-center ${selectedAnswer === option
+                      ? 'border-amber-500 dark:border-amber-400 bg-amber-500 dark:bg-amber-400 text-white'
+                      : 'border-gray-400 dark:border-dark-200 text-gray-600 dark:text-cream-200'
                       }`}>
                       {selectedAnswer === option ? <CheckCircle className="w-4 h-4" /> : String.fromCharCode(65 + index)}
                     </div>
@@ -641,7 +653,7 @@ export default function Quiz() {
           <div className="flex justify-between">
             <button
               onClick={handleSkipQuestion}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+              className="px-6 py-3 border border-gray-300 dark:border-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-300/50 transition-colors font-medium flex items-center gap-2"
             >
               <SkipForward className="w-4 h-4" />
               Skip Question
@@ -651,14 +663,14 @@ export default function Quiz() {
               <button
                 onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
                 disabled={currentQuestionIndex === 0}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 border border-gray-300 dark:border-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-300/50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               <button
                 onClick={handleSubmitAnswer}
                 disabled={!selectedAnswer || isLoadingNextQuestion}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-600 dark:to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 dark:hover:from-amber-700 dark:hover:to-orange-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isLoadingNextQuestion ? (
                   <>
