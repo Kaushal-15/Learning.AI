@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../index.css";
 
 export default function Home() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Enforce Light Mode
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   return (
     <>

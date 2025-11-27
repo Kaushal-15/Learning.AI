@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
     ArrowLeft,
     Clock,
@@ -15,7 +16,10 @@ import {
 import AnimatedBackground from "./AnimatedBackground";
 import ThemeToggle from "./ThemeToggle";
 
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+
 
 // Test categories based on difficulty levels for each roadmap
 const testCategories = {
@@ -716,7 +720,7 @@ export default function Test() {
             <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative flex items-center justify-center">
                 <AnimatedBackground />
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] dark:border-cream-300 mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-cream-300 mx-auto mb-4"></div>
                     <p className="text-gray-600 dark:text-cream-100">Loading assessments...</p>
                 </div>
             </div>
@@ -727,9 +731,12 @@ export default function Test() {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
                 <AnimatedBackground />
-                <div className="max-w-4xl mx-auto px-6 py-8">
-                    {/* Results Header */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-6">
+                <div className="absolute top-4 right-4 z-10">
+                    <ThemeToggle />
+                </div>
+                <div className="max-w-4xl mx-auto px-6 py-8 relative z-10">
+                    {/* Professional Results Header */}
+                    <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-dark-300 p-8 mb-6">
                         <div className="text-center mb-8">
                             <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${testResults.percentage >= 80 ? 'bg-green-100' :
                                 testResults.percentage >= 60 ? 'bg-yellow-100' : 'bg-red-100'
@@ -741,39 +748,39 @@ export default function Test() {
                                         <Brain className="w-10 h-10 text-red-600" />
                                 }
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">Test Complete!</h2>
-                            <p className="text-gray-600">{selectedCategory.name} Assessment</p>
+                            <h2 className="text-3xl font-bold text-gray-900 dark:text-cream-100 mb-2">Test Complete!</h2>
+                            <p className="text-gray-600 dark:text-cream-200">{selectedCategory.name} Assessment</p>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4 mb-8">
-                            <div className="text-center p-6 bg-[#FFECC0] rounded-lg border border-gray-200">
-                                <div className="text-3xl font-bold text-[#344F1F] mb-1">{testResults.percentage}%</div>
-                                <div className="text-sm text-gray-600">Score</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                            <div className="text-center p-6 bg-gradient-to-r from-amber-400/10 to-orange-500/10 dark:from-amber-400/20 dark:to-orange-500/20 border border-amber-400/20 dark:border-amber-400/30 rounded-lg">
+                                <div className="text-3xl font-bold text-amber-500 dark:text-amber-400 mb-1">{testResults.percentage}%</div>
+                                <div className="text-sm text-gray-600 dark:text-cream-200">Score</div>
                             </div>
-                            <div className="text-center p-6 bg-green-50 rounded-lg border border-gray-200">
-                                <div className="text-3xl font-bold text-green-600 mb-1">{testResults.correct}/{testResults.total}</div>
-                                <div className="text-sm text-gray-600">Correct Answers</div>
+                            <div className="text-center p-6 bg-green-500/10 dark:bg-green-500/20 border border-green-500/20 dark:border-green-500/30 rounded-lg">
+                                <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-1">{testResults.correct}/{testResults.total}</div>
+                                <div className="text-sm text-gray-600 dark:text-cream-200">Correct Answers</div>
                             </div>
-                            <div className={`text-center p-6 rounded-lg border ${testResults.tabSwitchCount > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+                            <div className={`text-center p-6 rounded-lg border ${testResults.tabSwitchCount > 0 ? 'bg-red-500/10 dark:bg-red-500/20 border-red-500/20 dark:border-red-500/30' : 'bg-green-500/10 dark:bg-green-500/20 border-green-500/20 dark:border-green-500/30'
                                 }`}>
-                                <div className={`text-3xl font-bold mb-1 ${testResults.tabSwitchCount > 0 ? 'text-red-600' : 'text-green-600'
+                                <div className={`text-3xl font-bold mb-1 ${testResults.tabSwitchCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                                     }`}>
                                     {testResults.tabSwitchCount || 0}
                                 </div>
-                                <div className="text-sm text-gray-600">Tab Switches</div>
+                                <div className="text-sm text-gray-600 dark:text-cream-200">Tab Switches</div>
                             </div>
                         </div>
 
                         <div className="mb-8">
-                            <div className="flex justify-between text-sm text-gray-600 mb-2">
+                            <div className="flex justify-between text-sm text-gray-600 dark:text-cream-200 mb-2">
                                 <span>Performance</span>
                                 <span>{testResults.percentage}%</span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-3">
                                 <div
-                                    className={`h-2 rounded-full transition-all duration-1000 ${testResults.percentage >= 80 ? 'bg-green-500' :
-                                        testResults.percentage >= 60 ? 'bg-yellow-500' :
-                                            'bg-red-500'
+                                    className={`h-3 rounded-full transition-all duration-1000 ${testResults.percentage >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                                        testResults.percentage >= 60 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+                                            'bg-gradient-to-r from-red-500 to-pink-500'
                                         }`}
                                     style={{ width: `${testResults.percentage}%` }}
                                 ></div>
@@ -788,16 +795,15 @@ export default function Test() {
                                     setSelectedCategory(null);
                                     setQuestions([]);
                                 }}
-                                className="flex-1 py-3 px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                                className="flex-1 py-3 px-6 border border-gray-300 dark:border-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-300/50 transition-colors font-medium"
                             >
                                 Take Another Test
                             </button>
                             <button
                                 onClick={() => {
-                                    // Force refresh dashboard data by adding timestamp
                                     navigate("/dashboard", { state: { refresh: Date.now() } });
                                 }}
-                                className="flex-1 py-3 px-6 bg-[#344F1F] text-white rounded-lg hover:bg-[#2a3f1a] transition-colors font-medium"
+                                className="flex-1 py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-cream-500 dark:to-cream-400 text-white dark:text-dark-500 rounded-lg hover:from-blue-700 hover:to-purple-700 dark:hover:from-cream-400 dark:hover:to-cream-300 transition-colors font-medium"
                             >
                                 Back to Dashboard
                             </button>
@@ -805,8 +811,8 @@ export default function Test() {
                     </div>
 
                     {/* Detailed Results */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-                        <h3 className="text-xl font-bold text-gray-800 mb-6">Detailed Results</h3>
+                    <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-dark-300 p-8">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-cream-100 mb-6">Detailed Results</h3>
 
                         <div className="space-y-6">
                             {testResults.detailedResults.map((result, index) => (
@@ -820,8 +826,8 @@ export default function Test() {
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${result.isCorrect
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-red-500 text-white'
+                                                ? 'bg-green-500 dark:bg-green-600 text-white'
+                                                : 'bg-red-500 dark:bg-red-600 text-white'
                                                 }`}>
                                                 {result.isCorrect ?
                                                     <CheckCircle className="w-5 h-5" /> :
@@ -877,11 +883,11 @@ export default function Test() {
 
     if (loadingQuestions) {
         return (
-            <div className="min-h-screen bg-gray-50 relative flex items-center justify-center">
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative flex items-center justify-center">
                 <AnimatedBackground />
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading questions...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-cream-300 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-cream-100">Loading questions...</p>
                 </div>
             </div>
         );
@@ -889,19 +895,19 @@ export default function Test() {
 
     if (questionError) {
         return (
-            <div className="min-h-screen bg-gray-50 relative flex items-center justify-center p-6">
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative flex items-center justify-center p-6">
                 <AnimatedBackground />
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-md w-full text-center">
-                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Test</h2>
-                    <p className="text-gray-600 mb-6">{questionError}</p>
+                <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200 dark:border-dark-300 p-8 max-w-md w-full text-center">
+                    <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-cream-100 mb-2">Error Loading Test</h2>
+                    <p className="text-gray-600 dark:text-cream-200 mb-6">{questionError}</p>
                     <button
                         onClick={() => {
                             setQuestionError(null);
                             setTestStarted(false);
                             setSelectedCategory(null);
                         }}
-                        className="px-6 py-2 bg-[#344F1F] text-white rounded-lg hover:bg-[#2a3f1a] transition-colors"
+                        className="px-6 py-2 bg-blue-600 dark:bg-cream-500 text-white dark:text-dark-500 rounded-lg hover:bg-blue-700 dark:hover:bg-cream-400 transition-colors"
                     >
                         Back to Tests
                     </button>
@@ -916,22 +922,12 @@ export default function Test() {
         const correctAnswerIndex = question.options.findIndex(option => option === question.answer);
 
         return (
-            <div className="min-h-screen relative" style={{
-                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 50%, #16213e 75%, #1a1a2e 100%)',
-                backgroundSize: '400% 400%',
-                animation: 'gradientShift 15s ease infinite'
-            }}>
-                {/* Add CSS animation */}
-                <style jsx>{`
-          @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-          }
-        `}</style>
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
+                <AnimatedBackground />
+
 
                 {/* Proctoring Overlay */}
-                <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-red-600 via-red-700 to-red-600 text-white text-center py-3 z-50 shadow-lg">
+                <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-red-600 via-red-700 to-red-600 dark:from-red-700 dark:via-red-800 dark:to-red-700 text-white text-center py-3 z-50 shadow-lg">
                     <div className="flex items-center justify-center gap-2 text-sm font-bold">
                         <AlertCircle className="w-5 h-5 animate-pulse" />
                         <span className="tracking-wide">🔒 SECURE PROCTORED EXAMINATION IN PROGRESS 🔒</span>
@@ -956,18 +952,18 @@ export default function Test() {
                 }}></div>
 
                 {/* Test Header */}
-                <div className="bg-white shadow-xl border-b-2 border-red-200 mt-16 relative z-10">
+                <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm shadow-xl border-b-2 border-red-200 dark:border-red-400/30 mt-16 relative z-10">
                     <div className="max-w-4xl mx-auto px-6 py-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <h1 className="text-xl font-bold text-gray-800">{selectedCategory.name} Test</h1>
-                                <span className="text-sm text-gray-600">
+                                <h1 className="text-xl font-bold text-gray-800 dark:text-cream-100">{selectedCategory.name} Test</h1>
+                                <span className="text-sm text-gray-600 dark:text-cream-200">
                                     Question {currentQuestion + 1} of {questions.length}
                                 </span>
                             </div>
 
                             <div className="flex items-center gap-6">
-                                <div className="flex items-center gap-2 text-red-600">
+                                <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                                     <Clock className="w-5 h-5" />
                                     <span className="font-mono text-lg font-bold">{formatTime(timeLeft)}</span>
                                 </div>
@@ -976,9 +972,9 @@ export default function Test() {
 
                         {/* Progress Bar */}
                         <div className="mt-4">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-2">
                                 <div
-                                    className="bg-[#344F1F] h-2 rounded-full transition-all duration-300"
+                                    className="bg-blue-600 dark:bg-cream-500 h-2 rounded-full transition-all duration-300"
                                     style={{ width: `${progress}%` }}
                                 ></div>
                             </div>
@@ -1004,7 +1000,7 @@ export default function Test() {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-2xl border-2 border-red-100 p-8 relative z-20 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-2xl border-2 border-red-100 dark:border-red-400/30 p-8 relative z-20">
                         {/* Question Header with Topic and Difficulty */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
@@ -1014,14 +1010,14 @@ export default function Test() {
                                         {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}
                                     </div>
                                 </span>
-                                <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                                <span className="text-sm text-gray-600 dark:text-cream-200 bg-gray-100 dark:bg-dark-300/50 px-3 py-1 rounded-full">
                                     {question.topic}
                                 </span>
                             </div>
                         </div>
 
                         <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-6">{question.question}</h2>
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-6">{question.question}</h2>
 
                             <div className="space-y-4">
                                 {question.options.map((option, index) => (
@@ -1029,14 +1025,14 @@ export default function Test() {
                                         key={index}
                                         onClick={() => handleAnswerSelect(currentQuestion, index)}
                                         className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${answers[currentQuestion] === index
-                                            ? 'border-[#344F1F] bg-[#FFECC0] text-[#344F1F]'
-                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                            ? 'border-blue-500 dark:border-cream-400 bg-blue-50 dark:bg-cream-400/20 text-blue-700 dark:text-cream-300'
+                                            : 'border-gray-200 dark:border-dark-300 hover:border-gray-300 dark:hover:border-dark-200 hover:bg-gray-50 dark:hover:bg-dark-300/50 text-gray-900 dark:text-cream-100'
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${answers[currentQuestion] === index
-                                                ? 'border-[#344F1F] bg-[#344F1F]'
-                                                : 'border-gray-300'
+                                                ? 'border-blue-500 dark:border-cream-400 bg-blue-500 dark:bg-cream-400'
+                                                : 'border-gray-300 dark:border-dark-200'
                                                 }`}>
                                                 {answers[currentQuestion] === index && (
                                                     <CheckCircle className="w-4 h-4 text-white" />
@@ -1054,7 +1050,7 @@ export default function Test() {
                             <button
                                 onClick={previousQuestion}
                                 disabled={currentQuestion === 0}
-                                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-3 border border-gray-300 dark:border-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-300/50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Previous
                             </button>
@@ -1062,7 +1058,7 @@ export default function Test() {
                             <button
                                 onClick={nextQuestion}
                                 disabled={answers[currentQuestion] === undefined}
-                                className="px-6 py-3 bg-[#344F1F] text-white rounded-lg hover:bg-[#2a3f1a] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-3 bg-blue-600 dark:bg-cream-500 text-white dark:text-dark-500 rounded-lg hover:bg-blue-700 dark:hover:bg-cream-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {currentQuestion === questions.length - 1 ? 'Finish Test' : 'Next Question'}
                             </button>
@@ -1081,16 +1077,16 @@ export default function Test() {
     if (showProctoringModal && pendingCategory) {
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8">
+                <div className="bg-white dark:bg-dark-400 rounded-lg shadow-xl max-w-2xl w-full p-8">
                     <div className="text-center mb-6">
-                        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Proctored Test Environment</h2>
-                        <p className="text-gray-600">Please read and accept the following terms before starting your test</p>
+                        <AlertCircle className="w-16 h-16 text-red-500 dark:text-red-400 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-2">Proctored Test Environment</h2>
+                        <p className="text-gray-600 dark:text-cream-200">Please read and accept the following terms before starting your test</p>
                     </div>
 
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
-                        <h3 className="font-bold text-red-800 mb-4">Test Rules & Monitoring:</h3>
-                        <ul className="space-y-2 text-sm text-red-700">
+                    <div className="bg-red-50 dark:bg-red-400/20 border border-red-200 dark:border-red-400/30 rounded-lg p-6 mb-6">
+                        <h3 className="font-bold text-red-800 dark:text-red-300 mb-4">Test Rules & Monitoring:</h3>
+                        <ul className="space-y-2 text-sm text-red-700 dark:text-red-400">
                             <li>• This test will run in fullscreen mode - you cannot exit during the test</li>
                             <li>• Tab switching and window changes are monitored and recorded</li>
                             <li>• Right-click and developer tools are disabled</li>
@@ -1100,9 +1096,9 @@ export default function Test() {
                         </ul>
                     </div>
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-                        <h3 className="font-bold text-blue-800 mb-2">Test Details:</h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-blue-700">
+                    <div className="bg-blue-50 dark:bg-blue-400/20 border border-blue-200 dark:border-blue-400/30 rounded-lg p-6 mb-6">
+                        <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2">Test Details:</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-blue-700 dark:text-blue-400">
                             <div>
                                 <span className="font-medium">Category:</span> {pendingCategory.name}
                             </div>
@@ -1124,13 +1120,13 @@ export default function Test() {
                                 setShowProctoringModal(false);
                                 setPendingCategory(null);
                             }}
-                            className="flex-1 py-3 px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                            className="flex-1 py-3 px-6 border border-gray-300 dark:border-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-300/50 transition-colors font-medium"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={() => startTest(pendingCategory)}
-                            className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                            className="flex-1 py-3 px-6 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors font-medium"
                         >
                             I Accept - Start Test
                         </button>
@@ -1141,25 +1137,32 @@ export default function Test() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 relative">
+        <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
             <AnimatedBackground />
+            <div className="absolute top-4 right-4 z-10">
+                <ThemeToggle />
+            </div>
             {/* Header */}
-            <header className="bg-white shadow-sm border-b border-gray-200">
+            <header className="bg-white dark:bg-dark-400/80 backdrop-blur-sm shadow-sm border-b border-gray-200 dark:border-dark-300">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => navigate("/dashboard")}
-                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="p-2 text-gray-400 dark:text-cream-200 hover:text-gray-600 dark:hover:text-cream-100 transition-colors"
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Knowledge Assessment</h1>
-                            <p className="text-gray-600">Test your skills and track your progress</p>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-cream-100">Knowledge Assessment</h1>
+                            <p className="text-gray-600 dark:text-cream-200">Test your skills and track your progress</p>
                         </div>
                     </div>
                 </div>
             </header>
+
+
+
+
 
             {/* Test Categories */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1173,14 +1176,14 @@ export default function Test() {
                         return (
                             <div
                                 key={test.id}
-                                className={`bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-all duration-200 ${isCompleted ? 'border-green-200 bg-green-50' : 'border-gray-200'
+                                className={`bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg shadow-sm border p-6 hover:shadow-md transition-all duration-200 ${isCompleted ? 'border-green-200 dark:border-green-400/30 bg-green-50 dark:bg-green-400/10' : 'border-gray-200 dark:border-dark-300'
                                     }`}
                             >
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-lg font-semibold text-gray-900">{test.name}</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-cream-100">{test.name}</h3>
                                         {isCompleted && (
-                                            <CheckCircle className="w-5 h-5 text-green-600" />
+                                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                                         )}
                                     </div>
                                     <div className={`px-2 py-1 rounded text-xs font-medium ${getDifficultyColor(test.difficulty)}`}>
@@ -1192,28 +1195,28 @@ export default function Test() {
                                 </div>
 
                                 {isCompleted && (
-                                    <div className="mb-4 p-3 bg-green-100 rounded-lg border border-green-200">
+                                    <div className="mb-4 p-3 bg-green-100 dark:bg-green-400/20 rounded-lg border border-green-200 dark:border-green-400/30">
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-green-800 font-medium">Completed</span>
-                                            <span className="text-green-700">Best: {completion.bestScore}%</span>
+                                            <span className="text-green-800 dark:text-green-300 font-medium">Completed</span>
+                                            <span className="text-green-700 dark:text-green-400">Best: {completion.bestScore}%</span>
                                         </div>
-                                        <div className="text-xs text-green-600 mt-1">
+                                        <div className="text-xs text-green-600 dark:text-green-400 mt-1">
                                             Attempts: {completion.attemptCount} • Last: {new Date(completion.lastAttemptDate).toLocaleDateString()}
                                         </div>
                                     </div>
                                 )}
 
-                                <p className="text-sm text-gray-600 mb-4">{test.description}</p>
+                                <p className="text-sm text-gray-600 dark:text-cream-200 mb-4">{test.description}</p>
 
                                 <div className="space-y-3 mb-6">
-                                    <div className="flex items-center justify-between text-sm text-gray-600">
+                                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-cream-200">
                                         <span className="flex items-center gap-1">
                                             <BookOpen className="w-4 h-4" />
                                             Questions
                                         </span>
                                         <span className="font-semibold">{test.questions}</span>
                                     </div>
-                                    <div className="flex items-center justify-between text-sm text-gray-600">
+                                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-cream-200">
                                         <span className="flex items-center gap-1">
                                             <Clock className="w-4 h-4" />
                                             Duration
@@ -1225,8 +1228,8 @@ export default function Test() {
                                 <button
                                     onClick={() => showProctoringWarning(test)}
                                     className={`w-full py-3 px-4 rounded-lg transition-colors font-medium ${isCompleted
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                        : 'bg-[#344F1F] text-white hover:bg-[#2a3f1a]'
+                                        ? 'bg-blue-600 dark:bg-cream-500 text-white dark:text-dark-500 hover:bg-blue-700 dark:hover:bg-cream-400'
+                                        : 'bg-blue-600 dark:bg-cream-500 text-white dark:text-dark-500 hover:bg-blue-700 dark:hover:bg-cream-400'
                                         }`}
                                 >
                                     {isCompleted ? 'Retake Test' : 'Start Test'}
