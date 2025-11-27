@@ -10,6 +10,8 @@ import Roadmap from "./components/Roadmap";
 import Learn from "./components/Learn";
 import Test from "./components/Test";
 import LessonDetail from "./components/LessonDetail";
+import QuizSelection from "./components/QuizSelection";
+import Quiz from "./components/Quiz";
 
 export default function App() {
   return (
@@ -29,8 +31,10 @@ export default function App() {
           <Route path="/learn" element={<Learn />} />
           <Route path="/learn/:roadmapId/:lessonId" element={<LessonDetail />} />
           <Route path="/test" element={<Test />} />
+          <Route path="/quiz-selection" element={<QuizSelection />} />
+          <Route path="/quiz/:id" element={<Quiz />} />
         </Route>
       </Routes>
-      ,</BrowserRouter>
+    </BrowserRouter>
   );
 }

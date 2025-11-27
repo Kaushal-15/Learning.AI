@@ -1,0 +1,172 @@
+/* Dark Mode Utility Classes */
+
+/* Base transitions for smooth theme switching */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom dark mode variables */
+:root {
+  --primary-green: #344F1F;
+  --primary-green-hover: #2a3f1a;
+  --primary-green-light: #4a6b2a;
+}
+
+/* Dark mode specific overrides */
+.dark {
+  color-scheme: dark;
+}
+
+/* Form elements dark mode */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark textarea,
+.dark select {
+  @apply bg-gray-800 border-gray-600 text-white placeholder-gray-400;
+}
+
+.dark input[type="text"]:focus,
+.dark input[type="email"]:focus,
+.dark input[type="password"]:focus,
+.dark textarea:focus,
+.dark select:focus {
+  @apply border-green-500 ring-green-500;
+}
+
+/* Button variants for dark mode */
+.btn-primary-dark {
+  @apply bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700;
+}
+
+.btn-secondary-dark {
+  @apply bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600 hover:border-gray-500;
+}
+
+/* Card components dark mode */
+.card-dark {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.card-dark-hover {
+  @apply hover:bg-gray-750 hover:border-gray-600;
+}
+
+/* Navigation dark mode */
+.nav-dark {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.nav-item-dark {
+  @apply text-gray-300 hover:text-white;
+}
+
+.nav-item-active-dark {
+  @apply text-white border-green-500;
+}
+
+/* Modal dark mode */
+.modal-dark {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.modal-overlay-dark {
+  @apply bg-black bg-opacity-75;
+}
+
+/* Alert/notification dark mode */
+.alert-success-dark {
+  @apply bg-green-900 bg-opacity-20 text-green-300 border-green-800;
+}
+
+.alert-error-dark {
+  @apply bg-red-900 bg-opacity-20 text-red-300 border-red-800;
+}
+
+.alert-warning-dark {
+  @apply bg-yellow-900 bg-opacity-20 text-yellow-300 border-yellow-800;
+}
+
+.alert-info-dark {
+  @apply bg-blue-900 bg-opacity-20 text-blue-300 border-blue-800;
+}
+
+/* Quiz/Test specific dark mode */
+.quiz-option-dark {
+  @apply bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700 hover:border-gray-500;
+}
+
+.quiz-option-selected-dark {
+  @apply bg-green-900 bg-opacity-30 border-green-600 text-green-300;
+}
+
+.quiz-option-correct-dark {
+  @apply bg-green-900 bg-opacity-50 border-green-500 text-green-200;
+}
+
+.quiz-option-incorrect-dark {
+  @apply bg-red-900 bg-opacity-50 border-red-500 text-red-200;
+}
+
+/* Progress bars dark mode */
+.progress-bg-dark {
+  @apply bg-gray-700;
+}
+
+.progress-fill-dark {
+  @apply bg-green-600;
+}
+
+/* Scrollbar dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Loading spinner dark mode */
+.spinner-dark {
+  border-color: #374151;
+  border-top-color: #10b981;
+}
+
+/* Syntax highlighting for code blocks (if any) */
+.dark .hljs {
+  @apply bg-gray-900 text-gray-200;
+}
+
+/* Custom focus styles for accessibility */
+.dark *:focus {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .dark {
+    --tw-bg-opacity: 1;
+    --tw-text-opacity: 1;
+  }
+  
+  .dark .bg-gray-800 {
+    @apply bg-black;
+  }
+  
+  .dark .text-gray-300 {
+    @apply text-white;
+  }
+  
+  .dark .border-gray-600 {
+    @apply border-gray-400;
+  }
+}

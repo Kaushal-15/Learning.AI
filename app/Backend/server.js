@@ -19,6 +19,7 @@ const authMiddleware = require('./middleware/authMiddleware');
 // ===============================
 const questionRoutes = require('./routes/questionRoutes');
 const testResultRoutes = require('./routes/testResultRoutes');
+const quizRoutes = require('./routes/quizRoutes');
 const assessmentRoutes = require('./routes/assessmentRoutes');
 const learnerRoutes = require('./routes/learnerRoutes');
 const profileRoutes = require('./routes/profileRoutes');
@@ -60,7 +61,7 @@ app.use(
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma"],
   })
 );
 
@@ -113,6 +114,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/quiz', quizRoutes); // Dynamic MCQ Quiz system
 app.use('/api/test-results', testResultRoutes);
 app.use('/api/assessment', assessmentRoutes);
 app.use('/api/learners', learnerRoutes);

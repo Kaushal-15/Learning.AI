@@ -13,6 +13,7 @@ import {
     AlertCircle
 } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
+import ThemeToggle from "./ThemeToggle";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -712,11 +713,11 @@ export default function Test() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 relative flex items-center justify-center">
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative flex items-center justify-center">
                 <AnimatedBackground />
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading assessments...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] dark:border-cream-300 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-cream-100">Loading assessments...</p>
                 </div>
             </div>
         );
@@ -724,7 +725,7 @@ export default function Test() {
 
     if (testCompleted && testResults) {
         return (
-            <div className="min-h-screen bg-gray-50 relative">
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
                 <AnimatedBackground />
                 <div className="max-w-4xl mx-auto px-6 py-8">
                     {/* Results Header */}
