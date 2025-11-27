@@ -18,6 +18,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [showRoadmapModal, setShowRoadmapModal] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [quizStats, setQuizStats] = useState(null);
 
     // Helper function to map roadmap names
     const getRoadmapKey = (roadmap) => {
@@ -56,7 +57,7 @@ export default function Dashboard() {
                     const roadmapKey = getRoadmapKey(userData.user.selectedRoadmap);
 
                     // Fetch all data in parallel to reduce loading time
-                    const [learnerRes, testRes, statsRes, completionsRes, analysisRes] = await Promise.allSettled([
+                    const [learnerRes, testRes, statsRes, completionsRes, analysisRes, quizStatsRes] = await Promise.allSettled([
                         fetch("http://localhost:3000/api/learners/me", {
                             method: "GET",
                             credentials: "include",
@@ -90,6 +91,14 @@ export default function Dashboard() {
                             }
                         }),
                         fetch(`http://localhost:3000/api/test-results/analysis/weak-areas?roadmapType=${roadmapKey}`, {
+                            method: "GET",
+                            credentials: "include",
+                            headers: {
+                                'Cache-Control': 'no-cache',
+                                'Pragma': 'no-cache'
+                            }
+                        }),
+                        fetch("http://localhost:3000/api/quiz/stats", {
                             method: "GET",
                             credentials: "include",
                             headers: {
@@ -138,6 +147,15 @@ export default function Dashboard() {
                         const analysisData = await analysisRes.value.json();
                         if (analysisData.success) {
                             setWeakAreasAnalysis(analysisData.data);
+                        }
+                    }
+
+                    // Process quiz statistics
+                    if (quizStatsRes.status === 'fulfilled' && quizStatsRes.value.ok) {
+                        const quizData = await quizStatsRes.value.json();
+                        console.log('Dashboard - Quiz stats data:', quizData);
+                        if (quizData.success) {
+                            setQuizStats(quizData.stats);
                         }
                     }
 
@@ -235,11 +253,11 @@ export default function Dashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative flex items-center justify-center">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 relative flex items-center justify-center transition-colors duration-200">
                 <AnimatedBackground />
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] dark:border-cream-300 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-cream-100">Loading your dashboard...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
                 </div>
             </div>
         );
@@ -260,67 +278,67 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative transition-colors duration-300">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 relative transition-colors duration-200">
             <AnimatedBackground />
             {/* ================= HEADER ================= */}
-            <header className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-dark-300">
+            <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#344F1F] dark:bg-cream-500 rounded-lg flex items-center justify-center">
-                                    <BookOpen className="w-5 h-5 text-white dark:text-dark-500" />
+                                <div className="w-8 h-8 bg-[#344F1F] rounded-lg flex items-center justify-center">
+                                    <BookOpen className="w-5 h-5 text-white" />
                                 </div>
-                                <h1 className="text-xl font-semibold text-gray-900 dark:text-cream-100">Learning.AI</h1>
+                                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Learning.AI</h1>
                             </div>
                         </div>
 
                         <nav className="hidden md:flex space-x-8">
                             <button
                                 onClick={() => navigate("/dashboard")}
-                                className="text-[#344F1F] dark:text-cream-300 font-medium border-b-2 border-[#344F1F] dark:border-cream-300 pb-1"
+                                className="text-[#344F1F] font-medium border-b-2 border-[#344F1F] pb-1"
                             >
                                 Dashboard
                             </button>
                             <button
                                 onClick={() => navigate("/learn")}
-                                className="text-gray-500 dark:text-cream-200/70 hover:text-[#344F1F] dark:hover:text-cream-200 font-medium transition-colors"
+                                className="text-gray-500 hover:text-[#344F1F] font-medium transition-colors"
                             >
                                 Learn
                             </button>
                             <button
                                 onClick={() => navigate("/test")}
-                                className="text-gray-500 dark:text-cream-200/70 hover:text-[#344F1F] dark:hover:text-cream-200 font-medium transition-colors"
+                                className="text-gray-500 hover:text-[#344F1F] font-medium transition-colors"
                             >
                                 Tests
                             </button>
                             <button
                                 onClick={() => navigate("/quiz-selection")}
-                                className="text-gray-500 dark:text-cream-200/70 hover:text-[#344F1F] dark:hover:text-cream-200 font-medium transition-colors"
+                                className="text-gray-500 hover:text-[#344F1F] font-medium transition-colors"
                             >
                                 Quiz
                             </button>
                             <button
                                 onClick={() => navigate("/profile")}
-                                className="text-gray-500 dark:text-cream-200/70 hover:text-[#344F1F] dark:hover:text-cream-200 font-medium transition-colors"
+                                className="text-gray-500 hover:text-[#344F1F] font-medium transition-colors"
                             >
                                 Profile
                             </button>
                         </nav>
 
                         <div className="flex items-center gap-4">
+                            <ThemeToggle />
                             {user && (
                                 <div className="hidden md:block text-right">
-                                    <p className="text-sm font-medium text-gray-700 dark:text-cream-200">
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {user.name?.split(" ")[0]}
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-cream-300/70">{user.selectedRoadmap ? getRoadmapTitle(user.selectedRoadmap) : 'Learning Path'}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{user.selectedRoadmap ? getRoadmapTitle(user.selectedRoadmap) : 'Learning Path'}</p>
                                 </div>
                             )}
-                            <ThemeToggle />
                             <button
                                 onClick={refreshData}
-                                className="p-2 text-gray-400 dark:text-cream-300/70 hover:text-gray-600 dark:hover:text-cream-200 transition-colors"
+                                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                                 title="Refresh data"
                             >
                                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -364,13 +382,13 @@ export default function Dashboard() {
             {/* ================= INTRO ================= */}
             <div className="w-[90%] md:w-3/4 mt-8 text-left">
                 {user ? (
-                    <h2 className="text-2xl font-semibold text-gray-800 dark:text-cream-100">
+                    <h2 className="text-2xl font-semibold text-gray-800">
                         Welcome back, {user.name?.split(" ")[0]}! 👋
                     </h2>
                 ) : (
-                    <h2 className="text-2xl font-semibold text-gray-800 dark:text-cream-100">Loading user...</h2>
+                    <h2 className="text-2xl font-semibold text-gray-800">Loading user...</h2>
                 )}
-                <p className="text-gray-600 dark:text-cream-200/70 mt-1">
+                <p className="text-gray-600 mt-1">
                     Here’s what’s happening with your learners today.
                 </p>
             </div>
@@ -379,50 +397,101 @@ export default function Dashboard() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Stats Overview Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-gradient-to-r from-cream-400 to-cream-500 dark:from-cream-500 dark:to-cream-600 rounded-xl shadow-lg p-6 text-white dark:text-dark-500">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-cream-100 dark:text-dark-400 text-sm font-medium">Tests Completed</p>
+                                <p className="text-blue-100 text-sm font-medium">Tests Completed</p>
                                 <p className="text-3xl font-bold">{testStats?.totalTests || 0}</p>
                             </div>
-                            <div className="bg-cream-300 dark:bg-cream-400 bg-opacity-30 rounded-lg p-3">
+                            <div className="bg-blue-400 bg-opacity-30 rounded-lg p-3">
                                 <Target className="w-8 h-8" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-gradient-to-r from-cream-400 to-cream-500 dark:from-cream-500 dark:to-cream-600 rounded-xl shadow-lg p-6 text-white dark:text-dark-500">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-cream-100 dark:text-dark-400 text-sm font-medium">Average Score</p>
+                                <p className="text-green-100 text-sm font-medium">Average Score</p>
                                 <p className="text-3xl font-bold">{testStats?.averageScore || 0}%</p>
                             </div>
-                            <div className="bg-cream-300 dark:bg-cream-400 bg-opacity-30 rounded-lg p-3">
+                            <div className="bg-green-400 bg-opacity-30 rounded-lg p-3">
                                 <TrendingUp className="w-8 h-8" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-gradient-to-r from-cream-400 to-cream-500 dark:from-cream-500 dark:to-cream-600 rounded-xl shadow-lg p-6 text-white dark:text-dark-500">
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-cream-100 dark:text-dark-400 text-sm font-medium">Best Score</p>
+                                <p className="text-purple-100 text-sm font-medium">Best Score</p>
                                 <p className="text-3xl font-bold">{testStats?.bestScore || 0}%</p>
                             </div>
-                            <div className="bg-cream-300 dark:bg-cream-400 bg-opacity-30 rounded-lg p-3">
+                            <div className="bg-purple-400 bg-opacity-30 rounded-lg p-3">
                                 <Trophy className="w-8 h-8" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-gradient-to-r from-cream-400 to-cream-500 dark:from-cream-500 dark:to-cream-600 rounded-xl shadow-lg p-6 text-white dark:text-dark-500">
+                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-cream-100 dark:text-dark-400 text-sm font-medium">Study Time</p>
+                                <p className="text-orange-100 text-sm font-medium">Study Time</p>
                                 <p className="text-3xl font-bold">{testStats?.totalTimeSpent ? `${Math.round(testStats.totalTimeSpent / 60)}m` : '0m'}</p>
                             </div>
-                            <div className="bg-cream-300 dark:bg-cream-400 bg-opacity-30 rounded-lg p-3">
+                            <div className="bg-orange-400 bg-opacity-30 rounded-lg p-3">
                                 <Clock className="w-8 h-8" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Quiz Stats Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-indigo-100 text-sm font-medium">Quizzes Taken</p>
+                                <p className="text-3xl font-bold">{quizStats?.totalQuizzes || 0}</p>
+                            </div>
+                            <div className="bg-indigo-400 bg-opacity-30 rounded-lg p-3">
+                                <Brain className="w-8 h-8" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-pink-100 text-sm font-medium">Quiz Accuracy</p>
+                                <p className="text-3xl font-bold">{quizStats?.averageAccuracy || 0}%</p>
+                            </div>
+                            <div className="bg-pink-400 bg-opacity-30 rounded-lg p-3">
+                                <Target className="w-8 h-8" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-teal-100 text-sm font-medium">Quiz Points</p>
+                                <p className="text-3xl font-bold">{quizStats?.totalPoints || 0}</p>
+                            </div>
+                            <div className="bg-teal-400 bg-opacity-30 rounded-lg p-3">
+                                <Award className="w-8 h-8" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-cyan-100 text-sm font-medium">Current Streak</p>
+                                <p className="text-3xl font-bold">{quizStats?.currentStreak || 0}</p>
+                            </div>
+                            <div className="bg-cyan-400 bg-opacity-30 rounded-lg p-3">
+                                <Trophy className="w-8 h-8" />
                             </div>
                         </div>
                     </div>
@@ -430,24 +499,24 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                     {/* ========== CURRENT LEARNING PATH ========== */}
-                    <div className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md rounded-xl shadow-lg dark:shadow-glass-dark border border-gray-100 dark:border-dark-300 p-6">
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-cream-100">Current Learning Path</h3>
-                            <BookOpen className="w-6 h-6 text-[#344F1F] dark:text-cream-400" />
+                            <h3 className="text-xl font-bold text-gray-900">Current Learning Path</h3>
+                            <BookOpen className="w-6 h-6 text-[#344F1F]" />
                         </div>
                         {user?.selectedRoadmap ? (
                             <div className="space-y-6">
-                                <div className="bg-gradient-to-r from-[#344F1F] to-[#4a6b2a] dark:from-cream-500 dark:to-cream-600 rounded-lg p-4 text-white dark:text-dark-500">
+                                <div className="bg-gradient-to-r from-[#344F1F] to-[#4a6b2a] rounded-lg p-4 text-white">
                                     <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-3 h-3 bg-white dark:bg-dark-500 rounded-full animate-pulse"></div>
+                                        <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                                         <span className="font-semibold">Active Path</span>
                                     </div>
                                     <h4 className="text-lg font-bold mb-2">{getRoadmapTitle(user.selectedRoadmap)}</h4>
                                     <div className="flex items-center gap-4 text-sm opacity-90">
-                                        <span className="bg-white dark:bg-dark-500 bg-opacity-20 dark:bg-opacity-30 px-2 py-1 rounded">
+                                        <span className="bg-white bg-opacity-20 px-2 py-1 rounded">
                                             {user.skillLevel?.charAt(0).toUpperCase() + user.skillLevel?.slice(1)} Level
                                         </span>
-                                        <span className="bg-white dark:bg-dark-500 bg-opacity-20 dark:bg-opacity-30 px-2 py-1 rounded">
+                                        <span className="bg-white bg-opacity-20 px-2 py-1 rounded">
                                             {user.learningTimeline?.replace('-', ' ')}
                                         </span>
                                     </div>
@@ -561,6 +630,66 @@ export default function Dashboard() {
                         )}
                     </div>
 
+                    {/* ========== QUIZ PERFORMANCE ========== */}
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-gray-900">Quiz Performance</h3>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => navigate("/quiz-dashboard")}
+                                    className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
+                                >
+                                    View Details
+                                </button>
+                                <Brain className="w-6 h-6 text-[#344F1F]" />
+                            </div>
+                        </div>
+                        {quizStats && quizStats.totalQuizzes > 0 ? (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg p-4 text-center">
+                                        <div className="text-2xl font-bold text-indigo-600">{quizStats.totalQuizzes}</div>
+                                        <div className="text-sm text-gray-600">Quizzes Taken</div>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4 text-center">
+                                        <div className="text-2xl font-bold text-green-600">{quizStats.averageAccuracy}%</div>
+                                        <div className="text-sm text-gray-600">Accuracy</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4 text-center">
+                                        <div className="text-2xl font-bold text-purple-600">{quizStats.totalPoints}</div>
+                                        <div className="text-sm text-gray-600">Points Earned</div>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg p-4 text-center">
+                                        <div className="text-2xl font-bold text-orange-600">{quizStats.currentStreak}</div>
+                                        <div className="text-sm text-gray-600">Current Streak</div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => navigate("/quiz-selection")}
+                                    className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200"
+                                >
+                                    Take New Quiz
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Brain className="w-8 h-8 text-indigo-500" />
+                                </div>
+                                <h4 className="text-lg font-semibold text-gray-700 mb-2">No Quizzes Taken</h4>
+                                <p className="text-gray-500 mb-6">Start with our intelligent quiz system to track your progress</p>
+                                <button
+                                    onClick={() => navigate("/quiz-selection")}
+                                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                >
+                                    Start First Quiz
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     {/* ========== AI INSIGHTS & ANALYTICS ========== */}
                     <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
                         <div className="flex items-center justify-between mb-6">
@@ -642,13 +771,75 @@ export default function Dashboard() {
 
                 </div>
 
+                {/* ========== QUIZ STATISTICS (NEW) ========== */}
+                {quizStats && quizStats.totalTests > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-bold text-gray-900">Quiz Performance</h3>
+                            <button
+                                onClick={() => navigate('/quiz-start')}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+                            >
+                                Take Quiz
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-blue-50 rounded-lg p-4 text-center">
+                                <div className="text-3xl font-bold text-blue-600">{quizStats.totalTests}</div>
+                                <div className="text-sm text-gray-600 mt-1">Quizzes Taken</div>
+                            </div>
+                            <div className="bg-green-50 rounded-lg p-4 text-center">
+                                <div className="text-3xl font-bold text-green-600">{quizStats.totalCorrect}</div>
+                                <div className="text-sm text-gray-600 mt-1">Correct Answers</div>
+                            </div>
+                            <div className="bg-purple-50 rounded-lg p-4 text-center">
+                                <div className="text-3xl font-bold text-purple-600">{quizStats.averageScore}%</div>
+                                <div className="text-sm text-gray-600 mt-1">Average Score</div>
+                            </div>
+                            <div className="bg-orange-50 rounded-lg p-4 text-center">
+                                <div className="text-3xl font-bold text-orange-600">{quizStats.totalQuestions}</div>
+                                <div className="text-sm text-gray-600 mt-1">Total Questions</div>
+                            </div>
+                        </div>
+
+                        {quizStats.categoryStats && Object.keys(quizStats.categoryStats).length > 0 && (
+                            <div>
+                                <h4 className="font-semibold text-gray-800 mb-3">Performance by Topic</h4>
+                                <div className="space-y-2">
+                                    {Object.entries(quizStats.categoryStats).slice(0, 4).map(([category, stats]) => (
+                                        <div key={category} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                                                <span className="font-medium text-gray-700 capitalize">{category}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-sm text-gray-600">{stats.count} tests</span>
+                                                <span className={`font-bold ${stats.avgScore >= 75 ? 'text-green-600' : stats.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                    {stats.avgScore}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => navigate('/quiz-history')}
+                                    className="w-full mt-4 py-2 text-indigo-600 hover:text-indigo-700 font-medium"
+                                >
+                                    View Full History →
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ========== QUICK ACTIONS ========== */}
-                <div className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md rounded-xl shadow-lg dark:shadow-glass-dark border border-gray-100 dark:border-dark-300 p-8">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-cream-100 mb-8 text-center">Quick Actions</h3>
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-8 text-center">Quick Actions</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <button
                             onClick={() => navigate("/learn")}
-                            className="group relative overflow-hidden bg-gradient-to-br from-[#344F1F] to-[#4a6b2a] dark:from-cream-500 dark:to-cream-600 text-white dark:text-dark-500 rounded-xl p-6 hover:from-[#2a3f1a] hover:to-[#3a5520] dark:hover:from-cream-400 dark:hover:to-cream-500 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+                            className="group relative overflow-hidden bg-gradient-to-br from-[#344F1F] to-[#4a6b2a] text-white rounded-xl p-6 hover:from-[#2a3f1a] hover:to-[#3a5520] transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
                         >
                             <div className="absolute top-0 right-0 w-20 h-20 bg-white bg-opacity-10 rounded-full -mr-10 -mt-10"></div>
                             <BookOpen className="w-8 h-8 mb-4 relative z-10" />
@@ -670,24 +861,24 @@ export default function Dashboard() {
                         </button>
                         <button
                             onClick={() => navigate("/quiz-selection")}
-                            className="group relative overflow-hidden bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 hover:from-purple-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+                            className="group relative overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-6 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
                         >
                             <div className="absolute top-0 right-0 w-20 h-20 bg-white bg-opacity-10 rounded-full -mr-10 -mt-10"></div>
                             <Brain className="w-8 h-8 mb-4 relative z-10" />
                             <div className="text-left relative z-10">
-                                <div className="font-bold text-lg mb-1">Start Quiz</div>
-                                <div className="text-sm opacity-90">Practice & learn</div>
+                                <div className="font-bold text-lg mb-1">Interactive Quiz</div>
+                                <div className="text-sm opacity-90">Dynamic MCQ Engine</div>
                             </div>
                         </button>
                         <button
-                            onClick={() => navigate("/profile")}
+                            onClick={() => setShowRoadmapModal(true)}
                             className="group relative overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-6 hover:from-orange-600 hover:to-orange-700 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
                         >
                             <div className="absolute top-0 right-0 w-20 h-20 bg-white bg-opacity-10 rounded-full -mr-10 -mt-10"></div>
-                            <User className="w-8 h-8 mb-4 relative z-10" />
+                            <TrendingUp className="w-8 h-8 mb-4 relative z-10" />
                             <div className="text-left relative z-10">
-                                <div className="font-bold text-lg mb-1">View Profile</div>
-                                <div className="text-sm opacity-90">Check progress</div>
+                                <div className="font-bold text-lg mb-1">Change Path</div>
+                                <div className="text-sm opacity-90">Switch roadmap</div>
                             </div>
                         </button>
                     </div>
@@ -695,7 +886,7 @@ export default function Dashboard() {
             </main>
 
             {/* Footer */}
-            <footer className="bg-white/90 dark:bg-dark-400/50 backdrop-blur-md border-t border-gray-200 dark:border-dark-300 mt-12">
+            <footer className="bg-white border-t border-gray-200 mt-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                     {user && (
                         <div className="text-center text-sm text-gray-500">
