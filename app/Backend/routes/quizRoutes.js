@@ -11,13 +11,13 @@ const authMiddleware = require('../middleware/authMiddleware');
 router.post('/create', authMiddleware, async (req, res) => {
   try {
     const { roadmapType, difficulty, questionCount = 20, timeLimit = 30, adaptiveDifficulty = false } = req.body;
-    
+
     // Get user performance data for adaptive selection
     let userPerformance = await UserPerformance.findOne({
       userId: req.user.id,
       roadmapType
     });
-    
+
     if (!userPerformance) {
       userPerformance = new UserPerformance({
         userId: req.user.id,
@@ -25,15 +25,15 @@ router.post('/create', authMiddleware, async (req, res) => {
       });
       await userPerformance.save();
     }
-    
+
     // Get question history to avoid repetition
     const questionHistory = await QuestionHistory.find({
       userId: req.user.id,
       roadmapType
     }).select('questionId');
-    
+
     const attemptedQuestionIds = new Set(questionHistory.map(h => h.questionId));
-    
+
     // Map roadmap names to question files
     const roadmapMapping = {
       'frontend': 'frontend',
@@ -45,18 +45,18 @@ router.post('/create', authMiddleware, async (req, res) => {
       'database': 'database-data-science',
       'cybersecurity': 'cybersecurity'
     };
-    
+
     const questionFile = roadmapMapping[roadmapType] || 'frontend';
     const questionsPath = path.join(__dirname, '../Questions', `${questionFile}.json`);
     const questionsData = await fs.readFile(questionsPath, 'utf8');
     const { questions: allQuestions } = JSON.parse(questionsData);
-    
+
     // Determine effective difficulty based on adaptive settings
     let effectiveDifficulty = difficulty;
     if (adaptiveDifficulty && userPerformance.overallStats.totalQuestions > 10) {
       effectiveDifficulty = userPerformance.adaptiveSettings.currentDifficultyLevel;
     }
-    
+
     // Smart question filtering with time-based freshness
     const now = new Date();
     const daysSinceAttempt = (questionId) => {
@@ -64,19 +64,19 @@ router.post('/create', authMiddleware, async (req, res) => {
       if (!history) return Infinity;
       return (now - new Date(history.lastAttempted)) / (1000 * 60 * 60 * 24);
     };
-    
+
     let availableQuestions = allQuestions.filter(q => {
       // Allow questions attempted more than 7 days ago
       const daysSince = daysSinceAttempt(q.questionId);
       if (attemptedQuestionIds.has(q.questionId) && daysSince < 7) return false;
-      
+
       // Filter by difficulty
       if (effectiveDifficulty !== 'mixed') {
         return q.difficulty === effectiveDifficulty;
       }
       return true;
     });
-    
+
     // If not enough fresh questions, include some previously attempted ones
     if (availableQuestions.length < questionCount) {
       const additionalQuestions = allQuestions.filter(q => {
@@ -85,71 +85,98 @@ router.post('/create', authMiddleware, async (req, res) => {
         }
         return attemptedQuestionIds.has(q.questionId);
       });
-      
+
       availableQuestions = [...availableQuestions, ...additionalQuestions];
     }
-    
+
     // Enhanced prioritization with spaced repetition
     const prioritizeQuestions = (questions) => {
       return questions.map(q => {
         let priority = 1;
         const history = questionHistory.find(h => h.questionId === q.questionId);
-        
+
         // Higher priority for incorrect answers (spaced repetition)
         if (history && !history.isCorrect) {
           const daysSince = daysSinceAttempt(q.questionId);
           if (daysSince >= 1) priority += 3; // Recently incorrect
           if (daysSince >= 3) priority += 2; // Needs review
         }
-        
+
         // Higher priority for weak topics
         if (userPerformance.overallStats.weakTopics.includes(q.topic)) {
           priority += 2;
         }
-        
+
         // Lower priority for strong topics (but still include some)
         if (userPerformance.overallStats.strongTopics.includes(q.topic)) {
           priority -= 1;
         }
-        
+
         return { ...q, priority };
       }).sort((a, b) => b.priority - a.priority);
     };
-    
+
     if (userPerformance.overallStats.totalQuestions > 5) {
       availableQuestions = prioritizeQuestions(availableQuestions);
-      
+
       // Smart distribution: 40% high priority, 40% medium, 20% random
       const highPriorityCount = Math.ceil(questionCount * 0.4);
       const mediumPriorityCount = Math.ceil(questionCount * 0.4);
       const randomCount = questionCount - highPriorityCount - mediumPriorityCount;
-      
+
       const highPriority = availableQuestions.slice(0, highPriorityCount);
       const mediumPriority = availableQuestions.slice(highPriorityCount, highPriorityCount + mediumPriorityCount);
       const randomQuestions = availableQuestions.slice(highPriorityCount + mediumPriorityCount)
         .sort(() => Math.random() - 0.5).slice(0, randomCount);
-      
+
       availableQuestions = [...highPriority, ...mediumPriority, ...randomQuestions];
     }
-    
+
     // Shuffle and limit questions
     const shuffledQuestions = availableQuestions
       .sort(() => Math.random() - 0.5)
       .slice(0, questionCount)
-      .map(q => ({
-        questionId: q.questionId,
-        question: q.question,
-        options: [...q.options].sort(() => Math.random() - 0.5), // Shuffle options
-        correctAnswer: q.answer,
-        topic: q.topic,
-        difficulty: q.difficulty,
-        explanation: q.explanation,
-        userAnswer: '',
-        isCorrect: false,
-        timeSpent: 0,
-        status: 'unanswered'
-      }));
-    
+      .map(q => {
+        // Handle different answer formats
+        let correctAnswer = q.answer;
+        let shuffledOptions = [...q.options];
+
+        // Check if answer is letter-based (A, B, C, D) and options have letter prefixes
+        if (/^[A-D]$/.test(q.answer)) {
+          // Find the option that starts with this letter
+          const matchingOption = q.options.find(option =>
+            option.startsWith(q.answer + '.')
+          );
+          if (matchingOption) {
+            correctAnswer = matchingOption;
+          } else {
+            // Fallback: Convert letter to index if no letter prefix found
+            const letterIndex = q.answer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+            if (letterIndex >= 0 && letterIndex < q.options.length) {
+              correctAnswer = q.options[letterIndex];
+            }
+          }
+        }
+
+        // Now shuffle the options
+        shuffledOptions = shuffledOptions.sort(() => Math.random() - 0.5);
+
+        return {
+          questionId: q.questionId,
+          question: q.question,
+          options: shuffledOptions,
+          correctAnswer: correctAnswer,
+          originalAnswer: q.answer, // Keep original for reference
+          topic: q.topic,
+          difficulty: q.difficulty,
+          explanation: q.explanation,
+          userAnswer: '',
+          isCorrect: false,
+          timeSpent: 0,
+          status: 'unanswered'
+        };
+      });
+
     const quiz = new Quiz({
       userId: req.user.id,
       title: `${roadmapType.charAt(0).toUpperCase() + roadmapType.slice(1)} Quiz - ${adaptiveDifficulty ? 'Adaptive' : effectiveDifficulty}`,
@@ -169,9 +196,9 @@ router.post('/create', authMiddleware, async (req, res) => {
         difficultyDropThreshold: 1
       } : undefined
     });
-    
+
     await quiz.save();
-    
+
     res.json({
       success: true,
       data: quiz,
@@ -182,7 +209,7 @@ router.post('/create', authMiddleware, async (req, res) => {
         freshQuestions: availableQuestions.length - attemptedQuestionIds.size
       }
     });
-    
+
   } catch (error) {
     console.error('Error creating quiz:', error);
     res.status(500).json({
@@ -199,19 +226,19 @@ router.get('/:id', authMiddleware, async (req, res) => {
       _id: req.params.id,
       userId: req.user.id
     });
-    
+
     if (!quiz) {
       return res.status(404).json({
         success: false,
         message: 'Quiz not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: quiz
     });
-    
+
   } catch (error) {
     console.error('Error fetching quiz:', error);
     res.status(500).json({
@@ -225,36 +252,44 @@ router.get('/:id', authMiddleware, async (req, res) => {
 router.put('/:id/answer', authMiddleware, async (req, res) => {
   try {
     const { questionIndex, answer, timeSpent } = req.body;
-    
+
     const quiz = await Quiz.findOne({
       _id: req.params.id,
       userId: req.user.id
     });
-    
+
     if (!quiz) {
       return res.status(404).json({
         success: false,
         message: 'Quiz not found'
       });
     }
-    
+
     let adaptiveChange = null;
-    
+
     if (questionIndex >= 0 && questionIndex < quiz.questions.length) {
       const question = quiz.questions[questionIndex];
       question.userAnswer = answer;
+
+      // Debug logging to see what's being compared
+      console.log('=== ANSWER COMPARISON DEBUG ===');
+      console.log('User answer:', answer);
+      console.log('Stored correctAnswer:', question.correctAnswer);
+      console.log('Original answer:', question.originalAnswer);
+      console.log('Question options:', question.options);
+
       question.isCorrect = answer === question.correctAnswer;
       question.timeSpent = timeSpent || 0;
       question.status = 'answered';
-      
+
       // Update quiz statistics immediately
       quiz.updateStats();
-      
+
       // Handle adaptive difficulty adjustment
       if (quiz.isAdaptive) {
         adaptiveChange = quiz.adjustAdaptiveDifficulty(questionIndex, question.isCorrect, timeSpent || 0);
       }
-      
+
       // Update question history
       try {
         const existingHistory = await QuestionHistory.findOne({
@@ -262,7 +297,7 @@ router.put('/:id/answer', authMiddleware, async (req, res) => {
           roadmapType: quiz.roadmapType,
           questionId: question.questionId
         });
-        
+
         if (existingHistory) {
           existingHistory.userAnswer = answer;
           existingHistory.isCorrect = question.isCorrect;
@@ -284,43 +319,43 @@ router.put('/:id/answer', authMiddleware, async (req, res) => {
           });
           await newHistory.save();
         }
-        
+
         // Update user performance
         let userPerformance = await UserPerformance.findOne({
           userId: req.user.id,
           roadmapType: quiz.roadmapType
         });
-        
+
         if (!userPerformance) {
           userPerformance = new UserPerformance({
             userId: req.user.id,
             roadmapType: quiz.roadmapType
           });
         }
-        
+
         userPerformance.updatePerformance({
           topic: question.topic,
           difficulty: question.difficulty,
           isCorrect: question.isCorrect,
           timeSpent: timeSpent || 0
         });
-        
+
         await userPerformance.save();
-        
+
       } catch (historyError) {
         console.error('Error updating question history:', historyError);
         // Don't fail the main request if history update fails
       }
-      
+
       await quiz.save();
     }
-    
+
     res.json({
       success: true,
       data: quiz,
       adaptiveChange
     });
-    
+
   } catch (error) {
     console.error('Error updating quiz answer:', error);
     res.status(500).json({
@@ -334,21 +369,21 @@ router.put('/:id/answer', authMiddleware, async (req, res) => {
 router.put('/:id/replace-question', authMiddleware, async (req, res) => {
   try {
     const { questionIndex } = req.body;
-    
+
     const quiz = await Quiz.findOne({
       _id: req.params.id,
       userId: req.user.id
     });
-    
+
     if (!quiz || !quiz.isAdaptive) {
       return res.status(400).json({
         success: false,
         message: 'Quiz not found or not adaptive'
       });
     }
-    
+
     const targetDifficulty = quiz.adaptiveSettings.currentDifficulty;
-    
+
     // Load question bank
     const roadmapMapping = {
       'frontend': 'frontend',
@@ -360,20 +395,20 @@ router.put('/:id/replace-question', authMiddleware, async (req, res) => {
       'database': 'database-data-science',
       'cybersecurity': 'cybersecurity'
     };
-    
+
     const questionFile = roadmapMapping[quiz.roadmapType] || 'frontend';
     const questionsPath = path.join(__dirname, '../Questions', `${questionFile}.json`);
     const questionsData = await fs.readFile(questionsPath, 'utf8');
     const { questions: allQuestions } = JSON.parse(questionsData);
-    
+
     // Get already used question IDs
     const usedQuestionIds = new Set(quiz.questions.map(q => q.questionId));
-    
+
     // Find questions matching the target difficulty
-    const availableQuestions = allQuestions.filter(q => 
+    const availableQuestions = allQuestions.filter(q =>
       q.difficulty === targetDifficulty && !usedQuestionIds.has(q.questionId)
     );
-    
+
     if (availableQuestions.length === 0) {
       return res.json({
         success: true,
@@ -381,17 +416,42 @@ router.put('/:id/replace-question', authMiddleware, async (req, res) => {
         replaced: false
       });
     }
-    
+
     // Select a random question
     const selectedQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
-    
+
     // Replace the question at the specified index
     if (questionIndex >= 0 && questionIndex < quiz.questions.length) {
+      // Handle different answer formats
+      let correctAnswer = selectedQuestion.answer;
+      let shuffledOptions = [...selectedQuestion.options];
+
+      // Check if answer is letter-based (A, B, C, D) and options have letter prefixes
+      if (/^[A-D]$/.test(selectedQuestion.answer)) {
+        // Find the option that starts with this letter
+        const matchingOption = selectedQuestion.options.find(option =>
+          option.startsWith(selectedQuestion.answer + '.')
+        );
+        if (matchingOption) {
+          correctAnswer = matchingOption;
+        } else {
+          // Fallback: Convert letter to index if no letter prefix found
+          const letterIndex = selectedQuestion.answer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+          if (letterIndex >= 0 && letterIndex < selectedQuestion.options.length) {
+            correctAnswer = selectedQuestion.options[letterIndex];
+          }
+        }
+      }
+
+      // Now shuffle the options
+      shuffledOptions = shuffledOptions.sort(() => Math.random() - 0.5);
+
       quiz.questions[questionIndex] = {
         questionId: selectedQuestion.questionId,
         question: selectedQuestion.question,
-        options: [...selectedQuestion.options].sort(() => Math.random() - 0.5),
-        correctAnswer: selectedQuestion.answer,
+        options: shuffledOptions,
+        correctAnswer: correctAnswer,
+        originalAnswer: selectedQuestion.answer,
         topic: selectedQuestion.topic,
         difficulty: selectedQuestion.difficulty,
         explanation: selectedQuestion.explanation,
@@ -402,9 +462,9 @@ router.put('/:id/replace-question', authMiddleware, async (req, res) => {
         adaptiveDifficultyAtTime: targetDifficulty,
         status: 'unanswered'
       };
-      
+
       await quiz.save();
-      
+
       res.json({
         success: true,
         data: quiz,
@@ -417,7 +477,7 @@ router.put('/:id/replace-question', authMiddleware, async (req, res) => {
         message: 'Invalid question index'
       });
     }
-    
+
   } catch (error) {
     console.error('Error replacing question:', error);
     res.status(500).json({
@@ -434,14 +494,14 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
       _id: req.params.id,
       userId: req.user.id
     });
-    
+
     if (!quiz) {
       return res.status(404).json({
         success: false,
         message: 'Quiz not found'
       });
     }
-    
+
     if (!quiz.isAdaptive) {
       return res.json({
         success: true,
@@ -449,10 +509,10 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
         nextQuestion: null
       });
     }
-    
+
     const currentIndex = quiz.currentQuestionIndex;
     const targetDifficulty = quiz.adaptiveSettings.currentDifficulty;
-    
+
     // Load question bank for the roadmap
     const roadmapMapping = {
       'frontend': 'frontend',
@@ -464,20 +524,20 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
       'database': 'database-data-science',
       'cybersecurity': 'cybersecurity'
     };
-    
+
     const questionFile = roadmapMapping[quiz.roadmapType] || 'frontend';
     const questionsPath = path.join(__dirname, '../Questions', `${questionFile}.json`);
     const questionsData = await fs.readFile(questionsPath, 'utf8');
     const { questions: allQuestions } = JSON.parse(questionsData);
-    
+
     // Get already used question IDs
     const usedQuestionIds = new Set(quiz.questions.map(q => q.questionId));
-    
+
     // Find questions matching the current adaptive difficulty
-    const availableQuestions = allQuestions.filter(q => 
+    const availableQuestions = allQuestions.filter(q =>
       q.difficulty === targetDifficulty && !usedQuestionIds.has(q.questionId)
     );
-    
+
     if (availableQuestions.length === 0) {
       // Fallback to any difficulty if no questions available at target difficulty
       const fallbackQuestions = allQuestions.filter(q => !usedQuestionIds.has(q.questionId));
@@ -488,14 +548,40 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
           nextQuestion: null
         });
       }
-      
+
       // Select a random fallback question
       const randomQuestion = fallbackQuestions[Math.floor(Math.random() * fallbackQuestions.length)];
+
+      // Handle different answer formats
+      let correctAnswer = randomQuestion.answer;
+      let shuffledOptions = [...randomQuestion.options];
+
+      // Check if answer is letter-based (A, B, C, D) and options have letter prefixes
+      if (/^[A-D]$/.test(randomQuestion.answer)) {
+        // Find the option that starts with this letter
+        const matchingOption = randomQuestion.options.find(option =>
+          option.startsWith(randomQuestion.answer + '.')
+        );
+        if (matchingOption) {
+          correctAnswer = matchingOption;
+        } else {
+          // Fallback: Convert letter to index if no letter prefix found
+          const letterIndex = randomQuestion.answer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+          if (letterIndex >= 0 && letterIndex < randomQuestion.options.length) {
+            correctAnswer = randomQuestion.options[letterIndex];
+          }
+        }
+      }
+
+      // Now shuffle the options
+      shuffledOptions = shuffledOptions.sort(() => Math.random() - 0.5);
+
       const adaptiveQuestion = {
         questionId: randomQuestion.questionId,
         question: randomQuestion.question,
-        options: [...randomQuestion.options].sort(() => Math.random() - 0.5),
-        correctAnswer: randomQuestion.answer,
+        options: shuffledOptions,
+        correctAnswer: correctAnswer,
+        originalAnswer: randomQuestion.answer,
         topic: randomQuestion.topic,
         difficulty: randomQuestion.difficulty,
         explanation: randomQuestion.explanation,
@@ -506,7 +592,7 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
         adaptiveDifficultyAtTime: targetDifficulty,
         status: 'unanswered'
       };
-      
+
       return res.json({
         success: true,
         nextQuestion: adaptiveQuestion,
@@ -517,14 +603,40 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
         }
       });
     }
-    
+
     // Select a random question from available ones at target difficulty
     const selectedQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+
+    // Handle different answer formats
+    let correctAnswer = selectedQuestion.answer;
+    let shuffledOptions = [...selectedQuestion.options];
+
+    // Check if answer is letter-based (A, B, C, D) and options have letter prefixes
+    if (/^[A-D]$/.test(selectedQuestion.answer)) {
+      // Find the option that starts with this letter
+      const matchingOption = selectedQuestion.options.find(option =>
+        option.startsWith(selectedQuestion.answer + '.')
+      );
+      if (matchingOption) {
+        correctAnswer = matchingOption;
+      } else {
+        // Fallback: Convert letter to index if no letter prefix found
+        const letterIndex = selectedQuestion.answer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+        if (letterIndex >= 0 && letterIndex < selectedQuestion.options.length) {
+          correctAnswer = selectedQuestion.options[letterIndex];
+        }
+      }
+    }
+
+    // Now shuffle the options
+    shuffledOptions = shuffledOptions.sort(() => Math.random() - 0.5);
+
     const adaptiveQuestion = {
       questionId: selectedQuestion.questionId,
       question: selectedQuestion.question,
-      options: [...selectedQuestion.options].sort(() => Math.random() - 0.5),
-      correctAnswer: selectedQuestion.answer,
+      options: shuffledOptions,
+      correctAnswer: correctAnswer,
+      originalAnswer: selectedQuestion.answer,
       topic: selectedQuestion.topic,
       difficulty: selectedQuestion.difficulty,
       explanation: selectedQuestion.explanation,
@@ -535,7 +647,7 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
       adaptiveDifficultyAtTime: targetDifficulty,
       status: 'unanswered'
     };
-    
+
     res.json({
       success: true,
       nextQuestion: adaptiveQuestion,
@@ -546,7 +658,7 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
         availableCount: availableQuestions.length
       }
     });
-    
+
   } catch (error) {
     console.error('Error getting next adaptive question:', error);
     res.status(500).json({
@@ -560,29 +672,29 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
 router.put('/:id/skip', authMiddleware, async (req, res) => {
   try {
     const { questionIndex } = req.body;
-    
+
     const quiz = await Quiz.findOne({
       _id: req.params.id,
       userId: req.user.id
     });
-    
+
     if (!quiz) {
       return res.status(404).json({
         success: false,
         message: 'Quiz not found'
       });
     }
-    
+
     if (questionIndex >= 0 && questionIndex < quiz.questions.length) {
       quiz.questions[questionIndex].status = 'skipped';
       await quiz.save();
     }
-    
+
     res.json({
       success: true,
       data: quiz
     });
-    
+
   } catch (error) {
     console.error('Error skipping question:', error);
     res.status(500).json({
@@ -599,23 +711,105 @@ router.put('/:id/complete', authMiddleware, async (req, res) => {
       _id: req.params.id,
       userId: req.user.id
     });
-    
+
     if (!quiz) {
       return res.status(404).json({
         success: false,
         message: 'Quiz not found'
       });
     }
-    
+
     quiz.status = 'completed';
     quiz.completedAt = new Date();
     await quiz.save();
-    
+
+    // Save test result for dashboard display
+    try {
+      const TestResult = require('../models/TestResult');
+      const TestCompletion = require('../models/TestCompletion');
+
+      // Build detailed results from quiz questions
+      const detailedResults = quiz.questions.map(q => ({
+        question: q.question,
+        userAnswer: q.userAnswer || '',
+        correctAnswer: q.correctAnswer,
+        isCorrect: q.isCorrect || false,
+        topic: q.topic,
+        difficulty: q.difficulty,
+        timeSpent: q.timeSpent || 0
+      }));
+
+      // Map roadmapType to full roadmap name for consistency
+      const roadmapMapping = {
+        'frontend': 'frontend-development',
+        'backend': 'backend-development',
+        'full-stack': 'full-stack-development',
+        'mobile': 'mobile-development',
+        'ai-ml': 'ai-machine-learning',
+        'devops': 'devops-cloud',
+        'database': 'database-data-science',
+        'cybersecurity': 'cybersecurity'
+      };
+
+      const roadmapType = roadmapMapping[quiz.roadmapType] || quiz.roadmapType;
+
+      // Calculate time spent in seconds
+      const timeSpent = quiz.completedAt ?
+        Math.floor((new Date(quiz.completedAt) - new Date(quiz.startedAt)) / 1000) : 0;
+
+      // Create test result
+      const testResult = new TestResult({
+        userId: req.user.id,
+        roadmapType: roadmapType,
+        testCategory: quiz.title || 'Quiz',
+        difficulty: quiz.difficulty || 'mixed',
+        score: quiz.accuracy || 0,
+        correctAnswers: quiz.correctAnswers || 0,
+        totalQuestions: quiz.totalQuestions || quiz.questions.length,
+        timeSpent: timeSpent,
+        timeTaken: timeSpent,
+        detailedResults: detailedResults
+      });
+
+      await testResult.save();
+      console.log('Test result saved for quiz completion:', testResult._id);
+
+      // Update or create test completion record
+      const existingCompletion = await TestCompletion.findOne({
+        userId: req.user.id,
+        roadmapType: roadmapType,
+        testCategory: quiz.title || 'Quiz',
+        difficulty: quiz.difficulty || 'mixed'
+      });
+
+      if (existingCompletion) {
+        existingCompletion.bestScore = Math.max(existingCompletion.bestScore, quiz.accuracy || 0);
+        existingCompletion.attemptCount += 1;
+        existingCompletion.lastAttemptDate = new Date();
+        await existingCompletion.save();
+        console.log('Test completion updated:', existingCompletion._id);
+      } else {
+        const newCompletion = new TestCompletion({
+          userId: req.user.id,
+          roadmapType: roadmapType,
+          testCategory: quiz.title || 'Quiz',
+          difficulty: quiz.difficulty || 'mixed',
+          bestScore: quiz.accuracy || 0,
+          attemptCount: 1
+        });
+        await newCompletion.save();
+        console.log('Test completion created:', newCompletion._id);
+      }
+    } catch (resultError) {
+      console.error('Error saving quiz test result:', resultError);
+      // Don't fail the quiz completion if result saving fails
+    }
+
     res.json({
       success: true,
       data: quiz
     });
-    
+
   } catch (error) {
     console.error('Error completing quiz:', error);
     res.status(500).json({
@@ -629,22 +823,22 @@ router.put('/:id/complete', authMiddleware, async (req, res) => {
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const { limit = 10, status } = req.query;
-    
+
     const query = { userId: req.user.id };
     if (status) {
       query.status = status;
     }
-    
+
     const quizzes = await Quiz.find(query)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .select('-questions.explanation'); // Exclude explanations for list view
-    
+
     res.json({
       success: true,
       data: quizzes
     });
-    
+
   } catch (error) {
     console.error('Error fetching quiz history:', error);
     res.status(500).json({
@@ -658,25 +852,25 @@ router.get('/', authMiddleware, async (req, res) => {
 router.get('/preview', authMiddleware, async (req, res) => {
   try {
     const { roadmapType, difficulty, questionCount = 10 } = req.query;
-    
+
     // Get user performance and history
     const [userPerformance, questionHistory] = await Promise.all([
       UserPerformance.findOne({ userId: req.user.id, roadmapType }),
       QuestionHistory.find({ userId: req.user.id, roadmapType }).select('questionId lastAttempted isCorrect topic')
     ]);
-    
+
     // Load questions
     const roadmapMapping = {
       'frontend': 'frontend', 'backend': 'backend', 'full-stack': 'full-stack',
       'mobile': 'mobile-app', 'ai-ml': 'ai-machine-learning', 'devops': 'devops-cloud',
       'database': 'database-data-science', 'cybersecurity': 'cybersecurity'
     };
-    
+
     const questionFile = roadmapMapping[roadmapType] || 'frontend';
     const questionsPath = path.join(__dirname, '../Questions', `${questionFile}.json`);
     const questionsData = await fs.readFile(questionsPath, 'utf8');
     const { questions: allQuestions } = JSON.parse(questionsData);
-    
+
     // Analyze what questions would be selected
     const attemptedQuestionIds = new Set(questionHistory.map(h => h.questionId));
     const freshQuestions = allQuestions.filter(q => !attemptedQuestionIds.has(q.questionId));
@@ -684,7 +878,7 @@ router.get('/preview', authMiddleware, async (req, res) => {
       const history = questionHistory.find(h => h.questionId === q.questionId);
       return history && !history.isCorrect;
     });
-    
+
     const topicDistribution = {};
     allQuestions.forEach(q => {
       if (!topicDistribution[q.topic]) topicDistribution[q.topic] = { total: 0, fresh: 0, review: 0 };
@@ -692,7 +886,7 @@ router.get('/preview', authMiddleware, async (req, res) => {
       if (!attemptedQuestionIds.has(q.questionId)) topicDistribution[q.topic].fresh++;
       if (reviewQuestions.find(rq => rq.questionId === q.questionId)) topicDistribution[q.topic].review++;
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -708,7 +902,7 @@ router.get('/preview', authMiddleware, async (req, res) => {
         } : null
       }
     });
-    
+
   } catch (error) {
     console.error('Error getting question preview:', error);
     res.status(500).json({ success: false, message: 'Failed to get preview' });
@@ -719,12 +913,12 @@ router.get('/preview', authMiddleware, async (req, res) => {
 router.get('/recommendations', authMiddleware, async (req, res) => {
   try {
     const { roadmapType } = req.query;
-    
+
     const userPerformance = await UserPerformance.findOne({
       userId: req.user.id,
       roadmapType: roadmapType || 'frontend'
     });
-    
+
     if (!userPerformance) {
       return res.json({
         success: true,
@@ -736,24 +930,24 @@ router.get('/recommendations', authMiddleware, async (req, res) => {
         }
       });
     }
-    
+
     const suggestions = [];
-    
+
     // Generate personalized suggestions
     if (userPerformance.overallStats.overallAccuracy >= 80) {
       suggestions.push('Great job! Consider trying harder questions to challenge yourself.');
     } else if (userPerformance.overallStats.overallAccuracy < 60) {
       suggestions.push('Focus on fundamentals. Practice more easy questions to build confidence.');
     }
-    
+
     if (userPerformance.overallStats.weakTopics.length > 0) {
       suggestions.push(`Work on: ${userPerformance.overallStats.weakTopics.slice(0, 3).join(', ')}`);
     }
-    
+
     if (userPerformance.overallStats.strongTopics.length > 0) {
       suggestions.push(`You excel in: ${userPerformance.overallStats.strongTopics.slice(0, 3).join(', ')}`);
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -768,7 +962,7 @@ router.get('/recommendations', authMiddleware, async (req, res) => {
         difficultyPerformance: userPerformance.difficultyPerformance
       }
     });
-    
+
   } catch (error) {
     console.error('Error getting recommendations:', error);
     res.status(500).json({
@@ -782,12 +976,12 @@ router.get('/recommendations', authMiddleware, async (req, res) => {
 router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
   try {
     const { roadmapType } = req.params;
-    
+
     const questionHistory = await QuestionHistory.find({
       userId: req.user.id,
       roadmapType
     });
-    
+
     const stats = {
       totalAttempted: questionHistory.length,
       correctAnswers: questionHistory.filter(q => q.isCorrect).length,
@@ -797,7 +991,7 @@ router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
         .sort((a, b) => new Date(b.lastAttempted) - new Date(a.lastAttempted))
         .slice(0, 10)
     };
-    
+
     // Calculate topic-wise stats
     questionHistory.forEach(q => {
       if (!stats.byTopic[q.topic]) {
@@ -809,7 +1003,7 @@ router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
         (stats.byTopic[q.topic].correct / stats.byTopic[q.topic].total) * 100
       );
     });
-    
+
     // Calculate difficulty-wise stats
     questionHistory.forEach(q => {
       if (!stats.byDifficulty[q.difficulty]) {
@@ -821,12 +1015,12 @@ router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
         (stats.byDifficulty[q.difficulty].correct / stats.byDifficulty[q.difficulty].total) * 100
       );
     });
-    
+
     res.json({
       success: true,
       data: stats
     });
-    
+
   } catch (error) {
     console.error('Error fetching question stats:', error);
     res.status(500).json({
@@ -840,12 +1034,12 @@ router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
 router.get('/insights/:roadmapType', authMiddleware, async (req, res) => {
   try {
     const { roadmapType } = req.params;
-    
+
     const userPerformance = await UserPerformance.findOne({
       userId: req.user.id,
       roadmapType
     });
-    
+
     if (!userPerformance) {
       return res.json({
         success: true,
@@ -857,23 +1051,23 @@ router.get('/insights/:roadmapType', authMiddleware, async (req, res) => {
         }
       });
     }
-    
+
     const { overallStats } = userPerformance;
     const dailyPercentage = Math.min((overallStats.questionsToday / overallStats.dailyGoal) * 100, 100);
-    
+
     // Determine learning velocity
     let learningVelocity = 'Steady Learner';
     if (overallStats.questionsToday >= overallStats.dailyGoal) learningVelocity = 'Goal Crusher';
     else if (overallStats.questionsToday >= overallStats.dailyGoal * 0.7) learningVelocity = 'On Track';
     else if (overallStats.questionsToday < overallStats.dailyGoal * 0.3) learningVelocity = 'Needs Boost';
-    
+
     // Next milestone
     let nextMilestone = 'Keep learning!';
     if (overallStats.currentStreak < 5) nextMilestone = `Get ${5 - overallStats.currentStreak} more correct for a 5-streak!`;
     else if (overallStats.currentStreak < 10) nextMilestone = `${10 - overallStats.currentStreak} more for a 10-streak!`;
     else if (overallStats.totalQuestions < 100) nextMilestone = `${100 - overallStats.totalQuestions} questions to reach 100!`;
     else nextMilestone = 'You\'re a learning champion!';
-    
+
     res.json({
       success: true,
       data: {
@@ -893,7 +1087,7 @@ router.get('/insights/:roadmapType', authMiddleware, async (req, res) => {
         adaptiveLevel: userPerformance.adaptiveSettings.currentDifficultyLevel
       }
     });
-    
+
   } catch (error) {
     console.error('Error getting learning insights:', error);
     res.status(500).json({
@@ -907,7 +1101,7 @@ router.get('/insights/:roadmapType', authMiddleware, async (req, res) => {
 router.get('/stats', authMiddleware, async (req, res) => {
   try {
     const quizzes = await Quiz.find({ userId: req.user.id });
-    
+
     if (quizzes.length === 0) {
       return res.json({
         success: true,
@@ -921,19 +1115,19 @@ router.get('/stats', authMiddleware, async (req, res) => {
         }
       });
     }
-    
+
     const completedQuizzes = quizzes.filter(q => q.status === 'completed');
     const totalQuestions = completedQuizzes.reduce((sum, q) => sum + q.totalQuestions, 0);
     const totalCorrect = completedQuizzes.reduce((sum, q) => sum + q.correctAnswers, 0);
     const totalPoints = completedQuizzes.reduce((sum, q) => sum + q.points, 0);
     const averageAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-    
+
     // Calculate current streak (consecutive correct answers in recent quizzes)
     let currentStreak = 0;
     const recentQuizzes = completedQuizzes
       .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
       .slice(0, 10);
-    
+
     for (const quiz of recentQuizzes) {
       if (quiz.accuracy >= 70) { // Consider 70%+ as a "good" quiz for streak
         currentStreak++;
@@ -941,7 +1135,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
         break;
       }
     }
-    
+
     res.json({
       success: true,
       stats: {
@@ -953,7 +1147,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
         totalCorrect
       }
     });
-    
+
   } catch (error) {
     console.error('Error getting quiz stats:', error);
     res.status(500).json({
@@ -967,15 +1161,15 @@ router.get('/stats', authMiddleware, async (req, res) => {
 router.get('/recent', authMiddleware, async (req, res) => {
   try {
     const { limit = 5 } = req.query;
-    
-    const recentQuizzes = await Quiz.find({ 
+
+    const recentQuizzes = await Quiz.find({
       userId: req.user.id,
-      isCompleted: true 
+      isCompleted: true
     })
-    .sort({ completedAt: -1 })
-    .limit(parseInt(limit))
-    .select('category accuracy points completedAt timeSpent questionCount');
-    
+      .sort({ completedAt: -1 })
+      .limit(parseInt(limit))
+      .select('category accuracy points completedAt timeSpent questionCount');
+
     res.json({
       success: true,
       data: recentQuizzes
