@@ -5,10 +5,14 @@ const QuestionHistory = require('../models/QuestionHistory');
 const UserPerformance = require('../models/UserPerformance');
 const fs = require('fs').promises;
 const path = require('path');
-const authMiddleware = require('../middleware/authMiddleware');
+
+// Async error handler wrapper
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
 
 // Create a new quiz session with intelligent question selection
-router.post('/create', authMiddleware, async (req, res) => {
+router.post('/create', asyncHandler(async (req, res) => {
   try {
     const { roadmapType, difficulty, questionCount = 20, timeLimit = 30, adaptiveDifficulty = false } = req.body;
 
@@ -217,10 +221,10 @@ router.post('/create', authMiddleware, async (req, res) => {
       message: 'Failed to create quiz'
     });
   }
-});
+}));
 
 // Get quiz by ID
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', asyncHandler(async (req, res) => {
   try {
     const quiz = await Quiz.findOne({
       _id: req.params.id,
@@ -246,10 +250,10 @@ router.get('/:id', authMiddleware, async (req, res) => {
       message: 'Failed to fetch quiz'
     });
   }
-});
+}));
 
 // Update quiz answer with intelligent tracking and adaptive difficulty
-router.put('/:id/answer', authMiddleware, async (req, res) => {
+router.put('/:id/answer', asyncHandler(async (req, res) => {
   try {
     const { questionIndex, answer, timeSpent } = req.body;
 
@@ -363,10 +367,10 @@ router.put('/:id/answer', authMiddleware, async (req, res) => {
       message: 'Failed to update answer'
     });
   }
-});
+}));
 
 // Replace a question with adaptive difficulty question
-router.put('/:id/replace-question', authMiddleware, async (req, res) => {
+router.put('/:id/replace-question', async (req, res) => {
   try {
     const { questionIndex } = req.body;
 
@@ -488,7 +492,7 @@ router.put('/:id/replace-question', authMiddleware, async (req, res) => {
 });
 
 // Get next adaptive question for dynamic difficulty adjustment
-router.get('/:id/next-question', authMiddleware, async (req, res) => {
+router.get('/:id/next-question', async (req, res) => {
   try {
     const quiz = await Quiz.findOne({
       _id: req.params.id,
@@ -669,7 +673,7 @@ router.get('/:id/next-question', authMiddleware, async (req, res) => {
 });
 
 // Skip question
-router.put('/:id/skip', authMiddleware, async (req, res) => {
+router.put('/:id/skip', async (req, res) => {
   try {
     const { questionIndex } = req.body;
 
@@ -705,7 +709,7 @@ router.put('/:id/skip', authMiddleware, async (req, res) => {
 });
 
 // Complete quiz
-router.put('/:id/complete', authMiddleware, async (req, res) => {
+router.put('/:id/complete', async (req, res) => {
   try {
     const quiz = await Quiz.findOne({
       _id: req.params.id,
@@ -820,7 +824,7 @@ router.put('/:id/complete', authMiddleware, async (req, res) => {
 });
 
 // Get user's quiz history
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { limit = 10, status } = req.query;
 
@@ -849,7 +853,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Get dynamic question preview (what questions would be selected)
-router.get('/preview', authMiddleware, async (req, res) => {
+router.get('/preview', async (req, res) => {
   try {
     const { roadmapType, difficulty, questionCount = 10 } = req.query;
 
@@ -910,7 +914,7 @@ router.get('/preview', authMiddleware, async (req, res) => {
 });
 
 // Get adaptive quiz recommendations
-router.get('/recommendations', authMiddleware, async (req, res) => {
+router.get('/recommendations', async (req, res) => {
   try {
     const { roadmapType } = req.query;
 
@@ -973,7 +977,7 @@ router.get('/recommendations', authMiddleware, async (req, res) => {
 });
 
 // Get question statistics for a user
-router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
+router.get('/stats/:roadmapType', async (req, res) => {
   try {
     const { roadmapType } = req.params;
 
@@ -1031,7 +1035,7 @@ router.get('/stats/:roadmapType', authMiddleware, async (req, res) => {
 });
 
 // Get learning insights and streaks
-router.get('/insights/:roadmapType', authMiddleware, async (req, res) => {
+router.get('/insights/:roadmapType', async (req, res) => {
   try {
     const { roadmapType } = req.params;
 
@@ -1098,7 +1102,7 @@ router.get('/insights/:roadmapType', authMiddleware, async (req, res) => {
 });
 
 // Get overall quiz statistics for dashboard
-router.get('/stats', authMiddleware, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const quizzes = await Quiz.find({ userId: req.user.id });
 
@@ -1158,7 +1162,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
 });
 
 // Get recent quizzes for dashboard
-router.get('/recent', authMiddleware, async (req, res) => {
+router.get('/recent', async (req, res) => {
   try {
     const { limit = 5 } = req.query;
 

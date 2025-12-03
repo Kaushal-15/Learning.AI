@@ -3,6 +3,22 @@ const router = express.Router();
 const Roadmap = require('../models/Roadmap');
 const authMiddleware = require('../middleware/authMiddleware');
 
+// Map frontend roadmapId to database roadmapId format
+const normalizeRoadmapId = (roadmapId) => {
+  const roadmapMapping = {
+    'full-stack': 'full-stack-development',
+    'frontend': 'frontend-development',
+    'backend': 'backend-development',
+    'mobile': 'mobile-app-development',
+    'database': 'database-data-science',
+    'cybersecurity': 'cybersecurity',
+    'devops': 'devops-cloud',
+    'ai-ml': 'ai-machine-learning'
+  };
+
+  return roadmapMapping[roadmapId] || roadmapId;
+};
+
 // Get all roadmaps (public)
 router.get('/', async (req, res) => {
   try {
@@ -32,7 +48,8 @@ router.get('/', async (req, res) => {
 router.get('/:roadmapId', async (req, res) => {
   try {
     const { roadmapId } = req.params;
-    const roadmap = await Roadmap.findOne({ roadmapId });
+    const normalizedId = normalizeRoadmapId(roadmapId);
+    const roadmap = await Roadmap.findOne({ roadmapId: normalizedId });
 
     if (!roadmap) {
       return res.status(404).json({
@@ -58,8 +75,9 @@ router.get('/:roadmapId', async (req, res) => {
 router.get('/:roadmapId/lessons/:lessonId', async (req, res) => {
   try {
     const { roadmapId, lessonId } = req.params;
-    
-    const roadmap = await Roadmap.findOne({ roadmapId });
+    const normalizedId = normalizeRoadmapId(roadmapId);
+
+    const roadmap = await Roadmap.findOne({ roadmapId: normalizedId });
     if (!roadmap) {
       return res.status(404).json({
         success: false,
@@ -113,7 +131,7 @@ router.get('/:roadmapId/progress', authMiddleware, async (req, res) => {
     // Get user's progress from learner data
     const Learner = require('../models/Learner');
     const User = require('../models/User');
-    
+
     const user = await User.findById(userId);
     const learner = await Learner.findOne({ email: user.email });
 
@@ -129,7 +147,8 @@ router.get('/:roadmapId/progress', authMiddleware, async (req, res) => {
     }
 
     // Calculate progress based on category mastery
-    const roadmap = await Roadmap.findOne({ roadmapId });
+    const normalizedId = normalizeRoadmapId(roadmapId);
+    const roadmap = await Roadmap.findOne({ roadmapId: normalizedId });
     if (!roadmap) {
       return res.status(404).json({
         success: false,
@@ -144,12 +163,12 @@ router.get('/:roadmapId/progress', authMiddleware, async (req, res) => {
     // Count total lessons and determine current level
     roadmap.levels.forEach(level => {
       totalLessons += level.lessons.length;
-      
+
       // Simple logic: if user has some mastery, they're at intermediate
       if (learner.categoryMastery && learner.categoryMastery.size > 0) {
         const avgMastery = Array.from(learner.categoryMastery.values())
           .reduce((sum, mastery) => sum + mastery.level, 0) / learner.categoryMastery.size;
-        
+
         if (avgMastery >= 70) currentLevel = 'Advanced';
         else if (avgMastery >= 40) currentLevel = 'Intermediate';
       }

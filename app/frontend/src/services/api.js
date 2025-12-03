@@ -19,11 +19,11 @@ class ApiService {
     try {
       const response = await fetch(url, config);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'API request failed');
       }
-      
+
       return data;
     } catch (error) {
       console.error('API Error:', error);
@@ -102,6 +102,18 @@ class ApiService {
 
   async getSessionPerformance(sessionId) {
     return this.request(`/performance/analytics/session/${sessionId}`);
+  }
+
+  // Content Generation API methods
+  async generateContent(params) {
+    return this.request('/content/generate', {
+      method: 'POST',
+      body: params,
+    });
+  }
+
+  async getContentCacheStats() {
+    return this.request('/content/cache/stats');
   }
 }
 
