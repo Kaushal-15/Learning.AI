@@ -3,19 +3,36 @@ const router = express.Router();
 const Progress = require('../models/Progress');
 const authMiddleware = require('../middleware/authMiddleware');
 
+// Map frontend roadmapId to database roadmapId format
+const normalizeRoadmapId = (roadmapId) => {
+  const roadmapMapping = {
+    'full-stack': 'full-stack-development',
+    'frontend': 'frontend-development',
+    'backend': 'backend-development',
+    'mobile': 'mobile-app-development',
+    'database': 'database-data-science',
+    'cybersecurity': 'cybersecurity',
+    'devops': 'devops-cloud',
+    'ai-ml': 'ai-machine-learning'
+  };
+
+  return roadmapMapping[roadmapId] || roadmapId;
+};
+
 // Get user's progress for a specific roadmap
 router.get('/:roadmapId', authMiddleware, async (req, res) => {
   try {
     const { roadmapId } = req.params;
+    const normalizedId = normalizeRoadmapId(roadmapId);
     const userId = req.user.id;
 
-    let progress = await Progress.findOne({ userId, roadmapId });
-    
+    let progress = await Progress.findOne({ userId, roadmapId: normalizedId });
+
     if (!progress) {
       // Create new progress record
       progress = new Progress({
         userId,
-        roadmapId,
+        roadmapId: normalizedId,
         completedLessons: [],
         currentLevel: 'Beginner',
         overallProgress: 0
@@ -40,14 +57,15 @@ router.get('/:roadmapId', authMiddleware, async (req, res) => {
 router.post('/complete-lesson', authMiddleware, async (req, res) => {
   try {
     const { roadmapId, lessonId, quizScore = 0, timeSpent = 0 } = req.body;
+    const normalizedId = normalizeRoadmapId(roadmapId);
     const userId = req.user.id;
 
-    let progress = await Progress.findOne({ userId, roadmapId });
-    
+    let progress = await Progress.findOne({ userId, roadmapId: normalizedId });
+
     if (!progress) {
       progress = new Progress({
         userId,
-        roadmapId,
+        roadmapId: normalizedId,
         completedLessons: [],
         currentLevel: 'Beginner',
         overallProgress: 0

@@ -28,6 +28,8 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const authRoutes = require('./routes/auth');
 const roadmapRoutes = require('./routes/roadmapRoutes');
 const progressRoutes = require('./routes/progressRoutes');
+const dailyLearningRoutes = require('./routes/dailyLearningRoutes');
+const contentRoutes = require('./routes/contentRoutes');
 
 // ===============================
 // Initialize App
@@ -104,22 +106,22 @@ app.get('/health', (req, res) => {
 // PUBLIC ROUTES (No Auth Required)
 // ===============================
 app.use('/api/auth', authRoutes); // signup/login/logout
+app.use('/api/content', contentRoutes); // Content generation (public for testing)
+app.use('/api/roadmaps', roadmapRoutes); // Roadmaps (public for viewing)
+app.use('/api/daily-learning', dailyLearningRoutes); // Daily learning (public for viewing)
 
 // ===============================
 // PROTECTED ROUTES (Require Login)
 // ===============================
-app.use(authMiddleware); // ✅ All routes below require valid token cookie
-
-app.use('/api/profile', profileRoutes);
-app.use('/api/roadmaps', roadmapRoutes);
-app.use('/api/progress', progressRoutes);
-app.use('/api/questions', questionRoutes);
-app.use('/api/quiz', quizRoutes); // Dynamic MCQ Quiz system
-app.use('/api/test-results', testResultRoutes);
-app.use('/api/assessment', assessmentRoutes);
-app.use('/api/learners', learnerRoutes);
-app.use('/api/performance', performanceRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/profile', authMiddleware, profileRoutes);
+app.use('/api/progress', authMiddleware, progressRoutes);
+app.use('/api/questions', authMiddleware, questionRoutes);
+app.use('/api/quiz', authMiddleware, quizRoutes); // Dynamic MCQ Quiz system
+app.use('/api/test-results', authMiddleware, testResultRoutes);
+app.use('/api/assessment', authMiddleware, assessmentRoutes);
+app.use('/api/learners', authMiddleware, learnerRoutes);
+app.use('/api/performance', authMiddleware, performanceRoutes);
+app.use('/api/analytics', authMiddleware, analyticsRoutes);
 
 // ===============================
 // 404 Handler

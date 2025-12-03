@@ -46,7 +46,7 @@ const AIQuestionTester = () => {
   const generateQuestion = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch(`${API_BASE}/questions/generate`, {
         method: 'POST',
@@ -57,7 +57,7 @@ const AIQuestionTester = () => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         setQuestion(data.data);
       } else {
@@ -110,19 +110,17 @@ const AIQuestionTester = () => {
         </h2>
         <div className="flex items-center">
           {serviceStatus && (
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${
-              serviceStatus.healthy 
-                ? 'bg-green-100 text-green-800 border border-green-200' 
-                : 'bg-red-100 text-red-800 border border-red-200'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                serviceStatus.healthy ? 'bg-green-500' : 'bg-red-500'
-              }`}></div>
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${serviceStatus.healthy
+              ? 'bg-green-100 text-green-800 border border-green-200'
+              : 'bg-red-100 text-red-800 border border-red-200'
+              }`}>
+              <div className={`w-2 h-2 rounded-full ${serviceStatus.healthy ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
               AI Service: {serviceStatus.healthy ? 'Healthy' : 'Unhealthy'}
               {serviceStatus.status && (
                 <span className="text-xs opacity-80 ml-2">
-                  (Client: {serviceStatus.status.hasClient ? 'Yes' : 'No'}, 
-                   Fallback: {serviceStatus.status.fallbackQuestionsAvailable || 0})
+                  (Client: {serviceStatus.status.hasClient ? 'Yes' : 'No'},
+                  Fallback: {serviceStatus.status.fallbackQuestionsAvailable || 0})
                 </span>
               )}
             </div>
@@ -137,7 +135,7 @@ const AIQuestionTester = () => {
           <h3 className="text-xl font-semibold text-gray-800 mb-6 pb-3 border-b-2 border-primary-500">
             Question Parameters
           </h3>
-          
+
           {/* Topic Input */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -167,8 +165,8 @@ const AIQuestionTester = () => {
                   className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:outline-none transition-colors"
                 />
                 {formData.category.length > 1 && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => removeCategoryLevel(index)}
                     className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors"
                   >
@@ -177,9 +175,9 @@ const AIQuestionTester = () => {
                 )}
               </div>
             ))}
-            <button 
-              type="button" 
-              onClick={addCategoryLevel} 
+            <button
+              type="button"
+              onClick={addCategoryLevel}
               className="mt-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
             >
               + Add Category Level
@@ -223,8 +221,8 @@ const AIQuestionTester = () => {
           </div>
 
           {/* Generate Button */}
-          <button 
-            onClick={generateQuestion} 
+          <button
+            onClick={generateQuestion}
             disabled={loading || !formData.topic.trim()}
             className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
           >
@@ -253,7 +251,7 @@ const AIQuestionTester = () => {
               <h3 className="text-xl font-semibold text-gray-800 mb-6 pb-3 border-b-2 border-green-500">
                 Generated Question
               </h3>
-              
+
               <div className="space-y-6">
                 {/* Question Text */}
                 <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-primary-500">
@@ -268,13 +266,12 @@ const AIQuestionTester = () => {
                   <h4 className="font-semibold text-gray-800 mb-3">Options:</h4>
                   <ul className="space-y-2">
                     {question.options.map((option, index) => (
-                      <li 
+                      <li
                         key={index}
-                        className={`p-3 rounded-lg border transition-colors ${
-                          option === question.correctAnswer 
-                            ? 'bg-green-100 border-green-300 text-green-800 font-semibold' 
-                            : 'bg-white border-gray-200 text-gray-700'
-                        }`}
+                        className={`p-3 rounded-lg border transition-colors ${option === question.correctAnswer
+                          ? 'bg-green-100 border-green-300 text-green-800 font-semibold'
+                          : 'bg-white border-gray-200 text-gray-700'
+                          }`}
                       >
                         {String.fromCharCode(65 + index)}. {option}
                         {option === question.correctAnswer && ' ✓'}
@@ -327,11 +324,10 @@ const AIQuestionTester = () => {
                       <>
                         <div className="bg-white p-3 rounded-lg border border-gray-200">
                           <strong className="block text-gray-800 mb-1">AI Generated:</strong>
-                          <span className={`text-sm px-2 py-1 rounded ${
-                            question.metadata.aiGenerated 
-                              ? 'bg-blue-100 text-blue-800' 
-                              : 'bg-orange-100 text-orange-800'
-                          }`}>
+                          <span className={`text-sm px-2 py-1 rounded ${question.metadata.aiGenerated
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-orange-100 text-orange-800'
+                            }`}>
                             {question.metadata.aiGenerated ? 'Yes' : 'No (Fallback)'}
                           </span>
                         </div>

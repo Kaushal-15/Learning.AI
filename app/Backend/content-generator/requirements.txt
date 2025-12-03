@@ -1,0 +1,6 @@
+pymongo
+transformers
+torch
+accelerate
+sentencepiece
+protobuf

@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  Circle, 
-  Play, 
-  Book, 
-  Target, 
-  Trophy, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
+  Circle,
+  Play,
+  Book,
+  Target,
+  Trophy,
   ArrowLeft,
   Star,
   Zap,
@@ -47,108 +47,73 @@ const roadmapColors = {
   'ai-ml': 'from-purple-500 to-violet-600'
 };
 
-// Fetch learning roadmap data from backend
+// Fetch learning roadmap data from backend - dynamic learning paths
 const fetchLearningRoadmap = async (roadmapType) => {
   try {
-    const res = await fetch(`${API_BASE}/roadmaps/${roadmapType}`, {
+    const res = await fetch(`${API_BASE}/daily-learning/${roadmapType}`, {
       credentials: "include"
     });
     const data = await res.json();
-    
-    if (res.ok && data.success) {
-      return data.data;
+
+    if (res.ok && data.success && data.data) {
+      // Transform the daily learning data into weeks structure
+      const learningContent = data.data;
+
+      // Group by weeks
+      const weeksMap = new Map();
+      learningContent.forEach(dayContent => {
+        if (!weeksMap.has(dayContent.week)) {
+          weeksMap.set(dayContent.week, {
+            week: dayContent.week,
+            title: `Week ${dayContent.week} Learning`,
+            description: dayContent.topic || 'Continue your learning journey',
+            days: []
+          });
+        }
+
+        // Determine the type based on difficulty or default to theory
+        const getTypeFromDifficulty = (difficulty) => {
+          if (!difficulty) return 'theory';
+          const types = ['theory', 'practice', 'project', 'review'];
+          const index = ['Beginner', 'Intermediate', 'Advanced'].indexOf(difficulty);
+          return types[Math.min(index + 1, types.length - 1)] || 'theory';
+        };
+
+        weeksMap.get(dayContent.week).days.push({
+          day: dayContent.day,
+          title: dayContent.topic,
+          duration: '2-3 hours', // Default duration
+          type: getTypeFromDifficulty(dayContent.difficultyLevel),
+          completed: false,
+          learningGoals: dayContent.learningGoals,
+          learningOptions: dayContent.learningOptions,
+          miniRecap: dayContent.miniRecap,
+          practiceSuggestions: dayContent.practiceSuggestions,
+          optionalChallenge: dayContent.optionalChallenge
+        });
+      });
+
+      // Convert weeks map to sorted array
+      const weeks = Array.from(weeksMap.values()).sort((a, b) => a.week - b.week);
+
+      // Get roadmap metadata
+      const roadmapRes = await fetch(`${API_BASE}/roadmaps/${roadmapType}`, {
+        credentials: "include"
+      });
+      const roadmapData = await roadmapRes.json();
+
+      return {
+        title: roadmapData.success ? roadmapData.data.title : roadmapType,
+        description: roadmapData.success ? roadmapData.data.description : 'Your learning journey',
+        weeks: weeks
+      };
     }
     return null;
   } catch (err) {
-    console.error("Error fetching roadmap:", err);
+    console.error("Error fetching learning roadmap:", err);
     return null;
   }
 };
-
-const baseRoadmaps = {
-    'full-stack': {
-      title: 'Full-Stack Development',
-      description: 'Master both frontend and backend development',
-      weeks: [
-        {
-          week: 1,
-          title: 'HTML & CSS Fundamentals',
-          description: 'Build solid foundation in web markup and styling',
-          days: [
-            { day: 1, title: 'HTML Structure & Semantics', duration: '2 hours', type: 'theory', completed: false },
-            { day: 2, title: 'CSS Basics & Selectors', duration: '2 hours', type: 'theory', completed: false },
-            { day: 3, title: 'CSS Flexbox Layout', duration: '3 hours', type: 'practice', completed: false },
-            { day: 4, title: 'CSS Grid System', duration: '3 hours', type: 'practice', completed: false },
-            { day: 5, title: 'Responsive Design', duration: '2 hours', type: 'project', completed: false },
-            { day: 6, title: 'Build Landing Page', duration: '4 hours', type: 'project', completed: false },
-            { day: 7, title: 'Review & Practice', duration: '2 hours', type: 'review', completed: false }
-          ]
-        },
-        {
-          week: 2,
-          title: 'JavaScript Fundamentals',
-          description: 'Learn programming concepts and DOM manipulation',
-          days: [
-            { day: 1, title: 'Variables & Data Types', duration: '2 hours', type: 'theory', completed: false },
-            { day: 2, title: 'Functions & Scope', duration: '3 hours', type: 'theory', completed: false },
-            { day: 3, title: 'DOM Manipulation', duration: '3 hours', type: 'practice', completed: false },
-            { day: 4, title: 'Event Handling', duration: '2 hours', type: 'practice', completed: false },
-            { day: 5, title: 'Async JavaScript', duration: '3 hours', type: 'theory', completed: false },
-            { day: 6, title: 'Interactive Web App', duration: '4 hours', type: 'project', completed: false },
-            { day: 7, title: 'Code Review & Debugging', duration: '2 hours', type: 'review', completed: false }
-          ]
-        },
-        {
-          week: 3,
-          title: 'React.js Basics',
-          description: 'Build dynamic user interfaces with React',
-          days: [
-            { day: 1, title: 'React Components', duration: '3 hours', type: 'theory', completed: false },
-            { day: 2, title: 'Props & State', duration: '3 hours', type: 'practice', completed: false },
-            { day: 3, title: 'Event Handling in React', duration: '2 hours', type: 'practice', completed: false },
-            { day: 4, title: 'React Hooks', duration: '3 hours', type: 'theory', completed: false },
-            { day: 5, title: 'API Integration', duration: '3 hours', type: 'practice', completed: false },
-            { day: 6, title: 'Build React App', duration: '5 hours', type: 'project', completed: false },
-            { day: 7, title: 'Testing & Deployment', duration: '2 hours', type: 'review', completed: false }
-          ]
-        },
-        {
-          week: 4,
-          title: 'Backend with Node.js',
-          description: 'Server-side development and APIs',
-          days: [
-            { day: 1, title: 'Node.js Basics', duration: '2 hours', type: 'theory', completed: false },
-            { day: 2, title: 'Express.js Framework', duration: '3 hours', type: 'theory', completed: false },
-            { day: 3, title: 'REST API Design', duration: '3 hours', type: 'practice', completed: false },
-            { day: 4, title: 'Database Integration', duration: '3 hours', type: 'practice', completed: false },
-            { day: 5, title: 'Authentication & Security', duration: '3 hours', type: 'theory', completed: false },
-            { day: 6, title: 'Full-Stack Project', duration: '6 hours', type: 'project', completed: false },
-            { day: 7, title: 'Deployment & DevOps', duration: '2 hours', type: 'review', completed: false }
-          ]
-        }
-      ]
-    },
-    'frontend': {
-      title: 'Frontend Development',
-      description: 'Create beautiful and interactive user interfaces',
-      weeks: [
-        {
-          week: 1,
-          title: 'Web Fundamentals',
-          description: 'HTML, CSS, and responsive design',
-          days: [
-            { day: 1, title: 'HTML5 Semantic Elements', duration: '2 hours', type: 'theory', completed: false },
-            { day: 2, title: 'CSS3 Advanced Features', duration: '3 hours', type: 'theory', completed: false },
-            { day: 3, title: 'Flexbox & Grid Mastery', duration: '3 hours', type: 'practice', completed: false },
-            { day: 4, title: 'Responsive Design Patterns', duration: '3 hours', type: 'practice', completed: false },
-            { day: 5, title: 'CSS Animations', duration: '2 hours', type: 'practice', completed: false },
-            { day: 6, title: 'Portfolio Website', duration: '4 hours', type: 'project', completed: false },
-            { day: 7, title: 'Cross-browser Testing', duration: '2 hours', type: 'review', completed: false }
-          ]
-        }
-      ]
-    }
-  };
 
 const getTypeIcon = (type) => {
   switch (type) {
@@ -186,18 +151,22 @@ export default function Learn() {
           credentials: "include",
         });
         const data = await res.json();
-        
+
         if (res.ok && data.success && data.user) {
           setUser(data.user);
-          
+
           if (!data.user.hasCompletedOnboarding) {
             navigate("/roadmap");
             return;
           }
-          
-          // Fetch roadmap data from backend
-          const roadmap = await fetchLearningRoadmap(data.user.selectedRoadmap);
-          setRoadmapData(roadmap);
+
+          // Fetch learning path data from backend
+          if (data.user.selectedRoadmap) {
+            const roadmap = await fetchLearningRoadmap(data.user.selectedRoadmap);
+            if (roadmap) {
+              setRoadmapData(roadmap);
+            }
+          }
         } else {
           navigate("/login");
         }
@@ -212,25 +181,75 @@ export default function Learn() {
     fetchUserData();
   }, [navigate]);
 
+  // Fetch progress when roadmapData is available
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (user?.selectedRoadmap && roadmapData) {
+        try {
+          const res = await fetch(`${API_BASE}/progress/${user.selectedRoadmap}`, {
+            credentials: 'include'
+          });
+          const data = await res.json();
+
+          if (data.success && data.data) {
+            const completedSet = new Set();
+            data.data.completedLessons.forEach(lesson => {
+              completedSet.add(lesson.lessonId);
+            });
+            setCompletedTasks(completedSet);
+          }
+        } catch (err) {
+          console.error('Error fetching progress:', err);
+        }
+      }
+    };
+
+    fetchProgress();
+  }, [user?.selectedRoadmap, roadmapData]);
+
   const toggleTaskCompletion = (weekIndex, dayIndex) => {
     const taskId = `${weekIndex}-${dayIndex}`;
     const newCompleted = new Set(completedTasks);
-    
+
     if (newCompleted.has(taskId)) {
       newCompleted.delete(taskId);
     } else {
       newCompleted.add(taskId);
     }
-    
+
     setCompletedTasks(newCompleted);
-    
+
     // Update in backend
-    // TODO: Implement API call to save progress
+    const updateBackend = async () => {
+      try {
+        await fetch(`${API_BASE}/progress/complete-lesson`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            roadmapId: user.selectedRoadmap,
+            lessonId: taskId,
+            timeSpent: 60 // Default estimate
+          })
+        });
+      } catch (err) {
+        console.error('Error saving progress:', err);
+        // Revert state on error
+        setCompletedTasks(prev => {
+          const reverted = new Set(prev);
+          if (reverted.has(taskId)) reverted.delete(taskId);
+          else reverted.add(taskId);
+          return reverted;
+        });
+      }
+    };
+
+    updateBackend();
   };
 
   const getWeekProgress = (week, weekIndex) => {
     const totalTasks = week.days.length;
-    const completedCount = week.days.filter((_, dayIndex) => 
+    const completedCount = week.days.filter((_, dayIndex) =>
       completedTasks.has(`${weekIndex}-${dayIndex}`)
     ).length;
     return Math.round((completedCount / totalTasks) * 100);
@@ -260,7 +279,7 @@ export default function Learn() {
       <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#FFECC0] via-[#f9f4e3] to-[#344F1F]">
         <div className="text-center">
           <p className="text-gray-700">No learning path found. Please complete onboarding first.</p>
-          <button 
+          <button
             onClick={() => navigate("/roadmap")}
             className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
@@ -295,7 +314,7 @@ export default function Learn() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-8">
               <div className="text-center">
                 <div className="text-2xl font-bold text-[#344F1F]">{getTotalProgress()}%</div>
@@ -307,11 +326,11 @@ export default function Learn() {
               </div>
             </div>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="pb-4">
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
+              <div
                 className="bg-[#344F1F] h-2 rounded-full transition-all duration-500"
                 style={{ width: `${getTotalProgress()}%` }}
               ></div>
@@ -330,21 +349,20 @@ export default function Learn() {
                 <Calendar className="w-5 h-5 text-[#344F1F]" />
                 Timeline
               </h3>
-              
+
               <div className="space-y-2">
                 {roadmapData.weeks.map((week, index) => {
                   const progress = getWeekProgress(week, index);
                   const isActive = currentWeek === week.week;
-                  
+
                   return (
                     <div
                       key={week.week}
                       onClick={() => setCurrentWeek(week.week)}
-                      className={`p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
-                        isActive 
-                          ? 'bg-[#344F1F] text-white border-[#344F1F]' 
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`p-4 rounded-lg cursor-pointer transition-all duration-200 border ${isActive
+                        ? 'bg-[#344F1F] text-white border-[#344F1F]'
+                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium">Week {week.week}</span>
@@ -352,10 +370,9 @@ export default function Learn() {
                       </div>
                       <div className="text-sm opacity-90 mb-3">{week.title}</div>
                       <div className={`w-full rounded-full h-1.5 ${isActive ? 'bg-white bg-opacity-30' : 'bg-gray-200'}`}>
-                        <div 
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            isActive ? 'bg-white' : 'bg-[#344F1F]'
-                          }`}
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-300 ${isActive ? 'bg-white' : 'bg-[#344F1F]'
+                            }`}
                           style={{ width: `${progress}%` }}
                         ></div>
                       </div>
@@ -383,7 +400,7 @@ export default function Learn() {
                         <p className="text-gray-600">{week.description}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-6 text-sm text-gray-500">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-[#344F1F]" />
@@ -405,13 +422,12 @@ export default function Learn() {
                     {week.days.map((day, dayIndex) => {
                       const taskId = `${weekIndex}-${dayIndex}`;
                       const isCompleted = completedTasks.has(taskId);
-                      
+
                       return (
                         <div
                           key={day.day}
-                          className={`bg-white rounded-lg shadow-sm border p-6 transition-all duration-200 hover:shadow-md ${
-                            isCompleted ? 'border-green-500 bg-green-50' : 'border-gray-200'
-                          }`}
+                          className={`bg-white rounded-lg shadow-sm border p-6 transition-all duration-200 hover:shadow-md ${isCompleted ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                            }`}
                         >
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
@@ -423,19 +439,18 @@ export default function Learn() {
                                 <h3 className="font-semibold text-gray-800">{day.title}</h3>
                               </div>
                             </div>
-                            
+
                             <button
                               onClick={() => toggleTaskCompletion(weekIndex, dayIndex)}
-                              className={`p-2 rounded-full transition-all duration-200 ${
-                                isCompleted 
-                                  ? 'bg-green-500 text-white hover:bg-green-600' 
-                                  : 'bg-gray-200 text-gray-400 hover:bg-gray-300'
-                              }`}
+                              className={`p-2 rounded-full transition-all duration-200 ${isCompleted
+                                ? 'bg-green-500 text-white hover:bg-green-600'
+                                : 'bg-gray-200 text-gray-400 hover:bg-gray-300'
+                                }`}
                             >
                               {isCompleted ? <CheckCircle className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
                             </button>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                             <span className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
@@ -445,13 +460,20 @@ export default function Learn() {
                               {day.type.charAt(0).toUpperCase() + day.type.slice(1)}
                             </span>
                           </div>
-                          
                           <button
-                            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                              isCompleted
-                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                : 'bg-[#344F1F] text-white hover:bg-[#2a3f1a]'
-                            }`}
+                            onClick={() => navigate('/LearnPaths', {
+                              state: {
+                                roadmapId: user?.selectedRoadmap,
+                                week: week.week,
+                                day: day.day,
+                                dayData: day,
+                                roadmapTitle: roadmapData.title
+                              }
+                            })}
+                            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${isCompleted
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-[#344F1F] text-white hover:bg-[#2a3f1a]'
+                              }`}
                           >
                             <Play className="w-4 h-4" />
                             {isCompleted ? 'Review' : 'Start Learning'}

@@ -1,18 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
-    LogOut, 
-    User, 
-    BookOpen, 
-    Target, 
-    TrendingUp, 
-    Trophy, 
-    Clock, 
-    Award, 
-    BarChart3, 
-    Calendar, 
-    CheckCircle2, 
-    RefreshCw, 
+import {
+    LogOut,
+    User,
+    BookOpen,
+    Target,
+    TrendingUp,
+    Trophy,
+    Clock,
+    Award,
+    BarChart3,
+    Calendar,
+    CheckCircle2,
+    RefreshCw,
     Brain,
     Search,
     Bell,
@@ -44,6 +44,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [showRoadmapModal, setShowRoadmapModal] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [progressData, setProgressData] = useState(null);
 
     // Helper function to map roadmap names
     const getRoadmapKey = (roadmap) => {
@@ -80,50 +81,47 @@ export default function Dashboard() {
                     }
 
                     const roadmapKey = getRoadmapKey(userData.user.selectedRoadmap);
-
                     // Fetch all data in parallel to reduce loading time
-                    const [learnerRes, testRes, statsRes, completionsRes, analysisRes] = await Promise.allSettled([
+                    const [learnerRes, testRes, statsRes, completionsRes, analysisRes, progressRes] = await Promise.allSettled([
                         fetch("http://localhost:3000/api/learners/me", {
                             method: "GET",
                             credentials: "include",
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
+                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                         }),
                         fetch("http://localhost:3000/api/test-results?limit=5", {
                             method: "GET",
                             credentials: "include",
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
+                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                         }),
                         fetch("http://localhost:3000/api/test-results/stats", {
                             method: "GET",
                             credentials: "include",
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
+                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                         }),
                         fetch(`http://localhost:3000/api/test-results/completions?roadmapType=${roadmapKey}`, {
                             method: "GET",
                             credentials: "include",
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
+                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                         }),
                         fetch(`http://localhost:3000/api/test-results/analysis/weak-areas?roadmapType=${roadmapKey}`, {
                             method: "GET",
                             credentials: "include",
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
+                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                        }),
+                        fetch(`http://localhost:3000/api/progress/${userData.user.selectedRoadmap}`, {
+                            method: "GET",
+                            credentials: "include",
+                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                         })
                     ]);
+
+                    // Process progress data
+                    if (progressRes.status === 'fulfilled' && progressRes.value.ok) {
+                        const progressJson = await progressRes.value.json();
+                        if (progressJson.success) {
+                            setProgressData(progressJson.data);
+                        }
+                    }
 
                     // Process learner data
                     if (learnerRes.status === 'fulfilled' && learnerRes.value.ok) {
@@ -337,13 +335,13 @@ export default function Dashboard() {
                             <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                                 <Bell className="w-5 h-5" />
                             </button>
-                            <button 
+                            <button
                                 onClick={refreshData}
                                 className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                             >
                                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                             </button>
-                            
+
                             {/* User Menu */}
                             <div className="flex items-center gap-3 pl-3 border-l border-gray-300 dark:border-gray-700">
                                 <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
@@ -379,7 +377,7 @@ export default function Dashboard() {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <button 
+                            <button
                                 onClick={() => navigate("/test")}
                                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-lg font-medium hover:from-amber-500 hover:to-orange-600 transition-all"
                             >
@@ -492,16 +490,24 @@ export default function Dashboard() {
                                         </div>
                                     </div>
 
+                                    {/* Current Path */}
                                     {/* Progress Bar */}
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Overall Progress</span>
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white">Week 3 of 12</span>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                                {progressData ? `${progressData.currentLevel} Level` : 'Beginner'}
+                                            </span>
                                         </div>
                                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                                            <div className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full transition-all duration-500" style={{ width: '25%' }}></div>
+                                            <div
+                                                className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full transition-all duration-500"
+                                                style={{ width: `${progressData?.overallProgress || 0}%` }}
+                                            ></div>
                                         </div>
-                                        <div className="text-xs text-gray-400 text-center">25% Complete</div>
+                                        <div className="text-xs text-gray-400 text-center">
+                                            {progressData?.overallProgress || 0}% Complete
+                                        </div>
                                     </div>
 
                                     {/* Next Steps */}
@@ -541,7 +547,7 @@ export default function Dashboard() {
                         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Tests</h3>
-                                <button 
+                                <button
                                     onClick={() => navigate("/test")}
                                     className="text-amber-400 hover:text-amber-300 text-sm font-medium"
                                 >
@@ -560,12 +566,11 @@ export default function Dashboard() {
                                                     </div>
                                                     <div>
                                                         <h4 className="font-medium text-gray-900 dark:text-white text-sm">{completion.testCategory}</h4>
-                                                        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
-                                                            completion.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
+                                                        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${completion.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
                                                             completion.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                            completion.difficulty === 'Hard' ? 'bg-orange-500/20 text-orange-400' :
-                                                            'bg-red-500/20 text-red-400'
-                                                        }`}>
+                                                                completion.difficulty === 'Hard' ? 'bg-orange-500/20 text-orange-400' :
+                                                                    'bg-red-500/20 text-red-400'
+                                                            }`}>
                                                             {completion.difficulty}
                                                         </span>
                                                     </div>
@@ -609,7 +614,7 @@ export default function Dashboard() {
                                         <p className="text-gray-600 dark:text-gray-400 text-xs">Test your knowledge</p>
                                     </div>
                                 </button>
-                                
+
                                 <button
                                     onClick={() => navigate("/quiz-selection")}
                                     className="w-full flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -622,7 +627,7 @@ export default function Dashboard() {
                                         <p className="text-gray-600 dark:text-gray-400 text-xs">Quick practice session</p>
                                     </div>
                                 </button>
-                                
+
                                 <button
                                     onClick={() => navigate("/learn")}
                                     className="w-full flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"

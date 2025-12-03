@@ -2,10 +2,9 @@ const express = require('express');
 const router = express.Router();
 const TestResult = require('../models/TestResult');
 const TestCompletion = require('../models/TestCompletion');
-const authMiddleware = require('../middleware/authMiddleware');
 
 // Save test result
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const {
       roadmapType,
@@ -97,7 +96,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // Get user's test results
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { roadmapType, limit = 10 } = req.query;
 
@@ -132,7 +131,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Get test statistics
-router.get('/stats', authMiddleware, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const { roadmapType } = req.query;
 
@@ -196,7 +195,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
 });
 
 // Get test completions (must be before /:id route)
-router.get('/completions', authMiddleware, async (req, res) => {
+router.get('/completions', async (req, res) => {
   try {
     const { roadmapType } = req.query;
 
@@ -232,7 +231,7 @@ router.get('/completions', authMiddleware, async (req, res) => {
 });
 
 // Get weak areas analysis (must be before /:id route)
-router.get('/analysis/weak-areas', authMiddleware, async (req, res) => {
+router.get('/analysis/weak-areas', async (req, res) => {
   try {
     const { roadmapType } = req.query;
 
@@ -250,25 +249,29 @@ router.get('/analysis/weak-areas', authMiddleware, async (req, res) => {
     const difficultyScores = {};
 
     recentResults.forEach(result => {
-      result.detailedResults.forEach(detail => {
-        // Track topic performance
-        if (!topicScores[detail.topic]) {
-          topicScores[detail.topic] = { correct: 0, total: 0 };
-        }
-        topicScores[detail.topic].total++;
-        if (detail.isCorrect) {
-          topicScores[detail.topic].correct++;
-        }
+      if (result.detailedResults && Array.isArray(result.detailedResults)) {
+        result.detailedResults.forEach(detail => {
+          if (detail && detail.topic && detail.difficulty !== undefined) {
+            // Track topic performance
+            if (!topicScores[detail.topic]) {
+              topicScores[detail.topic] = { correct: 0, total: 0 };
+            }
+            topicScores[detail.topic].total++;
+            if (detail.isCorrect) {
+              topicScores[detail.topic].correct++;
+            }
 
-        // Track difficulty performance
-        if (!difficultyScores[detail.difficulty]) {
-          difficultyScores[detail.difficulty] = { correct: 0, total: 0 };
-        }
-        difficultyScores[detail.difficulty].total++;
-        if (detail.isCorrect) {
-          difficultyScores[detail.difficulty].correct++;
-        }
-      });
+            // Track difficulty performance
+            if (!difficultyScores[detail.difficulty]) {
+              difficultyScores[detail.difficulty] = { correct: 0, total: 0 };
+            }
+            difficultyScores[detail.difficulty].total++;
+            if (detail.isCorrect) {
+              difficultyScores[detail.difficulty].correct++;
+            }
+          }
+        });
+      }
     });
 
     // Calculate weak areas (topics with < 70% accuracy)
@@ -316,7 +319,7 @@ router.get('/analysis/weak-areas', authMiddleware, async (req, res) => {
 });
 
 // Debug route to check all test results for a user
-router.get('/debug/all', authMiddleware, async (req, res) => {
+router.get('/debug/all', async (req, res) => {
   try {
     const testResults = await TestResult.find({ userId: req.user.id });
     const completions = await TestCompletion.find({ userId: req.user.id });
@@ -340,7 +343,7 @@ router.get('/debug/all', authMiddleware, async (req, res) => {
 });
 
 // Get detailed test result
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const testResult = await TestResult.findOne({
       _id: req.params.id,
