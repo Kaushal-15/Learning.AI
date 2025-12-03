@@ -2,10 +2,9 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs').promises;
 const path = require('path');
-const authMiddleware = require('../middleware/authMiddleware');
 
 // Get questions by roadmap and difficulty
-router.get('/:roadmap', authMiddleware, async (req, res) => {
+router.get('/:roadmap', async (req, res) => {
   try {
     const { roadmap } = req.params;
     const { difficulty, limit } = req.query;
@@ -90,7 +89,7 @@ router.get('/:roadmap', authMiddleware, async (req, res) => {
 });
 
 // Get question statistics
-router.get('/:roadmap/stats', authMiddleware, async (req, res) => {
+router.get('/:roadmap/stats', async (req, res) => {
   try {
     const { roadmap } = req.params;
     

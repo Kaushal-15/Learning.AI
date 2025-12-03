@@ -5,10 +5,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "kill-port 3000 || true && nodemon server.js",
-    "test": "jest"
+    "dev": "node health-check.js && kill-port 3000 || true && nodemon server.js",
+    "test": "jest",
+    "health-check": "node health-check.js",
+    "test-backend": "node test-backend.js",
+    "monitor-errors": "node error-monitor.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

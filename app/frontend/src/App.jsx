@@ -8,10 +8,13 @@ import ProtectedLayout from "./components/ProtectedLayout";
 import Profile from "./components/Profile";
 import Roadmap from "./components/Roadmap";
 import Learn from "./components/Learn";
+import LearnPaths from "./components/LearnPaths";
 import Test from "./components/Test";
 import LessonDetail from "./components/LessonDetail";
 import QuizSelection from "./components/QuizSelection";
 import Quiz from "./components/Quiz";
+import ContentGeneratorDemo from "./components/ContentGeneratorDemo";
+import AdaptiveQuizTest from "./components/AdaptiveQuizTest";
 
 export default function App() {
   return (
@@ -29,10 +32,13 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/roadmap" element={<Roadmap />} />
           <Route path="/learn" element={<Learn />} />
+          <Route path="/LearnPaths" element={<LearnPaths />} />
           <Route path="/learn/:roadmapId/:lessonId" element={<LessonDetail />} />
           <Route path="/test" element={<Test />} />
           <Route path="/quiz-selection" element={<QuizSelection />} />
           <Route path="/quiz/:id" element={<Quiz />} />
+          <Route path="/content-demo" element={<ContentGeneratorDemo />} />
+          <Route path="/adaptive-quiz-test" element={<AdaptiveQuizTest />} />
         </Route>
       </Routes>
     </BrowserRouter>
