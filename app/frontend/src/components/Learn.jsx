@@ -21,7 +21,9 @@ import {
   Layers,
   Brain
 } from "lucide-react";
-import AnimatedBackground from "./AnimatedBackground";
+import { useTheme } from "../contexts/ThemeContext";
+import Sidebar from "./Sidebar";
+import "../styles/DevvoraStyles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -137,11 +139,21 @@ const getTypeColor = (type) => {
 
 export default function Learn() {
   const navigate = useNavigate();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [user, setUser] = useState(null);
   const [roadmapData, setRoadmapData] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [loading, setLoading] = useState(true);
   const [completedTasks, setCompletedTasks] = useState(new Set());
+
+  // Apply dashboard-dark class when theme changes
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dashboard-dark');
+    } else {
+      document.documentElement.classList.remove('dashboard-dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -264,11 +276,10 @@ export default function Learn() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 relative flex items-center justify-center">
-        <AnimatedBackground />
+      <div className="min-h-screen bg-gray-50 dashboard-dark:bg-black relative flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#344F1F] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your learning path...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dashboard-dark:text-[#ecd69f]">Loading your learning path...</p>
         </div>
       </div>
     );
@@ -291,199 +302,206 @@ export default function Learn() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
-      <AnimatedBackground />
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#344F1F] rounded-lg flex items-center justify-center">
-                  {roadmapIcons[user?.selectedRoadmap]}
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900">{roadmapData.title}</h1>
-                  <p className="text-sm text-gray-500">{roadmapData.description}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-8">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-[#344F1F]">{getTotalProgress()}%</div>
-                <div className="text-xs text-gray-500">Progress</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{Array.from(completedTasks).length}</div>
-                <div className="text-xs text-gray-500">Completed</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="pb-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-[#344F1F] h-2 rounded-full transition-all duration-500"
-                style={{ width: `${getTotalProgress()}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="dashboard-container">
+      {/* Sidebar */}
+      <Sidebar />
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar - Week Navigation */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-[#344F1F]" />
-                Timeline
-              </h3>
-
-              <div className="space-y-2">
-                {roadmapData.weeks.map((week, index) => {
-                  const progress = getWeekProgress(week, index);
-                  const isActive = currentWeek === week.week;
-
-                  return (
-                    <div
-                      key={week.week}
-                      onClick={() => setCurrentWeek(week.week)}
-                      className={`p-4 rounded-lg cursor-pointer transition-all duration-200 border ${isActive
-                        ? 'bg-[#344F1F] text-white border-[#344F1F]'
-                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Week {week.week}</span>
-                        <span className="text-sm">{progress}%</span>
-                      </div>
-                      <div className="text-sm opacity-90 mb-3">{week.title}</div>
-                      <div className={`w-full rounded-full h-1.5 ${isActive ? 'bg-white bg-opacity-30' : 'bg-gray-200'}`}>
-                        <div
-                          className={`h-1.5 rounded-full transition-all duration-300 ${isActive ? 'bg-white' : 'bg-[#344F1F]'
-                            }`}
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                      </div>
+      <div className="dashboard-main">
+        <div className="min-h-screen bg-gray-50 relative learn-page-container">
+          {/* Header */}
+          <header className="bg-white dashboard-dark:bg-[#0a0a0a] shadow-sm border-b border-gray-200 dashboard-dark:border-[#1a1a1a] transition-colors duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between py-4">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => navigate("/dashboard")}
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md">
+                      {roadmapIcons[user?.selectedRoadmap]}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content - Daily Tasks */}
-          <div className="lg:col-span-3">
-            {roadmapData.weeks
-              .filter(week => week.week === currentWeek)
-              .map((week, weekIndex) => (
-                <div key={week.week} className="space-y-6">
-                  {/* Week Header */}
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="w-12 h-12 bg-[#344F1F] text-white rounded-lg flex items-center justify-center">
-                        <Trophy className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Week {week.week}: {week.title}</h2>
-                        <p className="text-gray-600">{week.description}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[#344F1F]" />
-                        <span>{week.days.reduce((sum, day) => sum + parseInt(day.duration), 0)} hours total</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Target className="w-4 h-4 text-[#344F1F]" />
-                        <span>{week.days.length} tasks</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-[#344F1F]" />
-                        <span>{getWeekProgress(week, weekIndex)}% complete</span>
-                      </div>
+                    <div>
+                      <h1 className="text-xl font-semibold text-gray-900 dashboard-dark:text-[#ecd69f]">{roadmapData.title}</h1>
+                      <p className="text-sm text-gray-500 dashboard-dark:text-[#b8a67d]">{roadmapData.description}</p>
                     </div>
                   </div>
+                </div>
 
-                  {/* Daily Tasks */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {week.days.map((day, dayIndex) => {
-                      const taskId = `${weekIndex}-${dayIndex}`;
-                      const isCompleted = completedTasks.has(taskId);
+                <div className="flex items-center gap-8">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-500 dashboard-dark:text-[#ecd69f]">{getTotalProgress()}%</div>
+                    <div className="text-xs text-gray-500 dashboard-dark:text-[#b8a67d]">Progress</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600 dashboard-dark:text-[#ecd69f]">{Array.from(completedTasks).length}</div>
+                    <div className="text-xs text-gray-500 dashboard-dark:text-[#b8a67d]">Completed</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="pb-4">
+                <div className="w-full bg-gray-200 dashboard-dark:bg-[#1a1a1a] rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${getTotalProgress()}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {/* Sidebar - Week Navigation */}
+              <div className="lg:col-span-1">
+                <div className="bg-white dashboard-dark:bg-[#0a0a0a] rounded-3xl shadow-sm border border-gray-200 dashboard-dark:border-[#1a1a1a] p-6 sticky top-8 transition-all duration-300 hover:shadow-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 dashboard-dark:text-[#ecd69f] mb-4 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-[#344F1F]" />
+                    Timeline
+                  </h3>
+
+                  <div className="space-y-2">
+                    {roadmapData.weeks.map((week, index) => {
+                      const progress = getWeekProgress(week, index);
+                      const isActive = currentWeek === week.week;
 
                       return (
                         <div
-                          key={day.day}
-                          className={`bg-white rounded-lg shadow-sm border p-6 transition-all duration-200 hover:shadow-md ${isCompleted ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                          key={week.week}
+                          onClick={() => setCurrentWeek(week.week)}
+                          className={`p-4 rounded-2xl cursor-pointer transition-all duration-200 border-2 ${isActive
+                            ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white border-orange-500 shadow-lg'
+                            : 'bg-gray-50 dashboard-dark:bg-[#0a0a0a] hover:bg-gray-100 dashboard-dark:hover:bg-[#1a1a1a] text-gray-700 dashboard-dark:text-[#ecd69f] border-gray-200 dashboard-dark:border-[#1a1a1a] hover:border-orange-300'
                             }`}
                         >
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg border-2 ${getTypeColor(day.type)}`}>
-                                {getTypeIcon(day.type)}
-                              </div>
-                              <div>
-                                <div className="text-sm text-gray-500">Day {day.day}</div>
-                                <h3 className="font-semibold text-gray-800">{day.title}</h3>
-                              </div>
-                            </div>
-
-                            <button
-                              onClick={() => toggleTaskCompletion(weekIndex, dayIndex)}
-                              className={`p-2 rounded-full transition-all duration-200 ${isCompleted
-                                ? 'bg-green-500 text-white hover:bg-green-600'
-                                : 'bg-gray-200 text-gray-400 hover:bg-gray-300'
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">Week {week.week}</span>
+                            <span className="text-sm">{progress}%</span>
+                          </div>
+                          <div className="text-sm opacity-90 mb-3">{week.title}</div>
+                          <div className={`w-full rounded-full h-1.5 ${isActive ? 'bg-white bg-opacity-30' : 'bg-gray-200 dashboard-dark:bg-[#1a1a1a]'}`}>
+                            <div
+                              className={`h-1.5 rounded-full transition-all duration-300 ${isActive ? 'bg-white' : 'bg-gradient-to-r from-orange-500 to-orange-600'
                                 }`}
-                            >
-                              {isCompleted ? <CheckCircle className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
-                            </button>
+                              style={{ width: `${progress}%` }}
+                            ></div>
                           </div>
-
-                          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {day.duration}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(day.type)}`}>
-                              {day.type.charAt(0).toUpperCase() + day.type.slice(1)}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => navigate('/LearnPaths', {
-                              state: {
-                                roadmapId: user?.selectedRoadmap,
-                                week: week.week,
-                                day: day.day,
-                                dayData: day,
-                                roadmapTitle: roadmapData.title
-                              }
-                            })}
-                            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${isCompleted
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-[#344F1F] text-white hover:bg-[#2a3f1a]'
-                              }`}
-                          >
-                            <Play className="w-4 h-4" />
-                            {isCompleted ? 'Review' : 'Start Learning'}
-                          </button>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Main Content - Daily Tasks */}
+              <div className="lg:col-span-3">
+                {roadmapData.weeks
+                  .filter(week => week.week === currentWeek)
+                  .map((week, weekIndex) => (
+                    <div key={week.week} className="space-y-6">
+                      {/* Week Header */}
+                      <div className="bg-white dashboard-dark:bg-[#0a0a0a] rounded-3xl shadow-sm border border-gray-200 dashboard-dark:border-[#1a1a1a] p-6 transition-all duration-300">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-2xl flex items-center justify-center shadow-lg">
+                            <Trophy className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h2 className="text-xl font-semibold text-gray-900 dashboard-dark:text-[#ecd69f]">Week {week.week}: {week.title}</h2>
+                            <p className="text-gray-600 dashboard-dark:text-[#b8a67d]">{week.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 text-sm text-gray-500 dashboard-dark:text-[#b8a67d]">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-orange-500" />
+                            <span>{week.days.reduce((sum, day) => sum + parseInt(day.duration), 0)} hours total</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Target className="w-4 h-4 text-orange-500" />
+                            <span>{week.days.length} tasks</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-orange-500" />
+                            <span>{getWeekProgress(week, weekIndex)}% complete</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Daily Tasks */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {week.days.map((day, dayIndex) => {
+                          const taskId = `${weekIndex}-${dayIndex}`;
+                          const isCompleted = completedTasks.has(taskId);
+
+                          return (
+                            <div
+                              key={day.day}
+                              className={`bg-white dashboard-dark:bg-[#0a0a0a] rounded-3xl shadow-sm border-2 p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isCompleted ? 'border-green-500 bg-green-50 dashboard-dark:bg-green-900/20' : 'border-gray-200 dashboard-dark:border-[#1a1a1a]'
+                                }`}
+                            >
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg border-2 ${getTypeColor(day.type)}`}>
+                                    {getTypeIcon(day.type)}
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-gray-500 dashboard-dark:text-[#b8a67d]">Day {day.day}</div>
+                                    <h3 className="font-semibold text-gray-800 dashboard-dark:text-[#ecd69f]">{day.title}</h3>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => toggleTaskCompletion(weekIndex, dayIndex)}
+                                  className={`p-2 rounded-full transition-all duration-300 ${isCompleted
+                                    ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg'
+                                    : 'bg-gray-200 dashboard-dark:bg-[#1a1a1a] text-gray-400 dashboard-dark:text-[#b8a67d] hover:bg-gray-300 dashboard-dark:hover:bg-[#2a2a2a]'
+                                    }`}
+                                >
+                                  {isCompleted ? <CheckCircle className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                                </button>
+                              </div>
+
+                              <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  {day.duration}
+                                </span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(day.type)}`}>
+                                  {day.type.charAt(0).toUpperCase() + day.type.slice(1)}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => navigate('/LearnPaths', {
+                                  state: {
+                                    roadmapId: user?.selectedRoadmap,
+                                    week: week.week,
+                                    day: day.day,
+                                    dayData: day,
+                                    roadmapTitle: roadmapData.title
+                                  }
+                                })}
+                                className={`w-full py-3 px-4 rounded-2xl font-medium transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg ${isCompleted
+                                  ? 'bg-green-100 dashboard-dark:bg-green-900/30 text-green-700 dashboard-dark:text-green-400 hover:bg-green-200 dashboard-dark:hover:bg-green-900/40'
+                                  : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700'
+                                  }`}
+                              >
+                                <Play className="w-4 h-4" />
+                                {isCompleted ? 'Review' : 'Start Learning'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

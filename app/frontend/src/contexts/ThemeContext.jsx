@@ -25,9 +25,9 @@ export const ThemeProvider = ({ children }) => {
         if (typeof window !== 'undefined') {
             const root = document.documentElement;
             if (isDarkMode) {
-                root.classList.add('dark');
+                root.classList.add('app-dark');
             } else {
-                root.classList.remove('dark');
+                root.classList.remove('app-dark');
             }
         }
     }, [isDarkMode]);

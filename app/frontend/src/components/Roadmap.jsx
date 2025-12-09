@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Code, Database, Shield, Smartphone, Globe, Server, Layers, Brain } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
-import ThemeToggle from "./ThemeToggle";
+import GlobalThemeToggle from "./GlobalThemeToggle";
+import "../styles/DevvoraStyles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -126,7 +127,7 @@ export default function Roadmap() {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/profile/onboarding`, {
+      const res = await fetch(`${API_BASE} /profile/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -161,10 +162,8 @@ export default function Roadmap() {
 
   return (
     <section className="min-h-screen w-full flex flex-col items-center bg-gray-50 dark:bg-gradient-dark relative px-6 py-8">
+      <GlobalThemeToggle />
       <AnimatedBackground />
-      <div className="absolute top-4 right-4 z-10">
-        <ThemeToggle />
-      </div>
       {/* Header */}
       <div className="w-full max-w-6xl mb-8 relative z-10">
         <div className="text-center mb-6">
@@ -185,13 +184,13 @@ export default function Roadmap() {
           <div className="flex items-center space-x-4">
             {[1, 2, 3].map((stepNum) => (
               <div key={stepNum} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${step >= stepNum ? "bg-green-600 dark:bg-green-500 text-white" : "bg-gray-300 dark:bg-dark-300 text-gray-600 dark:text-cream-200"
-                  }`}>
+                <div className={`w - 8 h - 8 rounded - full flex items - center justify - center text - sm font - semibold ${step >= stepNum ? "bg-green-600 dark:bg-green-500 text-white" : "bg-gray-300 dark:bg-dark-300 text-gray-600 dark:text-cream-200"
+                  } `}>
                   {stepNum}
                 </div>
                 {stepNum < 3 && (
-                  <div className={`w-16 h-1 mx-2 ${step > stepNum ? "bg-green-600 dark:bg-green-500" : "bg-gray-300 dark:bg-dark-300"
-                    }`} />
+                  <div className={`w - 16 h - 1 mx - 2 ${step > stepNum ? "bg-green-600 dark:bg-green-500" : "bg-gray-300 dark:bg-dark-300"
+                    } `} />
                 )}
               </div>
             ))}
@@ -208,7 +207,7 @@ export default function Roadmap() {
               onClick={() => handleRoadmapSelect(roadmap.id)}
               className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl"
             >
-              <div className={`w-16 h-16 rounded-xl bg-gradient-to-r ${roadmap.color} flex items-center justify-center text-white mb-4`}>
+              <div className={`w - 16 h - 16 rounded - xl bg - gradient - to - r ${roadmap.color} flex items - center justify - center text - white mb - 4`}>
                 {roadmap.icon}
               </div>
               <h3 className="text-xl font-bold text-gray-800 dark:text-cream-100 mb-2">{roadmap.title}</h3>

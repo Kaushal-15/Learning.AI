@@ -34,7 +34,7 @@ const validateRequest = (req, res, next) => {
     }
 
     // Validate content_type
-    const validTypes = ['text', 'video', 'audio', 'image'];
+    const validTypes = ['text', 'video', 'audio', 'image', 'flashcards', 'full_module'];
     if (!validTypes.includes(content_type)) {
         return res.status(400).json({
             success: false,
@@ -84,11 +84,11 @@ router.post('/generate', validateRequest, async (req, res) => {
 
         console.log(`[Content Generation] Cache MISS - Generating new content...`);
 
-        // 2. Check if API key is configured
-        if (!process.env.GEMINI_API_KEY) {
+        // 2. Check if at least one API key is configured (Groq or Gemini)
+        if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY) {
             return res.status(503).json({
                 success: false,
-                message: 'Content generation service is not configured. Please contact administrator.'
+                message: 'Content generation service is not configured. Please add GROQ_API_KEY or GEMINI_API_KEY to your .env file.'
             });
         }
 

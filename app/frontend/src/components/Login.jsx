@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import "../styles/DevvoraStyles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -7,16 +9,17 @@ export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null); // { type: "error" | "success", text: string }
+  const [pageLoading, setPageLoading] = useState(true);
+  const [message, setMessage] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Enforce Light Mode
   useEffect(() => {
     document.documentElement.classList.remove('dark');
-    // Optional: Re-add dark mode if user navigates away (handled by other components usually)
-    return () => {
-      // We don't necessarily need to re-add it here, as other components like Dashboard 
-      // will check local storage and add it back if needed.
-    };
+    // Simulate initial page load
+    const timer = setTimeout(() => {
+      setPageLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleChange = (e) => {
@@ -37,10 +40,9 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
-
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ important: allows cookies to be sent & stored
+        credentials: "include",
         body: JSON.stringify({
           email: form.email.trim(),
           password: form.password,
@@ -51,8 +53,6 @@ export default function Login() {
 
       if (res.ok) {
         setMessage({ type: "success", text: "Logged in successfully! Redirecting..." });
-
-        // ✅ short delay so the user can see message
         setTimeout(() => {
           navigate("/dashboard");
         }, 800);
@@ -67,129 +67,156 @@ export default function Login() {
     }
   };
 
-  return (
-    <section className="w-full min-h-screen flex justify-center items-center bg-gradient-to-br from-[#FFECC0] via-[#f9f4e3] to-[#344F1F] text-color1 px-6 sm:px-10 md:px-16 lg:px-24">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
-        <h2 className="text-3xl font-extrabold mb-6 text-center text-gray-800">
-          Welcome back
-        </h2>
-        <p className="text-center text-gray-500 mb-8">
-          Log in to your <span className="font-semibold text-color1">Learning.AI</span> account
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email */}
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-md font-semibold mb-2 text-color1"
-            >
-              Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-color4 transition"
-              placeholder="Enter your email"
-              required
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-md font-semibold mb-2 text-color1"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-color4 transition"
-              placeholder="Enter your password"
-              required
-            />
-          </div>
-
-          {/* Remember me + Forgot password */}
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="remember" className="accent-color2" />
-              <label htmlFor="remember" className="text-sm text-color1">
-                Remember me
-              </label>
+  // Premium loading state
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative inline-block mb-6">
+            <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full opacity-20 animate-pulse"></div>
             </div>
-            <a
-              href="/forgot-password"
-              className="text-sm text-color1 hover:underline"
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Learning.AI</h3>
+          <p className="text-gray-600 text-sm">Preparing your learning experience...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="auth-split-container">
+      {/* Left Side - Logo */}
+      <div className="auth-left-panel">
+        <div className="auth-logo-container">
+          <div className="auth-logo-circle">
+            <svg viewBox="0 0 120 120" className="auth-logo-svg">
+              {/* Outer glow circle */}
+              <circle cx="60" cy="60" r="50" fill="none" stroke="url(#orangeGradient)" strokeWidth="2" opacity="0.3" />
+
+              {/* Book base */}
+              <rect x="35" y="45" width="50" height="35" rx="3" fill="white" opacity="0.9" />
+
+              {/* Book pages */}
+              <line x1="60" y1="45" x2="60" y2="80" stroke="#FF8A00" strokeWidth="1.5" opacity="0.5" />
+              <line x1="50" y1="45" x2="50" y2="80" stroke="#FF8A00" strokeWidth="1" opacity="0.3" />
+              <line x1="70" y1="45" x2="70" y2="80" stroke="#FF8A00" strokeWidth="1" opacity="0.3" />
+
+              {/* AI Sparkles/Stars */}
+              <path d="M 45 35 L 46 38 L 49 39 L 46 40 L 45 43 L 44 40 L 41 39 L 44 38 Z" fill="#FFB84D" />
+              <path d="M 75 32 L 76.5 36 L 80.5 37.5 L 76.5 39 L 75 43 L 73.5 39 L 69.5 37.5 L 73.5 36 Z" fill="white" />
+              <path d="M 88 55 L 89 58 L 92 59 L 89 60 L 88 63 L 87 60 L 84 59 L 87 58 Z" fill="#FFB84D" />
+
+              {/* Brain/Neural network symbol on book */}
+              <circle cx="60" cy="62" r="8" fill="none" stroke="#FF8A00" strokeWidth="2" />
+              <circle cx="60" cy="62" r="3" fill="#FF8A00" />
+              <line x1="60" y1="59" x2="60" y2="54" stroke="#FF8A00" strokeWidth="1.5" />
+              <line x1="63" y1="60" x2="67" y2="58" stroke="#FF8A00" strokeWidth="1.5" />
+              <line x1="57" y1="60" x2="53" y2="58" stroke="#FF8A00" strokeWidth="1.5" />
+
+              {/* Gradient definition */}
+              <defs>
+                <linearGradient id="orangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{ stopColor: '#FF8A00', stopOpacity: 1 }} />
+                  <stop offset="100%" style={{ stopColor: '#FFB84D', stopOpacity: 1 }} />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <h2 className="text-white text-2xl font-bold mt-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Learning.AI</h2>
+          <p className="text-white/80 text-sm mt-2">Your AI-Powered Learning Platform</p>
+        </div>
+      </div>
+
+      {/* Right Side - Form */}
+      <div className="auth-right-panel">
+        <div className="auth-form-container">
+          <h2 className="auth-title">Sign In</h2>
+          <p className="auth-subtitle">Welcome back! Please sign in to your account.</p>
+
+          <form onSubmit={handleSubmit} className="auth-form">
+            <div className="auth-input-group">
+              <label htmlFor="email" className="auth-label">Email Address *</label>
+              <input
+                id="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                className="auth-input"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            <div className="auth-input-group">
+              <label htmlFor="password" className="auth-label">Password *</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={handleChange}
+                  className="auth-input"
+                  placeholder="Enter your password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="auth-password-toggle"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="auth-forgot-link">
+              <button type="button" onClick={() => navigate("/forgot-password")} className="auth-link-button">
+                Forgot your password?
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="auth-submit-btn"
             >
-              Forgot Password?
-            </a>
+              {loading ? "Signing In..." : "Sign In →"}
+            </button>
+          </form>
+
+          {message && (
+            <div className={`auth-message ${message.type === "error" ? "auth-message-error" : "auth-message-success"}`}>
+              {message.text}
+            </div>
+          )}
+
+          <div className="auth-divider">
+            <span>Or continue with</span>
           </div>
 
-          {/* Login button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-color2 text-color1 py-3 rounded-lg text-lg font-semibold shadow-md hover:bg-[#ffb74d] hover:shadow-lg transition-all duration-200 disabled:opacity-60"
-          >
-            {loading ? "Logging In..." : "Log In"}
+          <button className="auth-google-btn">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            Continue with Google
           </button>
-        </form>
 
-        {/* Status Message */}
-        {message && (
-          <p
-            className={`text-center text-sm mt-4 ${message.type === "error" ? "text-red-600" : "text-green-700"
-              }`}
-          >
-            {message.text}
+          <p className="auth-switch-text">
+            By signing in, you agree to our Terms of Service and Privacy Policy.
           </p>
-        )}
 
-        {/* Divider */}
-        <div className="flex items-center my-6">
-          <div className="flex-1 h-px bg-gray-300"></div>
-          <span className="px-3 text-color1 text-sm">or continue with</span>
-          <div className="flex-1 h-px bg-gray-300"></div>
+          <p className="auth-switch-link">
+            <button onClick={() => navigate("/signup")} className="auth-link-button-primary">
+              Create a new account
+            </button>
+          </p>
         </div>
-
-        {/* OAuth Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button className="flex items-center justify-center gap-2 w-full py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
-            <img
-              src="https://www.svgrepo.com/show/355037/google.svg"
-              alt="Google"
-              className="w-5 h-5"
-            />
-            <span className="text-gray-700 font-medium">Google</span>
-          </button>
-          <button className="flex items-center justify-center gap-2 w-full py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
-            <img
-              src="https://www.svgrepo.com/show/349375/github.svg"
-              alt="GitHub"
-              className="w-5 h-5"
-            />
-            <span className="text-gray-700 font-medium">GitHub</span>
-          </button>
-        </div>
-
-        {/* Signup Link */}
-        <p className="text-center text-color1 text-sm mt-8">
-          Don’t have an account?{" "}
-          <a
-            href="/signup"
-            className="text-color1 font-semibold hover:underline"
-          >
-            Sign up
-          </a>
-        </p>
       </div>
-    </section>
+    </div>
   );
 }
