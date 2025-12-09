@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Brain, Target, BookOpen, ArrowRight, Zap, Trophy } from 'lucide-react';
-import ThemeToggle from './ThemeToggle';
+import { Brain, Target, BookOpen, ArrowRight, Zap, Trophy, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 import AnimatedBackground from './AnimatedBackground';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
@@ -10,12 +10,21 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api
 export default function QuizSelector() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [difficulty, setDifficulty] = useState('medium');
   const [questionCount, setQuestionCount] = useState(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [roadmapCategory, setRoadmapCategory] = useState('');
   const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dashboard-dark');
+    } else {
+      document.documentElement.classList.remove('dashboard-dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     if (user) {
@@ -76,48 +85,52 @@ export default function QuizSelector() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 relative transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 relative transition-colors duration-300">
       <AnimatedBackground />
 
-      {/* Header with Theme Toggle */}
-      <div className="absolute top-4 right-4 z-20">
-        <ThemeToggle />
-      </div>
+      {/* Theme Toggle */}
+      <button
+        onClick={toggleTheme}
+        className="fixed top-6 right-6 z-50 p-3 bg-white dashboard-dark:bg-[#0a0a0a] border-2 border-gray-200 dashboard-dark:border-[#1a1a1a] rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+        title={isDarkMode ? "Light Mode" : "Dark Mode"}
+      >
+        {isDarkMode ? <Sun className="w-5 h-5 text-[#ecd69f]" /> : <Moon className="w-5 h-5 text-gray-700" />}
+      </button>
 
       <div className="relative z-10 container mx-auto px-4 py-12 flex items-center justify-center min-h-screen">
         <div className="w-full max-w-2xl">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 transition-colors duration-300">
+          <div className="bg-white dashboard-dark:bg-[#0a0a0a] rounded-3xl shadow-xl p-8 border border-gray-200 dashboard-dark:border-[#1a1a1a] transition-all duration-300">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg transform rotate-3">
+              <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg transform rotate-3">
                 <Brain className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Start a Quiz</h2>
-              <p className="text-gray-600 dark:text-gray-400">Test your {roadmapCategory || 'development'} knowledge</p>
+              <h2 className="text-3xl font-bold text-gray-900 dashboard-dark:text-[#ecd69f] mb-2">Start a Quiz</h2>
+              <p className="text-gray-600 dashboard-dark:text-[#b8a67d]">Test your {roadmapCategory || 'development'} knowledge</p>
             </div>
 
             {error && (
-              <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded">
-                <p className="text-red-700 dark:text-red-400">{error}</p>
+              <div className="mb-6 bg-red-50 dashboard-dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded">
+                <p className="text-red-700 dashboard-dark:text-red-400">{error}</p>
               </div>
             )}
 
             <div className="space-y-8">
               {/* Display selected roadmap */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-semibold text-gray-700 dashboard-dark:text-[#ecd69f] mb-2 flex items-center gap-2">
                   <Target className="w-4 h-4" />
                   Your Learning Path
                 </label>
-                <div className="px-4 py-4 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-100 dark:border-indigo-500/30 rounded-xl transition-colors">
+                <div className="px-4 py-4 bg-orange-50 dashboard-dark:bg-orange-900/20 border-2 border-orange-100 dashboard-dark:border-orange-500/30 rounded-2xl transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 dark:bg-indigo-800 rounded-lg">
-                      <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <div className="p-2 bg-orange-100 dashboard-dark:bg-orange-800 rounded-lg">
+                      <BookOpen className="w-5 h-5 text-orange-600 dashboard-dark:text-orange-400" />
                     </div>
                     <div>
-                      <span className="font-bold text-indigo-900 dark:text-indigo-100 text-lg block">
+                      <span className="font-bold text-orange-900 dashboard-dark:text-orange-100 text-lg block">
                         {roadmapCategory || 'Select a roadmap first'}
                       </span>
-                      <span className="text-xs text-indigo-600 dark:text-indigo-400">
+                      <span className="text-xs text-orange-600 dashboard-dark:text-orange-400">
                         Questions tailored to your path
                       </span>
                     </div>
@@ -127,7 +140,7 @@ export default function QuizSelector() {
 
               {/* Difficulty Selection */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <label className="block text-sm font-semibold text-gray-700 dashboard-dark:text-[#ecd69f] mb-3 flex items-center gap-2">
                   <Trophy className="w-4 h-4" />
                   Difficulty Level
                 </label>
@@ -136,9 +149,9 @@ export default function QuizSelector() {
                     <button
                       key={level}
                       onClick={() => setDifficulty(level)}
-                      className={`px-4 py-3 rounded-xl font-semibold capitalize transition-all duration-200 ${difficulty === level
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 transform -translate-y-1'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      className={`px-4 py-3 rounded-2xl font-semibold capitalize transition-all duration-300 ${difficulty === level
+                        ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30 transform -translate-y-1'
+                        : 'bg-gray-100 dashboard-dark:bg-[#1a1a1a] text-gray-600 dashboard-dark:text-[#b8a67d] hover:bg-gray-200 dashboard-dark:hover:bg-[#2a2a2a]'
                         }`}
                     >
                       {level}
@@ -149,12 +162,12 @@ export default function QuizSelector() {
 
               {/* Question Count */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center justify-between">
+                <label className="block text-sm font-semibold text-gray-700 dashboard-dark:text-[#ecd69f] mb-4 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Zap className="w-4 h-4" />
                     Number of Questions
                   </span>
-                  <span className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full text-xs font-bold">
+                  <span className="bg-orange-100 dashboard-dark:bg-orange-900/50 text-orange-700 dashboard-dark:text-orange-300 px-3 py-1 rounded-full text-xs font-bold">
                     {questionCount} Questions
                   </span>
                 </label>
@@ -166,9 +179,9 @@ export default function QuizSelector() {
                     step="5"
                     value={questionCount}
                     onChange={(e) => setQuestionCount(parseInt(e.target.value))}
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-600 dark:accent-indigo-500"
+                    className="w-full h-2 bg-gray-200 dashboard-dark:bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-orange-600"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium">
+                  <div className="flex justify-between text-xs text-gray-500 dashboard-dark:text-[#b8a67d] mt-2 font-medium">
                     <span>5</span>
                     <span>15</span>
                     <span>30</span>
@@ -180,7 +193,7 @@ export default function QuizSelector() {
               <button
                 onClick={startQuiz}
                 disabled={loading || !roadmapCategory}
-                className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 group"
+                className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 group"
               >
                 {loading ? (
                   'Starting...'
@@ -193,8 +206,8 @@ export default function QuizSelector() {
               </button>
 
               {!roadmapCategory && (
-                <p className="text-sm text-center text-gray-500 dark:text-gray-400">
-                  Complete your <button onClick={() => navigate('/roadmap')} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">roadmap selection</button> to start
+                <p className="text-sm text-center text-gray-500 dashboard-dark:text-[#b8a67d]">
+                  Complete your <button onClick={() => navigate('/roadmap')} className="text-orange-600 dashboard-dark:text-orange-400 font-medium hover:underline">roadmap selection</button> to start
                 </p>
               )}
             </div>

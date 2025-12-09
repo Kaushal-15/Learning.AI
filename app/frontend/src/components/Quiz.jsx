@@ -14,7 +14,8 @@ import {
   Award
 } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
-import ThemeToggle from "./ThemeToggle";
+import GlobalThemeToggle from "./GlobalThemeToggle";
+import "../styles/DevvoraStyles.css";
 
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
@@ -319,10 +320,8 @@ export default function Quiz() {
   if (showResults) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
+        <GlobalThemeToggle />
         <AnimatedBackground />
-        <div className="absolute top-4 right-4 z-10">
-          <ThemeToggle />
-        </div>
         {/* Professional Results Header */}
         <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm border-b border-gray-200 dark:border-dark-300 p-6 relative z-10">
           <div className="max-w-6xl mx-auto">
@@ -480,10 +479,8 @@ export default function Quiz() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">
+      <GlobalThemeToggle />
       <AnimatedBackground />
-      <div className="absolute top-4 right-4 z-10">
-        <ThemeToggle />
-      </div>
       {/* Professional Quiz Header */}
       <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm border-b border-gray-200 dark:border-dark-300 p-6 relative z-10">
         <div className="max-w-6xl mx-auto">

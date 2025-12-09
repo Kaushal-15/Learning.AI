@@ -1,170 +1,70 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-    LogOut,
-    User,
-    BookOpen,
-    Target,
-    TrendingUp,
-    Trophy,
-    Clock,
-    Award,
-    BarChart3,
-    Calendar,
-    CheckCircle2,
-    RefreshCw,
-    Brain,
-    Search,
-    Bell,
-    Settings,
-    Activity,
-    Star,
-    ArrowUp,
-    Plus,
-    ChevronRight,
-    PlayCircle,
-    Users,
-    Zap
+    TrendingUp, Users, Award, BarChart3, Clock
 } from "lucide-react";
-import AnimatedBackground from "./AnimatedBackground";
-import ThemeToggle from "./ThemeToggle";
-
-import "../index.css";
+import { useTheme } from "../contexts/ThemeContext";
+import Sidebar from "./Sidebar";
+import "../styles/DevvoraStyles.css";
+import { BookOpen, FolderKanban } from "lucide-react";
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const location = useLocation();
-
     const [user, setUser] = useState(null);
-    const [learnerData, setLearnerData] = useState(null);
-    const [testResults, setTestResults] = useState([]);
-    const [testStats, setTestStats] = useState(null);
-    const [testCompletions, setTestCompletions] = useState([]);
-    const [weakAreasAnalysis, setWeakAreasAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [showRoadmapModal, setShowRoadmapModal] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
+    const [testResults, setTestResults] = useState([]);
     const [progressData, setProgressData] = useState(null);
+    const [showRoadmapModal, setShowRoadmapModal] = useState(false);
+    const { isDarkMode } = useTheme();
 
-    // Helper function to map roadmap names
-    const getRoadmapKey = (roadmap) => {
-        const mapping = {
-            'frontend': 'frontend-development',
-            'backend': 'backend-development',
-            'full-stack': 'full-stack-development',
-            'mobile': 'mobile-development',
-            'ai-ml': 'ai-machine-learning',
-            'devops': 'devops-cloud',
-            'database': 'database-data-science'
-        };
-        return mapping[roadmap] || roadmap;
-    };
-
-    // ✅ Fetch logged-in user details and check onboarding status
+    // Apply dashboard-dark class when theme changes
     useEffect(() => {
-        const fetchUserAndData = async () => {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dashboard-dark');
+        } else {
+            document.documentElement.classList.remove('dashboard-dark');
+        }
+    }, [isDarkMode]);
+
+    useEffect(() => {
+        const fetchUser = async () => {
             try {
-                // Fetch user profile
-                const userRes = await fetch("http://localhost:3000/api/profile/me", {
+                const res = await fetch("http://localhost:3000/api/profile/me", {
                     method: "GET",
                     credentials: "include",
                 });
-                const userData = await userRes.json();
+                const data = await res.json();
+                if (res.ok && data.success && data.user) {
+                    setUser(data.user);
 
-                if (userRes.ok && userData.success && userData.user) {
-                    setUser(userData.user);
-
-                    // Check if user has completed onboarding
-                    if (!userData.user.hasCompletedOnboarding) {
-                        navigate("/roadmap");
-                        return;
-                    }
-
-                    const roadmapKey = getRoadmapKey(userData.user.selectedRoadmap);
-                    // Fetch all data in parallel to reduce loading time
-                    const [learnerRes, testRes, statsRes, completionsRes, analysisRes, progressRes] = await Promise.allSettled([
-                        fetch("http://localhost:3000/api/learners/me", {
+                    // Fetch learning progress
+                    try {
+                        const progressRes = await fetch(`http://localhost:3000/api/progress/${data.user.selectedRoadmap}`, {
                             method: "GET",
                             credentials: "include",
-                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                        }),
-                        fetch("http://localhost:3000/api/test-results?limit=5", {
+                        });
+                        const progressData = await progressRes.json();
+                        if (progressRes.ok && progressData.success) {
+                            setProgressData(progressData.data);
+                        }
+                    } catch (progressErr) {
+                        console.error("Error fetching progress:", progressErr);
+                    }
+
+                    // Fetch test results
+                    try {
+                        const testRes = await fetch("http://localhost:3000/api/test-results?limit=5", {
                             method: "GET",
                             credentials: "include",
-                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                        }),
-                        fetch("http://localhost:3000/api/test-results/stats", {
-                            method: "GET",
-                            credentials: "include",
-                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                        }),
-                        fetch(`http://localhost:3000/api/test-results/completions?roadmapType=${roadmapKey}`, {
-                            method: "GET",
-                            credentials: "include",
-                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                        }),
-                        fetch(`http://localhost:3000/api/test-results/analysis/weak-areas?roadmapType=${roadmapKey}`, {
-                            method: "GET",
-                            credentials: "include",
-                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                        }),
-                        fetch(`http://localhost:3000/api/progress/${userData.user.selectedRoadmap}`, {
-                            method: "GET",
-                            credentials: "include",
-                            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                        })
-                    ]);
-
-                    // Process progress data
-                    if (progressRes.status === 'fulfilled' && progressRes.value.ok) {
-                        const progressJson = await progressRes.value.json();
-                        if (progressJson.success) {
-                            setProgressData(progressJson.data);
+                        });
+                        const testData = await testRes.json();
+                        if (testRes.ok && testData.success) {
+                            setTestResults(testData.data || []);
                         }
+                    } catch (testErr) {
+                        console.error("Error fetching test results:", testErr);
                     }
-
-                    // Process learner data
-                    if (learnerRes.status === 'fulfilled' && learnerRes.value.ok) {
-                        const learnerData = await learnerRes.value.json();
-                        if (learnerData.success) {
-                            setLearnerData(learnerData.data);
-                        }
-                    }
-
-                    // Process test results
-                    if (testRes.status === 'fulfilled' && testRes.value.ok) {
-                        const testData = await testRes.value.json();
-                        if (testData.success) {
-                            setTestResults(testData.data);
-                        }
-                    }
-
-                    // Process test statistics
-                    if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
-                        const statsData = await statsRes.value.json();
-                        if (statsData.success) {
-                            setTestStats(statsData.data);
-                        }
-                    }
-
-                    // Process test completions
-                    if (completionsRes.status === 'fulfilled' && completionsRes.value.ok) {
-                        const completionsData = await completionsRes.value.json();
-                        if (completionsData.success) {
-                            setTestCompletions(completionsData.data);
-                        }
-                    }
-
-                    // Process weak areas analysis
-                    if (analysisRes.status === 'fulfilled' && analysisRes.value.ok) {
-                        const analysisData = await analysisRes.value.json();
-                        if (analysisData.success) {
-                            setWeakAreasAnalysis(analysisData.data);
-                        }
-                    }
-
                 } else {
-                    console.warn("Not logged in:", userData.message);
                     navigate("/login");
                 }
             } catch (err) {
@@ -174,473 +74,424 @@ export default function Dashboard() {
                 setLoading(false);
             }
         };
+        fetchUser();
+    }, [navigate]);
 
-        fetchUserAndData();
-    }, [navigate, refreshKey]);
 
-    // Listen for navigation state changes (from test completion)
-    useEffect(() => {
-        if (location.state?.refresh) {
-            refreshData();
-        }
-    }, [location.state]);
 
-    // Handle roadmap change
-    const handleRoadmapChange = async () => {
-        try {
-            const res = await fetch("http://localhost:3000/api/profile/reset-progress", {
-                method: "POST",
-                credentials: "include",
-            });
-
-            if (res.ok) {
-                setShowRoadmapModal(false);
-                navigate("/roadmap");
-            } else {
-                console.error("Failed to reset progress");
-            }
-        } catch (err) {
-            console.error("Error resetting progress:", err);
-        }
+    // Calculate real statistics from progress data
+    const getCompletedLessons = () => {
+        if (!progressData || !progressData.completedLessons) return 0;
+        return progressData.completedLessons.length;
     };
 
-    // Refresh data
-    const refreshData = () => {
-        setLoading(true);
-        setTestStats(null);
-        setTestCompletions([]);
-        setTestResults([]);
-        setWeakAreasAnalysis(null);
-        setRefreshKey(prev => prev + 1);
+    const getTotalLessons = () => {
+        // Assuming each roadmap has approximately 40-50 lessons (can be adjusted)
+        return 45;
     };
 
-    // Auto-refresh when component becomes visible (user returns from test)
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                setTimeout(() => refreshData(), 1000);
-            }
-        };
+    const getOverallProgress = () => {
+        const completed = getCompletedLessons();
+        const total = getTotalLessons();
+        return total > 0 ? Math.round((completed / total) * 100) : 0;
+    };
 
-        const handleFocus = () => {
-            setTimeout(() => refreshData(), 1000);
-        };
+    const handleChangeRoadmap = () => {
+        setShowRoadmapModal(true);
+    };
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('focus', handleFocus);
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('focus', handleFocus);
-        };
-    }, []);
-
-    // ✅ Logout function
-    const logout = async () => {
-        try {
-            const res = await fetch("http://localhost:3000/api/auth/logout", {
-                method: "POST",
-                credentials: "include",
-            });
-            if (res.ok) {
-                localStorage.clear();
-                setUser(null);
-                window.location.href = "/login";
-            }
-        } catch (err) {
-            console.error("Logout failed:", err);
-        }
+    const confirmRoadmapChange = () => {
+        setShowRoadmapModal(false);
+        navigate("/roadmap");
     };
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+            <div className="min-h-screen bg-white flex items-center justify-center">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 dark:border-amber-400 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-300">Loading your dashboard...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading dashboard...</p>
                 </div>
             </div>
         );
     }
 
-    const getRoadmapTitle = (roadmap) => {
-        const roadmapTitles = {
-            'full-stack': 'Full-Stack Development',
-            'frontend': 'Frontend Development',
-            'backend': 'Backend Development',
-            'mobile': 'Mobile App Development',
-            'database': 'Database & Data Science',
-            'cybersecurity': 'Cybersecurity',
-            'devops': 'DevOps & Cloud',
-            'ai-ml': 'AI & Machine Learning'
-        };
-        return roadmapTitles[roadmap] || roadmap;
-    };
-
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 relative">
-            <AnimatedBackground />
-            <div className="absolute top-4 right-4 z-10">
-                <ThemeToggle />
-            </div>
-            {/* Professional Header */}
-            <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 relative z-10">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="flex items-center justify-between h-16">
-                        {/* Logo & Brand */}
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-gradient-to-r from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
-                                <Brain className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Learning.AI</h1>
-                                <p className="text-xs text-gray-600 dark:text-gray-400">Professional Learning Platform</p>
-                            </div>
+        <div className="dashboard-container">
+            {/* ==================== LEFT SIDEBAR ==================== */}
+            <Sidebar />
+
+            {/* ==================== MAIN CONTENT ==================== */}
+            <main className="dashboard-main">
+                {/* Welcome Card */}
+                <div className="dashboard-welcome-card">
+                    <div className="welcome-card-content">
+                        <h3 className="welcome-back-text">Welcome back</h3>
+                        <h2 className="welcome-name">{user?.name || "Learner"} 👋</h2>
+                        <p className="welcome-description">
+                            Current Roadmap: <strong>{user?.selectedRoadmap?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Not Selected'}</strong>
+                        </p>
+                        <div className="flex gap-3 mt-4">
+                            <button onClick={() => navigate("/learn")} className="btn-explore-courses">
+                                Continue Learning
+                            </button>
+                            <button
+                                onClick={handleChangeRoadmap}
+                                className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white rounded-full font-semibold transition-all duration-300 border-2 border-white/30"
+                            >
+                                Change Roadmap
+                            </button>
                         </div>
-
-                        {/* Navigation */}
-                        <nav className="hidden md:flex items-center gap-1">
-                            <button
-                                onClick={() => navigate("/dashboard")}
-                                className="flex items-center gap-2 px-4 py-2 text-white dark:text-white bg-blue-600 dark:bg-gray-700 rounded-lg font-medium"
-                            >
-                                <BarChart3 className="w-4 h-4" />
-                                Dashboard
-                            </button>
-                            <button
-                                onClick={() => navigate("/learn")}
-                                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors"
-                            >
-                                Learn
-                            </button>
-                            <button
-                                onClick={() => navigate("/test")}
-                                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors"
-                            >
-                                Tests
-                            </button>
-                            <button
-                                onClick={() => navigate("/quiz-selection")}
-                                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors"
-                            >
-                                Quiz
-                            </button>
-                        </nav>
-
-                        {/* Right Actions */}
-                        <div className="flex items-center gap-3">
-                            <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                                <Search className="w-5 h-5" />
-                            </button>
-                            <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                                <Bell className="w-5 h-5" />
-                            </button>
-                            <button
-                                onClick={refreshData}
-                                className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                            >
-                                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                            </button>
-
-                            {/* User Menu */}
-                            <div className="flex items-center gap-3 pl-3 border-l border-gray-300 dark:border-gray-700">
-                                <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-bold">
-                                        {user?.name?.charAt(0) || 'U'}
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={logout}
-                                    className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                >
-                                    <LogOut className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
+                    </div>
+                    <div className="welcome-card-character">
+                        <div className="character-3d-dashboard">🧑‍💻</div>
                     </div>
                 </div>
-            </header>
 
-
-
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-6 py-8 relative z-10">
-                {/* Welcome Section */}
-                <div className="mb-8">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                                Welcome back, {user?.name?.split(" ")[0] || 'Learner'}
-                            </h2>
-                            <p className="text-gray-600 dark:text-gray-400">
-                                {getRoadmapTitle(user?.selectedRoadmap)} • {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                            </p>
+                {/* Quick Action CTAs */}
+                <div className="dashboard-cta-grid">
+                    <button onClick={() => navigate("/test")} className="dashboard-cta-card cta-test">
+                        <div className="cta-icon-wrapper">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M9 11l3 3L22 4" />
+                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                            </svg>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => navigate("/test")}
-                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-lg font-medium hover:from-amber-500 hover:to-orange-600 transition-all"
-                            >
-                                <Plus className="w-4 h-4" />
-                                New Test
-                            </button>
+                        <div className="cta-content">
+                            <h3 className="cta-title">Take Assessment</h3>
+                            <p className="cta-description">Test your knowledge and track progress</p>
                         </div>
-                    </div>
+                        <div className="cta-arrow">→</div>
+                    </button>
+
+                    <button onClick={() => navigate("/quiz-selection")} className="dashboard-cta-card cta-quiz">
+                        <div className="cta-icon-wrapper">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                        </div>
+                        <div className="cta-content">
+                            <h3 className="cta-title">Practice Quiz</h3>
+                            <p className="cta-description">Quick practice sessions to reinforce learning</p>
+                        </div>
+                        <div className="cta-arrow">→</div>
+                    </button>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* Tests Completed */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-colors shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                <Target className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+                <div className="dashboard-stats-grid">
+                    {/* Lessons Completed */}
+                    <div className="stat-card">
+                        <div className="stat-header">
+                            <div className="stat-icon-wrapper stat-icon-blue">
+                                <BookOpen className="stat-icon" />
                             </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{testStats?.totalTests || 0}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Tests Completed</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <ArrowUp className="w-4 h-4 text-green-400" />
-                            <span className="text-green-400 text-sm">+12% this week</span>
-                        </div>
-                    </div>
-
-                    {/* Average Score */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-colors shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                <TrendingUp className="w-6 h-6 text-purple-500 dark:text-purple-400" />
-                            </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{testStats?.averageScore || 0}%</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Average Score</p>
+                            <div className="stat-value-container">
+                                <p className="stat-value">{getCompletedLessons()}</p>
+                                <p className="stat-label">Lessons Completed</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <ArrowUp className="w-4 h-4 text-green-400" />
-                            <span className="text-green-400 text-sm">+5% improvement</span>
+                        <div className="stat-footer">
+                            <div className="stat-progress-bar">
+                                <div className="stat-progress-fill" style={{ width: `${getOverallProgress()}%` }}></div>
+                            </div>
+                            <span className="stat-percentage">{getOverallProgress()}% of roadmap</span>
                         </div>
                     </div>
 
-                    {/* Best Score */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-colors shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                                <Trophy className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+                    {/* Tests Taken - Clickable */}
+                    <div
+                        className="stat-card cursor-pointer hover:shadow-xl transition-all duration-300"
+                        onClick={() => navigate("/quiz-selection")}
+                        title="View quiz history"
+                    >
+                        <div className="stat-header">
+                            <div className="stat-icon-wrapper stat-icon-purple">
+                                <FolderKanban className="stat-icon" />
                             </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{testStats?.bestScore || 0}%</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Best Score</p>
+                            <div className="stat-value-container">
+                                <p className="stat-value">{testResults.length}</p>
+                                <p className="stat-label">Tests Taken</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Star className="w-4 h-4 text-amber-400" />
-                            <span className="text-amber-400 text-sm">Personal Best</span>
+                        <div className="stat-footer">
+                            <div className="stat-progress-bar">
+                                <div className="stat-progress-fill stat-progress-purple" style={{ width: testResults.length > 0 ? "60%" : "0%" }}></div>
+                            </div>
+                            <span className="stat-percentage">Keep practicing!</span>
                         </div>
                     </div>
 
-                    {/* Study Time */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-colors shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                                <Clock className="w-6 h-6 text-green-500 dark:text-green-400" />
+                    {/* Average Score - Clickable */}
+                    <div
+                        className="stat-card cursor-pointer hover:shadow-xl transition-all duration-300"
+                        onClick={() => navigate("/quiz-selection")}
+                        title="View quiz history"
+                    >
+                        <div className="stat-header">
+                            <div className="stat-icon-wrapper stat-icon-green">
+                                <Award className="stat-icon" />
                             </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{testStats?.totalTimeSpent ? `${Math.round(testStats.totalTimeSpent / 60)}m` : '0m'}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Study Time</p>
+                            <div className="stat-value-container">
+                                <p className="stat-value">
+                                    {testResults.length > 0
+                                        ? Math.round(testResults.reduce((acc, test) => acc + (test.score || 0), 0) / testResults.length)
+                                        : 0}%
+                                </p>
+                                <p className="stat-label">Average Score</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-blue-400" />
-                            <span className="text-blue-400 text-sm">Active today</span>
+                        <div className="stat-footer">
+                            <div className="stat-progress-bar">
+                                <div className="stat-progress-fill stat-progress-green" style={{
+                                    width: testResults.length > 0
+                                        ? `${Math.round(testResults.reduce((acc, test) => acc + (test.score || 0), 0) / testResults.length)}%`
+                                        : "0%"
+                                }}></div>
+                            </div>
+                            <span className="stat-percentage">
+                                {testResults.length > 0 ? "Great progress!" : "Take your first test"}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Learning Path Progress */}
-                    <div className="lg:col-span-2">
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Learning Progress</h3>
-                                <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                                    <Settings className="w-5 h-5" />
-                                </button>
+                {/* Course Progress Section */}
+                <div className="dashboard-section">
+                    <div className="section-header-dashboard">
+                        <h3 className="section-title-dashboard">Learning Progress</h3>
+                        <button onClick={() => navigate("/learn")} className="view-all-link">View All</button>
+                    </div>
+                    <div className="course-progress-card">
+                        <div className="progress-item">
+                            <div className="progress-info">
+                                <span className="progress-course-name">
+                                    {user?.selectedRoadmap?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Your Roadmap'}
+                                </span>
+                                <span className="progress-percentage">{getOverallProgress()}%</span>
                             </div>
+                            <div className="progress-bar-container">
+                                <div className="progress-bar-fill progress-orange" style={{ width: `${getOverallProgress()}%` }}></div>
+                            </div>
+                        </div>
+                        {progressData && progressData.completedLessons && progressData.completedLessons.length > 0 ? (
+                            <div className="mt-4 text-sm text-gray-600 dashboard-dark:text-[#b8a67d]">
+                                <p>✅ {getCompletedLessons()} lessons completed out of {getTotalLessons()}</p>
+                                <p className="mt-1">🎯 Keep up the great work!</p>
+                            </div>
+                        ) : (
+                            <div className="mt-4 text-sm text-gray-600 dashboard-dark:text-[#b8a67d]">
+                                <p>Start your learning journey today!</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-                            {user?.selectedRoadmap ? (
-                                <div className="space-y-6">
-                                    {/* Current Path */}
-                                    <div className="bg-gradient-to-r from-amber-400/10 to-orange-500/10 border border-amber-400/20 rounded-lg p-4">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse"></div>
-                                            <span className="text-amber-400 font-medium">Active Learning Path</span>
-                                        </div>
-                                        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{getRoadmapTitle(user.selectedRoadmap)}</h4>
-                                        <div className="flex items-center gap-4 text-sm">
-                                            <span className="bg-amber-400/20 text-amber-300 px-2 py-1 rounded">
-                                                {user.skillLevel?.charAt(0).toUpperCase() + user.skillLevel?.slice(1)} Level
-                                            </span>
-                                            <span className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
-                                                {user.learningTimeline?.replace('-', ' ')}
-                                            </span>
-                                        </div>
-                                    </div>
+                {/* Recent Test Results Table */}
+                <div className="dashboard-section">
+                    <div className="section-header-dashboard">
+                        <h3 className="section-title-dashboard">Recent Test Results</h3>
+                        <button className="view-all-link" onClick={() => navigate("/test")}>View All</button>
+                    </div>
+                    <div className="courses-table-card">
+                        <table className="courses-table">
+                            <thead>
+                                <tr>
+                                    <th>Test Category</th>
+                                    <th>Difficulty</th>
+                                    <th>Score</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {testResults && testResults.length > 0 ? (
+                                    testResults.slice(0, 5).map((test, index) => (
+                                        <tr key={index}>
+                                            <td>
+                                                <div className="course-name-cell">
+                                                    <div className="course-icon">
+                                                        {test.testCategory?.includes('JavaScript') ? '⚡' :
+                                                            test.testCategory?.includes('React') ? '⚛️' :
+                                                                test.testCategory?.includes('Node') ? '🟢' :
+                                                                    test.testCategory?.includes('Database') ? '🗄️' : '📝'}
+                                                    </div>
+                                                    <span className="course-name-text">{test.testCategory || 'General Test'}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span className={`status-badge ${test.difficulty === 'Easy' ? 'status-easy' :
+                                                    test.difficulty === 'Medium' ? 'status-medium' :
+                                                        test.difficulty === 'Hard' ? 'status-hard' : 'status-expert'
+                                                    }`}>
+                                                    {test.difficulty || 'Medium'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div className="rating-cell">
+                                                    <span className={`score-value ${test.score >= 80 ? 'score-excellent' :
+                                                        test.score >= 60 ? 'score-good' : 'score-needs-improvement'
+                                                        }`}>
+                                                        {test.score}%
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span className="test-date">
+                                                    {new Date(test.completedAt || test.createdAt).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric'
+                                                    })}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>
+                                            <div style={{ color: 'var(--text-gray)' }}>
+                                                No test results yet. <button onClick={() => navigate("/test")} style={{ color: 'var(--orange-accent)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Take your first test!</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-                                    {/* Current Path */}
-                                    {/* Progress Bar */}
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Overall Progress</span>
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                                {progressData ? `${progressData.currentLevel} Level` : 'Beginner'}
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                                            <div
-                                                className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full transition-all duration-500"
-                                                style={{ width: `${progressData?.overallProgress || 0}%` }}
-                                            ></div>
-                                        </div>
-                                        <div className="text-xs text-gray-400 text-center">
-                                            {progressData?.overallProgress || 0}% Complete
-                                        </div>
-                                    </div>
-
-                                    {/* Next Steps */}
-                                    <div className="bg-blue-50 dark:bg-gray-700/50 rounded-lg p-4">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <span className="text-sm font-semibold text-blue-600 dark:text-blue-300">Next Milestone</span>
-                                            <Calendar className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                                        </div>
-                                        <p className="text-gray-900 dark:text-white font-medium mb-3">JavaScript Fundamentals</p>
-                                        <button
-                                            onClick={() => navigate("/learn")}
-                                            className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                        >
-                                            <PlayCircle className="w-4 h-4" />
-                                            Continue Learning
-                                        </button>
-                                    </div>
+                {/* Graphs Section */}
+                <div className="dashboard-graphs-grid">
+                    {/* Daily Learning Hours */}
+                    <div className="graph-card">
+                        <div className="graph-header">
+                            <h3 className="graph-title">Learning Activity</h3>
+                            <select className="graph-filter">
+                                <option>Last 7 days</option>
+                                <option>Last 30 days</option>
+                                <option>Last 90 days</option>
+                            </select>
+                        </div>
+                        <div className="graph-content">
+                            <div className="graph-stats">
+                                <div className="graph-stat-item">
+                                    <span className="graph-stat-label">Progress</span>
+                                    <span className="graph-stat-value">{getCompletedLessons()} Lessons Completed</span>
                                 </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-500" />
-                                    <p className="text-gray-600 dark:text-gray-400 mb-4">No active learning path</p>
-                                    <button
-                                        onClick={() => navigate("/roadmap")}
-                                        className="px-6 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors"
-                                    >
-                                        Choose Your Path
-                                    </button>
-                                </div>
-                            )}
+                            </div>
+                            <svg width="100%" height="200" viewBox="0 0 400 200" className="line-chart">
+                                <defs>
+                                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stopColor="#FF8A00" stopOpacity="0.3" />
+                                        <stop offset="100%" stopColor="#FF8A00" stopOpacity="0" />
+                                    </linearGradient>
+                                </defs>
+                                {(() => {
+                                    const progress = getOverallProgress();
+                                    const points = [];
+                                    for (let i = 0; i <= 7; i++) {
+                                        const x = i * 57;
+                                        const y = 180 - (progress * 1.5 * (i / 7));
+                                        points.push(`${x},${y}`);
+                                    }
+                                    return (
+                                        <>
+                                            <path
+                                                d={`M 0 180 L ${points.join(' L ')} L 400 180 Z`}
+                                                fill="url(#lineGradient)"
+                                            />
+                                            <polyline
+                                                fill="none"
+                                                stroke="#FF8A00"
+                                                strokeWidth="3"
+                                                points={points.join(' ')}
+                                            />
+                                            {points.map((point, i) => {
+                                                const [x, y] = point.split(',');
+                                                return <circle key={i} cx={x} cy={y} r="4" fill="#FF8A00" />;
+                                            })}
+                                        </>
+                                    );
+                                })()}
+                            </svg>
                         </div>
                     </div>
 
-                    {/* Test Achievements */}
-                    <div className="space-y-6">
-                        {/* Recent Tests */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Tests</h3>
-                                <button
-                                    onClick={() => navigate("/test")}
-                                    className="text-amber-400 hover:text-amber-300 text-sm font-medium"
-                                >
-                                    View All
-                                </button>
-                            </div>
+                    {/* Learning Statistics Pie Chart */}
+                    <div className="graph-card">
+                        <div className="graph-header">
+                            <h3 className="graph-title">Learning Statistics</h3>
+                        </div>
+                        <div className="graph-content pie-chart-container">
+                            {(() => {
+                                const completed = getCompletedLessons();
+                                const tests = testResults.length;
+                                const avgScore = testResults.length > 0
+                                    ? Math.round(testResults.reduce((acc, test) => acc + (test.score || 0), 0) / testResults.length)
+                                    : 0;
 
-                            {testCompletions && testCompletions.length > 0 ? (
-                                <div className="space-y-4">
-                                    {testCompletions.slice(0, 3).map((completion, index) => (
-                                        <div key={index} className="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                                                        <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-medium text-gray-900 dark:text-white text-sm">{completion.testCategory}</h4>
-                                                        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${completion.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
-                                                            completion.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                                completion.difficulty === 'Hard' ? 'bg-orange-500/20 text-orange-400' :
-                                                                    'bg-red-500/20 text-red-400'
-                                                            }`}>
-                                                            {completion.difficulty}
-                                                        </span>
-                                                    </div>
+                                const total = completed + tests + avgScore;
+                                const lessonsPercent = total > 0 ? (completed / total) * 100 : 33;
+                                const testsPercent = total > 0 ? (tests / total) * 100 : 33;
+                                const scorePercent = total > 0 ? (avgScore / total) * 100 : 34;
+
+                                const circumference = 2 * Math.PI * 80;
+                                const lessonsDash = (lessonsPercent / 100) * circumference;
+                                const testsDash = (testsPercent / 100) * circumference;
+                                const scoreDash = (scorePercent / 100) * circumference;
+
+                                return (
+                                    <>
+                                        <svg width="200" height="200" viewBox="0 0 200 200" className="pie-chart">
+                                            <circle
+                                                cx="100" cy="100" r="80"
+                                                fill="none" stroke="#10B981" strokeWidth="40"
+                                                strokeDasharray={`${lessonsDash} ${circumference}`}
+                                                transform="rotate(-90 100 100)"
+                                            />
+                                            <circle
+                                                cx="100" cy="100" r="80"
+                                                fill="none" stroke="#F59E0B" strokeWidth="40"
+                                                strokeDasharray={`${testsDash} ${circumference}`}
+                                                strokeDashoffset={`-${lessonsDash}`}
+                                                transform="rotate(-90 100 100)"
+                                            />
+                                            <circle
+                                                cx="100" cy="100" r="80"
+                                                fill="none" stroke="#EF4444" strokeWidth="40"
+                                                strokeDasharray={`${scoreDash} ${circumference}`}
+                                                strokeDashoffset={`-${lessonsDash + testsDash}`}
+                                                transform="rotate(-90 100 100)"
+                                            />
+                                        </svg>
+                                        <div className="pie-chart-legend">
+                                            <div className="legend-item">
+                                                <div className="legend-color" style={{ background: "#10B981" }}></div>
+                                                <div className="legend-text">
+                                                    <span className="legend-label">Lessons</span>
+                                                    <span className="legend-value">{completed}</span>
                                                 </div>
-                                                <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                                             </div>
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-green-400 font-bold">{completion.bestScore}%</span>
-                                                <span className="text-gray-600 dark:text-gray-400">{completion.attemptCount} attempts</span>
+                                            <div className="legend-item">
+                                                <div className="legend-color" style={{ background: "#F59E0B" }}></div>
+                                                <div className="legend-text">
+                                                    <span className="legend-label">Tests</span>
+                                                    <span className="legend-value">{tests}</span>
+                                                </div>
+                                            </div>
+                                            <div className="legend-item">
+                                                <div className="legend-color" style={{ background: "#EF4444" }}></div>
+                                                <div className="legend-text">
+                                                    <span className="legend-label">Avg Score</span>
+                                                    <span className="legend-value">{avgScore}%</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-6">
-                                    <Target className="w-8 h-8 mx-auto mb-3 text-gray-500" />
-                                    <p className="text-gray-400 text-sm mb-3">No tests completed yet</p>
-                                    <button
-                                        onClick={() => navigate("/test")}
-                                        className="px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors"
-                                    >
-                                        Take Your First Test
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Quick Actions */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => navigate("/test")}
-                                    className="w-full flex items-center gap-3 p-3 bg-gradient-to-r from-amber-400/10 to-orange-500/10 border border-amber-400/20 rounded-lg hover:from-amber-400/20 hover:to-orange-500/20 transition-all"
-                                >
-                                    <div className="w-8 h-8 bg-amber-400/20 rounded-lg flex items-center justify-center">
-                                        <Zap className="w-4 h-4 text-amber-400" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-gray-900 dark:text-white font-medium text-sm">Take Assessment</p>
-                                        <p className="text-gray-600 dark:text-gray-400 text-xs">Test your knowledge</p>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onClick={() => navigate("/quiz-selection")}
-                                    className="w-full flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                >
-                                    <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                        <Brain className="w-4 h-4 text-purple-400" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-gray-900 dark:text-white font-medium text-sm">Practice Quiz</p>
-                                        <p className="text-gray-600 dark:text-gray-400 text-xs">Quick practice session</p>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onClick={() => navigate("/learn")}
-                                    className="w-full flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                >
-                                    <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                        <BookOpen className="w-4 h-4 text-blue-400" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-gray-900 dark:text-white font-medium text-sm">Continue Learning</p>
-                                        <p className="text-gray-600 dark:text-gray-400 text-xs">Resume your path</p>
-                                    </div>
-                                </button>
-                            </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
