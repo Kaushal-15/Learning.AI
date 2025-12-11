@@ -45,11 +45,60 @@ router.get('/me', requireAuth, async (req, res) => {
         id: user._id,
         email: user.email,
         name: user.name,
-        learnerId: user.learnerId
+        learnerId: user.learnerId,
+        settings: user.settings
       }
     });
   } catch (err) {
     console.error('Error fetching user profile:', err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+});
+
+// ✅ Update user profile and settings
+router.put('/profile', requireAuth, async (req, res) => {
+  try {
+    const { name, settings } = req.body;
+    const updateData = {};
+
+    if (name) updateData.name = name;
+    if (settings) {
+      // Use dot notation to update nested fields without overwriting the whole object if needed
+      // But here we might want to merge or replace. Let's assume we replace the provided keys.
+      // For simplicity in Mongoose, we can just set the settings object if provided,
+      // or merge it. Let's do a merge approach for better UX.
+      const user = await User.findById(req.user.id);
+      updateData.settings = { ...user.settings, ...settings };
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-passwordHash -salt -refreshToken');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        learnerId: user.learnerId,
+        settings: user.settings
+      }
+    });
+  } catch (err) {
+    console.error('Error updating profile:', err);
     res.status(500).json({
       success: false,
       message: "Server error"
