@@ -23,6 +23,7 @@
     "joi": "^17.9.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.5.0",
+    "node-cron": "^4.2.1",
     "openai": "^6.2.0"
   },
   "devDependencies": {

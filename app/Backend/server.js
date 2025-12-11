@@ -30,6 +30,7 @@ const roadmapRoutes = require('./routes/roadmapRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const dailyLearningRoutes = require('./routes/dailyLearningRoutes');
 const contentRoutes = require('./routes/contentRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // ===============================
 // Initialize App
@@ -113,6 +114,7 @@ app.use('/api/daily-learning', dailyLearningRoutes); // Daily learning (public f
 // ===============================
 // PROTECTED ROUTES (Require Login)
 // ===============================
+app.use('/api/users', userRoutes); // User profile and settings
 app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/progress', authMiddleware, progressRoutes);
 app.use('/api/questions', authMiddleware, questionRoutes);
@@ -144,6 +146,11 @@ app.use(errorHandler);
 // ===============================
 // Start Server
 // ===============================
+const { initScheduler } = require('./services/schedulerService');
+
+// Initialize Scheduler
+initScheduler();
+
 app.listen(PORT, () => {
   console.log(
     `🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`

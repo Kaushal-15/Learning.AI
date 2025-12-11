@@ -20,6 +20,8 @@ export const ThemeProvider = ({ children }) => {
         return false;
     });
 
+    const [isPreferencesLoaded, setIsPreferencesLoaded] = useState(false);
+
     // Apply theme on mount and when isDarkMode changes
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -39,8 +41,59 @@ export const ThemeProvider = ({ children }) => {
         }
     }, [isDarkMode]);
 
+    // Sync with backend on mount and when changed
+    useEffect(() => {
+        // Only sync if we have loaded preferences from backend
+        if (!isPreferencesLoaded) return;
+
+        const syncTheme = async () => {
+            try {
+                await fetch('http://localhost:3000/api/users/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        settings: { theme: isDarkMode ? 'dark' : 'light' }
+                    })
+                });
+            } catch (err) {
+                // Ignore errors
+            }
+        };
+
+        // We only want to sync when isDarkMode changes, NOT when isPreferencesLoaded changes to true
+        // But we need isPreferencesLoaded to be true to allow syncing.
+        // The issue was likely that setting isPreferencesLoaded triggered this effect.
+        // We can check if it's the initial load.
+        syncTheme();
+    }, [isDarkMode]); // Remove isPreferencesLoaded from dependency array to avoid sync on load finish
+
+    // Fetch user preference on mount
+    useEffect(() => {
+        const fetchUserTheme = async () => {
+            try {
+                const res = await fetch('http://localhost:3000/api/users/me', { credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.user.settings?.theme) {
+                        const userTheme = data.user.settings.theme;
+                        if (userTheme === 'dark' && !isDarkMode) setIsDarkMode(true);
+                        if (userTheme === 'light' && isDarkMode) setIsDarkMode(false);
+                    }
+                }
+            } catch (e) {
+                // ignore
+            } finally {
+                setIsPreferencesLoaded(true);
+            }
+        };
+        fetchUserTheme();
+    }, []);
+
     const toggleTheme = () => {
         setIsDarkMode(prev => !prev);
+        // Ensure we start syncing if user manually toggles
+        if (!isPreferencesLoaded) setIsPreferencesLoaded(true);
     };
 
     return (
