@@ -60,9 +60,12 @@ router.post('/complete-lesson', authMiddleware, async (req, res) => {
     const normalizedId = normalizeRoadmapId(roadmapId);
     const userId = req.user.id;
 
+    console.log(`Completing lesson: ${lessonId} for roadmap: ${normalizedId} with score: ${quizScore}%`);
+
     let progress = await Progress.findOne({ userId, roadmapId: normalizedId });
 
     if (!progress) {
+      console.log('Creating new progress record for user');
       progress = new Progress({
         userId,
         roadmapId: normalizedId,
@@ -72,19 +75,31 @@ router.post('/complete-lesson', authMiddleware, async (req, res) => {
       });
     }
 
+    // Check if lesson is already completed
+    const existingLesson = progress.completedLessons.find(l => l.lessonId === lessonId);
+    if (existingLesson) {
+      console.log(`Lesson ${lessonId} already completed, updating score from ${existingLesson.quizScore}% to ${quizScore}%`);
+    } else {
+      console.log(`Marking lesson ${lessonId} as completed for the first time`);
+    }
+
     await progress.completeLesson(lessonId, timeSpent, quizScore);
     await progress.calculateProgress();
+
+    console.log(`✅ Lesson completion successful. Overall progress: ${progress.overallProgress}%`);
 
     res.json({
       success: true,
       data: progress,
-      message: 'Lesson marked as completed'
+      message: `Lesson marked as completed with ${quizScore}% score`,
+      lessonCompleted: true,
+      newCompletion: !existingLesson
     });
   } catch (error) {
     console.error('Error completing lesson:', error);
     res.status(500).json({
       success: false,
-      message: 'Error completing lesson'
+      message: 'Error completing lesson: ' + error.message
     });
   }
 });

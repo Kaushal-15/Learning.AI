@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Quiz = require('../models/Quiz');
+const Question = require('../models/Question');
 const QuestionHistory = require('../models/QuestionHistory');
 const UserPerformance = require('../models/UserPerformance');
 const fs = require('fs').promises;
@@ -14,7 +15,7 @@ const asyncHandler = (fn) => (req, res, next) => {
 // Create a new quiz session with intelligent question selection
 router.post('/create', asyncHandler(async (req, res) => {
   try {
-    const { roadmapType, difficulty, questionCount = 20, timeLimit = 30, adaptiveDifficulty = false } = req.body;
+    const { roadmapType, difficulty, questionCount = 20, timeLimit = 30, adaptiveDifficulty = false, topic } = req.body;
 
     // Get user performance data for adaptive selection
     let userPerformance = await UserPerformance.findOne({
@@ -38,28 +39,100 @@ router.post('/create', asyncHandler(async (req, res) => {
 
     const attemptedQuestionIds = new Set(questionHistory.map(h => h.questionId));
 
-    // Map roadmap names to question files
-    const roadmapMapping = {
-      'frontend': 'frontend',
-      'backend': 'backend',
-      'full-stack': 'full-stack',
-      'mobile': 'mobile-app',
-      'ai-ml': 'ai-machine-learning',
-      'devops': 'devops-cloud',
-      'database': 'database-data-science',
-      'cybersecurity': 'cybersecurity'
+
+    // Map roadmap types to categories (same as PersonalizedQuestionSetService)
+    const categoryMapping = {
+      'frontend': ['HTML', 'CSS', 'JavaScript', 'React', 'Vue', 'Angular', 'Frontend'],
+      'backend': ['Node.js', 'Express', 'API', 'Database', 'Server', 'Backend'],
+      'full-stack': ['HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'Database', 'Full-Stack'],
+      'mobile': ['React Native', 'Flutter', 'iOS', 'Android', 'Mobile'],
+      'ai-ml': ['Machine Learning', 'AI', 'Python', 'Data Science', 'Neural Networks'],
+      'devops': ['Docker', 'Kubernetes', 'AWS', 'CI/CD', 'DevOps', 'Cloud'],
+      'database': ['SQL', 'MongoDB', 'Database', 'Data Science', 'Analytics'],
+      'cybersecurity': ['Security', 'Encryption', 'Network Security', 'Cybersecurity']
     };
 
-    const questionFile = roadmapMapping[roadmapType] || 'frontend';
-    const questionsPath = path.join(__dirname, '../Questions', `${questionFile}.json`);
-    const questionsData = await fs.readFile(questionsPath, 'utf8');
-    const { questions: allQuestions } = JSON.parse(questionsData);
+    const relevantCategories = categoryMapping[roadmapType] || [roadmapType];
+
+    // Fetch questions from database using categories (same approach as PersonalizedQuestionSetService)
+    console.log(`Fetching questions for categories: ${relevantCategories.join(', ')}`);
+
+    let allQuestions = await Question.find({
+      category: { $in: relevantCategories }
+    }).lean();
+
+    console.log(`Found ${allQuestions.length} questions in database for ${roadmapType}`);
+
+    // Debug: Log first few questions
+    if (allQuestions.length > 0) {
+      console.log('Sample questions from DB:', allQuestions.slice(0, 2).map(q => ({
+        id: q._id,
+        content: q.content?.substring(0, 50),
+        categories: q.category,
+        difficulty: q.difficulty
+      })));
+    }
+
+    // Fallback to JSON files if database has no questions
+    if (allQuestions.length === 0) {
+      console.log(`No questions in database for categories ${relevantCategories.join(', ')}, loading from JSON files...`);
+
+      const jsonFileMapping = {
+        'frontend': 'frontend',
+        'backend': 'backend',
+        'full-stack': 'full-stack',
+        'mobile': 'mobile-app',
+        'ai-ml': 'ai-machine-learning',
+        'devops': 'devops-cloud',
+        'database': 'database-data-science',
+        'cybersecurity': 'cybersecurity'
+      };
+
+      const questionFile = jsonFileMapping[roadmapType] || roadmapType;
+      const questionsPath = path.join(__dirname, '../Questions', `${questionFile}.json`);
+
+      try {
+        const questionsData = await fs.readFile(questionsPath, 'utf8');
+        const { questions: jsonQuestions } = JSON.parse(questionsData);
+
+        // Transform JSON questions to match database format
+        allQuestions = (jsonQuestions || []).map(q => ({
+          _id: q.questionId,
+          content: q.question,
+          options: q.options,
+          correctAnswer: q.answer,
+          explanation: q.explanation,
+          category: [q.topic || roadmapType],
+          difficulty: q.difficulty === 'easy' ? 3 : q.difficulty === 'medium' ? 6 : 9,
+          questionId: q.questionId,
+          question: q.question,
+          answer: q.answer,
+          topic: q.topic
+        }));
+
+        console.log(`Loaded ${allQuestions.length} questions from ${questionFile}.json`);
+      } catch (err) {
+        console.error(`Error loading questions from JSON: ${err.message}`);
+        allQuestions = [];
+      }
+    }
 
     // Determine effective difficulty based on adaptive settings
     let effectiveDifficulty = difficulty;
     if (adaptiveDifficulty && userPerformance.overallStats.totalQuestions > 10) {
       effectiveDifficulty = userPerformance.adaptiveSettings.currentDifficultyLevel;
     }
+
+    // Convert difficulty to numeric range (more inclusive ranges)
+    const getDifficultyRange = (diff) => {
+      if (diff === 'easy') return { min: 1, max: 5 };
+      if (diff === 'medium') return { min: 3, max: 8 };
+      if (diff === 'hard') return { min: 6, max: 10 };
+      if (diff === 'mixed') return { min: 1, max: 10 };
+      return { min: 1, max: 10 };
+    };
+
+    const difficultyRange = getDifficultyRange(effectiveDifficulty);
 
     // Smart question filtering with time-based freshness
     const now = new Date();
@@ -69,25 +142,77 @@ router.post('/create', asyncHandler(async (req, res) => {
       return (now - new Date(history.lastAttempted)) / (1000 * 60 * 60 * 24);
     };
 
-    let availableQuestions = allQuestions.filter(q => {
-      // Allow questions attempted more than 7 days ago
-      const daysSince = daysSinceAttempt(q.questionId);
-      if (attemptedQuestionIds.has(q.questionId) && daysSince < 7) return false;
+    console.log(`Filtering questions with difficulty range: ${difficultyRange.min}-${difficultyRange.max}`);
+    console.log(`Topic filter: ${topic || 'none'}`);
 
-      // Filter by difficulty
-      if (effectiveDifficulty !== 'mixed') {
-        return q.difficulty === effectiveDifficulty;
+    // First, try with topic filter
+    let availableQuestions = allQuestions.filter(q => {
+      // Use questionId for JSON questions, _id for database questions
+      const qId = q._id ? q._id.toString() : q.questionId;
+
+      // Allow questions attempted more than 7 days ago
+      const daysSince = daysSinceAttempt(qId);
+      if (attemptedQuestionIds.has(qId) && daysSince < 7) {
+        return false;
       }
+
+      // Filter by difficulty range
+      const qDifficulty = typeof q.difficulty === 'number' ? q.difficulty :
+        (q.difficulty === 'easy' ? 3 : q.difficulty === 'medium' ? 6 : 9);
+
+      const passesDifficulty = qDifficulty >= difficultyRange.min && qDifficulty <= difficultyRange.max;
+      if (!passesDifficulty) {
+        return false;
+      }
+
+      // Filter by topic if provided (more flexible matching)
+      if (topic) {
+        const topicLower = topic.toLowerCase();
+        const hasMatchingTopic = q.topic === topic ||
+          (q.category && q.category.includes(topic)) ||
+          (q.category && q.category.some(cat =>
+            cat.toLowerCase().includes(topicLower) ||
+            topicLower.includes(cat.toLowerCase())
+          ));
+        return hasMatchingTopic;
+      }
+
       return true;
     });
+
+    console.log(`Questions after filtering: ${availableQuestions.length}`);
+
+    // If topic filter is too restrictive, try without it
+    if (topic && availableQuestions.length < questionCount) {
+      console.log(`⚠️ Topic filter too restrictive (${availableQuestions.length} questions), trying without topic filter...`);
+
+      availableQuestions = allQuestions.filter(q => {
+        const qId = q._id ? q._id.toString() : q.questionId;
+
+        // Allow questions attempted more than 7 days ago
+        const daysSince = daysSinceAttempt(qId);
+        if (attemptedQuestionIds.has(qId) && daysSince < 7) {
+          return false;
+        }
+
+        // Filter by difficulty range only
+        const qDifficulty = typeof q.difficulty === 'number' ? q.difficulty :
+          (q.difficulty === 'easy' ? 3 : q.difficulty === 'medium' ? 6 : 9);
+
+        return qDifficulty >= difficultyRange.min && qDifficulty <= difficultyRange.max;
+      });
+
+      console.log(`Questions without topic filter: ${availableQuestions.length}`);
+    }
 
     // If not enough fresh questions, include some previously attempted ones
     if (availableQuestions.length < questionCount) {
       const additionalQuestions = allQuestions.filter(q => {
+        const qId = q._id ? q._id.toString() : q.questionId;
         if (effectiveDifficulty !== 'mixed') {
-          return q.difficulty === effectiveDifficulty && attemptedQuestionIds.has(q.questionId);
+          return q.difficulty === effectiveDifficulty && attemptedQuestionIds.has(qId);
         }
-        return attemptedQuestionIds.has(q.questionId);
+        return attemptedQuestionIds.has(qId);
       });
 
       availableQuestions = [...availableQuestions, ...additionalQuestions];
@@ -97,11 +222,12 @@ router.post('/create', asyncHandler(async (req, res) => {
     const prioritizeQuestions = (questions) => {
       return questions.map(q => {
         let priority = 1;
-        const history = questionHistory.find(h => h.questionId === q.questionId);
+        const qId = q._id ? q._id.toString() : q.questionId;
+        const history = questionHistory.find(h => h.questionId === qId);
 
         // Higher priority for incorrect answers (spaced repetition)
         if (history && !history.isCorrect) {
-          const daysSince = daysSinceAttempt(q.questionId);
+          const daysSince = daysSinceAttempt(qId);
           if (daysSince >= 1) priority += 3; // Recently incorrect
           if (daysSince >= 3) priority += 2; // Needs review
         }
@@ -141,45 +267,80 @@ router.post('/create', asyncHandler(async (req, res) => {
       .sort(() => Math.random() - 0.5)
       .slice(0, questionCount)
       .map(q => {
-        // Handle different answer formats
-        let correctAnswer = q.answer;
+        // Handle both database and JSON question formats
+        const isDbQuestion = q.content && q.correctAnswer; // Database format
+        const questionText = isDbQuestion ? q.content : q.question;
+        const correctAnswer = isDbQuestion ? q.correctAnswer : q.answer;
+        const questionId = isDbQuestion ? q._id.toString() : q.questionId;
+        const questionTopic = isDbQuestion ? (q.category[0] || roadmapType) : (q.topic || roadmapType);
+        const questionDifficulty = isDbQuestion ? q.difficulty : q.difficulty;
+        const questionExplanation = q.explanation || 'No explanation available';
+
+        // Handle different answer formats for JSON questions
+        let finalCorrectAnswer = correctAnswer;
         let shuffledOptions = [...q.options];
 
-        // Check if answer is letter-based (A, B, C, D) and options have letter prefixes
-        if (/^[A-D]$/.test(q.answer)) {
-          // Find the option that starts with this letter
+        if (!isDbQuestion && /^[A-D]$/.test(correctAnswer)) {
+          // Handle letter-based answers (A, B, C, D) for JSON questions
           const matchingOption = q.options.find(option =>
-            option.startsWith(q.answer + '.')
+            option.startsWith(correctAnswer + '.')
           );
           if (matchingOption) {
-            correctAnswer = matchingOption;
+            finalCorrectAnswer = matchingOption;
           } else {
             // Fallback: Convert letter to index if no letter prefix found
-            const letterIndex = q.answer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+            const letterIndex = correctAnswer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
             if (letterIndex >= 0 && letterIndex < q.options.length) {
-              correctAnswer = q.options[letterIndex];
+              finalCorrectAnswer = q.options[letterIndex];
             }
           }
         }
 
-        // Now shuffle the options
+        // Shuffle the options
         shuffledOptions = shuffledOptions.sort(() => Math.random() - 0.5);
 
         return {
-          questionId: q.questionId,
-          question: q.question,
+          questionId: questionId,
+          question: questionText,
           options: shuffledOptions,
-          correctAnswer: correctAnswer,
-          originalAnswer: q.answer, // Keep original for reference
-          topic: q.topic,
-          difficulty: q.difficulty,
-          explanation: q.explanation,
+          correctAnswer: finalCorrectAnswer,
+          originalAnswer: correctAnswer, // Keep original for reference
+          topic: questionTopic,
+          difficulty: questionDifficulty,
+          explanation: questionExplanation,
           userAnswer: '',
           isCorrect: false,
           timeSpent: 0,
           status: 'unanswered'
         };
       });
+
+    console.log(`Available questions after filtering: ${availableQuestions.length}`);
+    console.log(`Final shuffled questions: ${shuffledQuestions.length}`);
+
+    // Critical check: Ensure we have questions before creating quiz
+    if (shuffledQuestions.length === 0) {
+      console.error(`❌ No questions available for quiz creation!`);
+      console.error(`   - Roadmap: ${roadmapType}`);
+      console.error(`   - Categories: ${relevantCategories.join(', ')}`);
+      console.error(`   - Difficulty: ${effectiveDifficulty} (${difficultyRange.min}-${difficultyRange.max})`);
+      console.error(`   - Total questions found: ${allQuestions.length}`);
+      console.error(`   - After filtering: ${availableQuestions.length}`);
+
+      return res.status(400).json({
+        success: false,
+        message: 'No questions available for this quiz configuration. Please try a different difficulty level or roadmap.',
+        debug: {
+          roadmapType,
+          categories: relevantCategories,
+          difficulty: effectiveDifficulty,
+          totalQuestions: allQuestions.length,
+          availableAfterFilter: availableQuestions.length
+        }
+      });
+    }
+
+    console.log(`✅ Creating quiz with ${shuffledQuestions.length} questions...`);
 
     const quiz = new Quiz({
       userId: req.user.id,
@@ -201,7 +362,16 @@ router.post('/create', asyncHandler(async (req, res) => {
       } : undefined
     });
 
-    await quiz.save();
+    console.log(`Creating quiz with ${shuffledQuestions.length} questions...`);
+    console.log(`First question:`, shuffledQuestions[0]);
+
+    try {
+      await quiz.save();
+      console.log(`✅ Quiz saved successfully with ID: ${quiz._id}`);
+    } catch (saveError) {
+      console.error('❌ Error saving quiz to database:', saveError);
+      throw saveError;
+    }
 
     res.json({
       success: true,
@@ -218,7 +388,8 @@ router.post('/create', asyncHandler(async (req, res) => {
     console.error('Error creating quiz:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create quiz'
+      message: 'Failed to create quiz',
+      error: error.message
     });
   }
 }));
@@ -277,12 +448,51 @@ router.put('/:id/answer', asyncHandler(async (req, res) => {
 
       // Debug logging to see what's being compared
       console.log('=== ANSWER COMPARISON DEBUG ===');
-      console.log('User answer:', answer);
-      console.log('Stored correctAnswer:', question.correctAnswer);
-      console.log('Original answer:', question.originalAnswer);
-      console.log('Question options:', question.options);
+      console.log('User answer:', JSON.stringify(answer));
+      console.log('User answer type:', typeof answer);
+      console.log('User answer length:', answer ? answer.length : 'null');
+      console.log('Stored correctAnswer:', JSON.stringify(question.correctAnswer));
+      console.log('Stored correctAnswer type:', typeof question.correctAnswer);
+      console.log('Stored correctAnswer length:', question.correctAnswer ? question.correctAnswer.length : 'null');
+      console.log('Original answer:', JSON.stringify(question.originalAnswer));
+      console.log('Question options:', JSON.stringify(question.options));
+      console.log('Strict equality (===):', answer === question.correctAnswer);
+      console.log('Loose equality (==):', answer == question.correctAnswer);
+      console.log('Trimmed comparison:', answer?.trim() === question.correctAnswer?.trim());
 
-      question.isCorrect = answer === question.correctAnswer;
+      // Enhanced answer validation with multiple checks
+      let isAnswerCorrect = false;
+
+      if (answer && question.correctAnswer) {
+        // Try exact match first
+        if (answer === question.correctAnswer) {
+          isAnswerCorrect = true;
+          console.log('✅ Match: Exact string match');
+        }
+        // Try trimmed match
+        else if (answer.trim() === question.correctAnswer.trim()) {
+          isAnswerCorrect = true;
+          console.log('✅ Match: Trimmed string match');
+        }
+        // Try case-insensitive match
+        else if (answer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim()) {
+          isAnswerCorrect = true;
+          console.log('✅ Match: Case-insensitive match');
+        }
+        // Check if user answer is in the options and matches correct answer
+        else if (question.options.includes(answer) && question.options.includes(question.correctAnswer)) {
+          const userIndex = question.options.indexOf(answer);
+          const correctIndex = question.options.indexOf(question.correctAnswer);
+          if (userIndex === correctIndex) {
+            isAnswerCorrect = true;
+            console.log('✅ Match: Same option index');
+          }
+        }
+      }
+
+      question.isCorrect = isAnswerCorrect;
+      console.log(`Final result: ${isAnswerCorrect ? '✅ CORRECT' : '❌ INCORRECT'}`);
+      console.log('=== END DEBUG ===');
       question.timeSpent = timeSpent || 0;
       question.status = 'answered';
 
@@ -826,11 +1036,14 @@ router.put('/:id/complete', async (req, res) => {
 // Get user's quiz history
 router.get('/', async (req, res) => {
   try {
-    const { limit = 10, status } = req.query;
+    const { limit = 10, status, source } = req.query;
 
     const query = { userId: req.user.id };
     if (status) {
       query.status = status;
+    }
+    if (source) {
+      query.source = source;
     }
 
     const quizzes = await Quiz.find(query)
@@ -840,6 +1053,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       success: true,
+      quizzes,
       data: quizzes
     });
 
@@ -1186,5 +1400,61 @@ router.get('/recent', async (req, res) => {
     });
   }
 });
+
+
+// Debug endpoint to check quiz status
+router.get('/:id/debug', asyncHandler(async (req, res) => {
+  try {
+    const quiz = await Quiz.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!quiz) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quiz not found'
+      });
+    }
+
+    const debugInfo = {
+      quizId: quiz._id,
+      title: quiz.title,
+      status: quiz.status,
+      totalQuestions: quiz.totalQuestions,
+      actualQuestionCount: quiz.questions.length,
+      currentQuestionIndex: quiz.currentQuestionIndex,
+      accuracy: quiz.accuracy,
+      correctAnswers: quiz.correctAnswers,
+      timeLimit: quiz.timeLimit,
+      startedAt: quiz.startedAt,
+      completedAt: quiz.completedAt,
+      isAdaptive: quiz.isAdaptive,
+      roadmapType: quiz.roadmapType,
+      difficulty: quiz.difficulty,
+      questionsPreview: quiz.questions.slice(0, 3).map(q => ({
+        questionId: q.questionId,
+        question: q.question.substring(0, 100) + '...',
+        optionsCount: q.options.length,
+        hasCorrectAnswer: !!q.correctAnswer,
+        status: q.status
+      }))
+    };
+
+    res.json({
+      success: true,
+      data: debugInfo
+    });
+
+  } catch (error) {
+    console.error('Error in quiz debug:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Debug failed',
+      error: error.message
+    });
+  }
+}));
+
 
 module.exports = router;

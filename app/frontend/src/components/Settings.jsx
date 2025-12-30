@@ -113,7 +113,9 @@ export default function Settings() {
     }
 
     return (
+
         <div className="min-h-screen p-8 pt-24 bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
+            <Sidebar />
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
                     Settings

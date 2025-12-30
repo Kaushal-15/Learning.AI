@@ -26,7 +26,32 @@ const roadmapSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
   skills: [{ type: String, required: true }],
-  levels: [levelSchema]
+  levels: [levelSchema],
+  category: {
+    type: String,
+    enum: ['dsa', 'backend', 'frontend', 'mobile', 'database', 'ai', 'devops', 'cybersecurity'],
+    default: null
+  },
+  totalTopics: {
+    type: Number,
+    default: 0,
+    min: [0, 'Total topics cannot be negative']
+  },
+  projects: [{
+    id: { type: String, required: true },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], required: true },
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    exampleUrl: { type: String, required: true },
+    requirements: [String],
+    implementationGuide: { type: String },
+    techStack: [String],
+    learningOutcomes: [String],
+    estimatedTime: { type: String },
+    difficultyLevel: { type: Number, min: 1, max: 10 },
+    features: [String],
+    bonusChallenges: [String]
+  }]
 }, {
   timestamps: true
 });

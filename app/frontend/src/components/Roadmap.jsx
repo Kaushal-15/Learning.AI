@@ -127,7 +127,7 @@ export default function Roadmap() {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE} /profile/onboarding`, {
+      const res = await fetch(`${API_BASE}/roadmap-selection/select`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

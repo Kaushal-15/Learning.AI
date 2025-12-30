@@ -23,6 +23,7 @@ import {
   Sun
 } from 'lucide-react';
 import { useTheme } from "../contexts/ThemeContext";
+import AnimatedBackground from "./AnimatedBackground";
 import api from '../services/api';
 import "../styles/DevvoraStyles.css";
 
@@ -31,7 +32,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api
 export default function LearnPaths() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { roadmapId, week, day, dayData, roadmapTitle } = location.state || {};
+  const { roadmapId, week, day, dayData: initialDayData, roadmapTitle } = location.state || {};
+  const [dayData, setDayData] = useState(initialDayData || null);
   const { isDarkMode, toggleTheme } = useTheme();
 
   const [selectedMode, setSelectedMode] = useState('text');
@@ -39,13 +41,13 @@ export default function LearnPaths() {
   const [content, setContent] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [generatedContent, setGeneratedContent] = useState(() => {
-    if (dayData?.learningOptions) {
+    if (initialDayData?.learningOptions) {
       // Map the database structure to the frontend state structure
       return {
-        text: dayData.learningOptions.text,
-        video: dayData.learningOptions.video,
-        audio: dayData.learningOptions.audio,
-        image: dayData.learningOptions.images // Note: DB uses 'images', frontend state uses 'image'
+        text: initialDayData.learningOptions.text,
+        video: initialDayData.learningOptions.video,
+        audio: initialDayData.learningOptions.audio,
+        image: initialDayData.learningOptions.images // Note: DB uses 'images', frontend state uses 'image'
       };
     }
     return {};
@@ -63,14 +65,90 @@ export default function LearnPaths() {
   }, [isDarkMode]);
 
   useEffect(() => {
-    if (!dayData) {
-      navigate('/learn');
-      return;
-    }
+    const fetchDayContent = async () => {
+      if (!dayData && roadmapId && week && day) {
+        setLoading(true);
+        try {
+          // Calculate the actual day number based on week and day
+          // Assuming 7 days per week structure or fetching by specific week-day endpoint
+          // Since the backend has /:roadmapId/day/:day, we might need to map week/day to total day index
+          // OR use a new endpoint. For now, let's try to fetch by week and filter
+
+          const res = await fetch(`${API_BASE}/daily-learning/${roadmapId}/week/${week}`, {
+            credentials: 'include'
+          });
+          const data = await res.json();
+
+          if (data.success && data.data) {
+            const foundDay = data.data.find(d => d.day === parseInt(day) || d.day === day);
+            if (foundDay) {
+              setDayData(foundDay);
+              // Update generated content state
+              if (foundDay.learningOptions) {
+                setGeneratedContent({
+                  text: foundDay.learningOptions.text,
+                  video: foundDay.learningOptions.video,
+                  audio: foundDay.learningOptions.audio,
+                  image: foundDay.learningOptions.images
+                });
+              }
+            } else {
+              console.error('Day content not found in week data');
+              // Fallback: try fetching by absolute day if possible, or handle error
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching day content:', err);
+        } finally {
+          setLoading(false);
+        }
+      } else if (!dayData && !roadmapId) {
+        // Only redirect if we really don't have enough info to fetch
+        navigate('/learn');
+      }
+    };
+
+    fetchDayContent();
 
     // Check if this day is already completed
-    checkCompletionStatus();
-  }, [dayData, navigate]);
+    if (roadmapId) {
+      checkCompletionStatus();
+    }
+  }, [dayData, roadmapId, week, day, navigate]);
+
+
+  const refreshCompletionStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/progress/${roadmapId}`, {
+        credentials: 'include'
+      });
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const dayId = `week${week}-day${day}`;
+        const isCompleted = data.data.completedLessons.some(
+          lesson => lesson.lessonId === dayId
+        );
+        setCompleted(isCompleted);
+        console.log('Completion status refreshed:', isCompleted);
+      }
+    } catch (err) {
+      console.error('Error refreshing completion status:', err);
+    }
+  };
+
+  // Refresh completion status when returning from quiz
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && roadmapId) {
+        // Page became visible again, refresh completion status
+        setTimeout(refreshCompletionStatus, 1000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [roadmapId, week, day]);
 
   const checkCompletionStatus = async () => {
     try {
@@ -185,27 +263,64 @@ export default function LearnPaths() {
     generateContent(contentType);
   };
 
-  const markAsCompleted = async () => {
+
+  const handleTakeQuiz = async () => {
     try {
-      const dayId = `week${week}-day${day}`;
-      const res = await fetch(`${API_BASE}/progress/complete-lesson`, {
+      setLoading(true);
+      console.log('Creating quiz for:', { roadmapId, topic: dayData.topic || dayData.title });
+
+      // Create a quiz for this topic using the api service
+      const response = await fetch(`${API_BASE}/quiz/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         credentials: 'include',
         body: JSON.stringify({
-          roadmapId,
-          lessonId: dayId,
-          timeSpent: 60, // default 60 minutes
-          quizScore: 100
+          roadmapType: roadmapId,
+          difficulty: 'medium', // Initial difficulty (must be lowercase: easy, medium, hard, advanced)
+          questionCount: 10,
+          timeLimit: 15,
+          topic: dayData.topic || dayData.title, // Pass topic to ensure relevance
+          adaptiveDifficulty: true // Enable dynamic adaptive difficulty
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setCompleted(true);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Quiz creation response:', data);
+
+      if (data.success && data.data) {
+        console.log('Quiz created successfully with ID:', data.data._id);
+        console.log('Quiz has', data.data.questions?.length || 0, 'questions');
+
+        // Ensure quiz has questions before navigating
+        if (!data.data.questions || data.data.questions.length === 0) {
+          throw new Error('Created quiz has no questions');
+        }
+
+        // Navigate to the quiz with the MongoDB _id
+        navigate(`/quiz/${data.data._id}`, {
+          state: {
+            topic: dayData.topic || dayData.title,
+            roadmapId,
+            week,
+            day,
+            lessonId: `week${week}-day${day}`, // Pass lesson ID for progress update
+            returnPath: location.pathname // Path to return to
+          }
+        });
+      } else {
+        throw new Error(data.message || 'Failed to create quiz');
       }
     } catch (err) {
-      console.error('Error marking as completed:', err);
+      console.error('Error creating quiz:', err);
+      alert('Error creating quiz: ' + err.message + '. Please try again or contact support.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -275,15 +390,26 @@ export default function LearnPaths() {
             </div>
 
             <button
-              onClick={markAsCompleted}
-              disabled={completed}
+              onClick={handleTakeQuiz}
+              disabled={completed || loading}
               className={`px-6 py-2 rounded-2xl font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg ${completed
                 ? 'bg-green-100 dashboard-dark:bg-green-900/30 text-green-700 dashboard-dark:text-green-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700'
+                : 'bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700'
                 }`}
             >
-              <CheckCircle className="w-5 h-5" />
-              {completed ? 'Completed' : 'Mark as Complete'}
+              {loading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : completed ? (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  Completed
+                </>
+              ) : (
+                <>
+                  <Brain className="w-5 h-5" />
+                  Take Quiz
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -527,37 +653,100 @@ export default function LearnPaths() {
                     </div>
                   )}
 
+                  {/* Helper function to convert YouTube URLs to embed format */}
+                  {(() => {
+                    const getYouTubeEmbedUrl = (url) => {
+                      if (!url) return '';
+
+                      // Already an embed URL
+                      if (url.includes('/embed/')) return url;
+
+                      // Extract video ID from watch URL
+                      if (url.includes('watch?v=')) {
+                        try {
+                          const videoId = new URL(url).searchParams.get('v');
+                          if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+                        } catch (e) {
+                          console.error('Error parsing YouTube URL:', e);
+                        }
+                      }
+
+                      // Extract from short URL (youtu.be)
+                      if (url.includes('youtu.be/')) {
+                        const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+                        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+                      }
+
+                      // If it's a search URL or playlist, create a search embed
+                      if (url.includes('/results?search_query=') || url.includes('search_query=')) {
+                        try {
+                          const searchQuery = new URL(url).searchParams.get('search_query');
+                          if (searchQuery) {
+                            // Use a curated playlist or search result
+                            return `https://www.youtube.com/embed/videoseries?list=PLWKjhJtqVAbnRT_hue-3zyiuIYj0OlpyG`;
+                          }
+                        } catch (e) {
+                          console.error('Error parsing search URL:', e);
+                        }
+                      }
+
+                      // Return original URL as fallback
+                      return url;
+                    };
+
+                    return null; // This is just to define the function
+                  })()}
+
                   {generatedContent.video.links && generatedContent.video.links.length > 0 ? (
-                    generatedContent.video.links.map((video, idx) => (
-                      <div key={idx} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
-                        <h4 className="font-semibold text-gray-900 mb-3">{video.title}</h4>
-                        <div className="relative w-full pb-[56.25%] mb-4 bg-gray-100 rounded-lg overflow-hidden">
-                          <iframe
-                            src={video.url}
-                            title={video.title}
-                            className="absolute top-0 left-0 w-full h-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          ></iframe>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Video className="w-4 h-4 text-red-600" />
+                    generatedContent.video.links.map((video, idx) => {
+                      const embedUrl = (() => {
+                        const url = video.url;
+                        if (!url) return '';
+                        if (url.includes('/embed/')) return url;
+                        if (url.includes('watch?v=')) {
+                          try {
+                            const videoId = new URL(url).searchParams.get('v');
+                            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+                          } catch (e) { }
+                        }
+                        if (url.includes('youtu.be/')) {
+                          const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+                          if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+                        }
+                        return url;
+                      })();
+
+                      return (
+                        <div key={idx} className="border border-gray-200 dashboard-dark:border-[#1a1a1a] rounded-lg p-4 hover:shadow-md transition-shadow bg-white dashboard-dark:bg-[#0a0a0a]">
+                          <h4 className="font-semibold text-gray-900 dashboard-dark:text-[#ecd69f] mb-3">{video.title}</h4>
+                          <div className="relative w-full pb-[56.25%] mb-4 bg-gray-100 dashboard-dark:bg-[#1a1a1a] rounded-lg overflow-hidden">
+                            <iframe
+                              src={embedUrl}
+                              title={video.title}
+                              className="absolute top-0 left-0 w-full h-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            ></iframe>
                           </div>
-                          <div>
-                            <p className="text-sm text-gray-600 mb-1">{video.description}</p>
-                            {video.duration && (
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {video.duration}
-                              </span>
-                            )}
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-red-100 dashboard-dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Video className="w-4 h-4 text-red-600 dashboard-dark:text-red-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600 dashboard-dark:text-[#b8a67d] mb-1">{video.description}</p>
+                              {video.duration && (
+                                <span className="text-xs text-gray-500 dashboard-dark:text-[#b8a67d] flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {video.duration}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    !generatedContent.video.script && <p className="text-gray-500">No video links available yet.</p>
+                    !generatedContent.video.script && <p className="text-gray-500 dashboard-dark:text-[#b8a67d]">No video links available yet.</p>
                   )}
                 </div>
               )}

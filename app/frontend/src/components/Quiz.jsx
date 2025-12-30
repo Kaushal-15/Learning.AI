@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 
 import {
   ArrowLeft,
@@ -24,7 +24,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api
 
 export default function Quiz() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
+  const { lessonId, roadmapId, returnPath } = location.state || {};
 
   const [quiz, setQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -36,32 +38,54 @@ export default function Quiz() {
   const [adaptiveNotification, setAdaptiveNotification] = useState(null);
   const [isLoadingNextQuestion, setIsLoadingNextQuestion] = useState(false);
 
-  // Fetch quiz data
+  
+  // Enhanced quiz loading with better error handling
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
+        console.log('Fetching quiz with ID:', id);
         const response = await fetch(`${API_BASE}/quiz/${id}`, {
           credentials: 'include'
         });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('Quiz data received:', data);
 
-        if (data.success) {
-          setQuiz(data.data);
-          setCurrentQuestionIndex(data.data.currentQuestionIndex || 0);
+        if (data.success && data.data) {
+          const quizData = data.data;
+          console.log('Quiz questions count:', quizData.questions?.length || 0);
+          
+          // Ensure quiz has questions
+          if (!quizData.questions || quizData.questions.length === 0) {
+            console.error('Quiz has no questions!');
+            alert('This quiz has no questions. Please try creating a new quiz.');
+            navigate('/dashboard');
+            return;
+          }
+          
+          setQuiz(quizData);
+          setCurrentQuestionIndex(quizData.currentQuestionIndex || 0);
 
           // Calculate time left
-          const elapsed = Math.floor((Date.now() - new Date(data.data.startedAt)) / 1000);
-          const totalTime = data.data.timeLimit * 60;
+          const elapsed = Math.floor((Date.now() - new Date(quizData.startedAt)) / 1000);
+          const totalTime = quizData.timeLimit * 60;
           setTimeLeft(Math.max(0, totalTime - elapsed));
 
-          if (data.data.status === 'completed') {
+          if (quizData.status === 'completed') {
             setShowResults(true);
           }
         } else {
+          console.error('Quiz fetch failed:', data.message);
+          alert('Failed to load quiz: ' + (data.message || 'Unknown error'));
           navigate('/dashboard');
         }
       } catch (error) {
         console.error('Error fetching quiz:', error);
+        alert('Error loading quiz: ' + error.message);
         navigate('/dashboard');
       } finally {
         setLoading(false);
@@ -70,6 +94,9 @@ export default function Quiz() {
 
     if (id) {
       fetchQuiz();
+    } else {
+      console.error('No quiz ID provided');
+      navigate('/dashboard');
     }
   }, [id, navigate]);
 
@@ -110,6 +137,7 @@ export default function Quiz() {
     if (!selectedAnswer) return;
 
     const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
+    const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
     try {
       const response = await fetch(`${API_BASE}/quiz/${id}/answer`, {
@@ -129,9 +157,32 @@ export default function Quiz() {
       if (data.success) {
         setQuiz(data.data);
 
+        // Award XP for correct answers
+        if (isCorrect && roadmapId) {
+          try {
+            const xpRes = await fetch(`${API_BASE}/progress-tracking/update`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                roadmapId: roadmapId,
+                questionId: `quiz-${id}-q${currentQuestionIndex}`,
+                difficulty: currentQuestion.difficulty
+              })
+            });
+
+            const xpData = await xpRes.json();
+            if (xpData.success && xpData.data.isNewCompletion) {
+              // Show XP notification
+              showXPNotification(xpData.data);
+            }
+          } catch (xpError) {
+            console.error('Error awarding XP:', xpError);
+          }
+        }
+
         // Handle adaptive difficulty notification
         if (data.adaptiveChange && data.adaptiveChange.changed) {
-          const isCorrect = selectedAnswer === quiz.questions[currentQuestionIndex].correctAnswer;
           setAdaptiveNotification({
             type: data.adaptiveChange.to > data.adaptiveChange.from ? 'increase' : 'decrease',
             from: data.adaptiveChange.from,
@@ -162,6 +213,59 @@ export default function Quiz() {
       }
     } catch (error) {
       console.error('Error submitting answer:', error);
+    }
+  };
+
+  // XP Notification function
+  const showXPNotification = (xpData) => {
+    const { xpAwarded, totalXP, league, streakInfo } = xpData;
+
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = 'xp-notification';
+    notification.innerHTML = `
+      <div class="xp-notification-content">
+        <div class="xp-icon">⭐</div>
+        <div class="xp-text">
+          <div class="xp-amount">+${xpAwarded} XP</div>
+          <div class="xp-total">Total: ${totalXP} XP • ${league}</div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+
+    // Show streak bonus notification if applicable
+    if (streakInfo && streakInfo.bonusAwarded) {
+      setTimeout(() => {
+        const streakNotif = document.createElement('div');
+        streakNotif.className = 'xp-notification streak-bonus';
+        streakNotif.innerHTML = `
+          <div class="xp-notification-content">
+            <div class="xp-icon">🔥</div>
+            <div class="xp-text">
+              <div class="xp-amount">${streakInfo.count}-Day Streak!</div>
+              <div class="xp-total">Bonus +${streakInfo.bonusXP} XP</div>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(streakNotif);
+        setTimeout(() => streakNotif.classList.add('show'), 10);
+        setTimeout(() => {
+          streakNotif.classList.remove('show');
+          setTimeout(() => streakNotif.remove(), 300);
+        }, 4000);
+      }, 500);
     }
   };
 
@@ -243,6 +347,50 @@ export default function Quiz() {
         setQuiz(completedQuiz);
         setShowResults(true);
         setTimeLeft(0); // Stop the timer
+
+        
+        // Check if we need to update lesson progress (60% threshold)
+        if (lessonId && roadmapId) {
+          const passedQuiz = completedQuiz.accuracy >= 60;
+          console.log(`Quiz completed with ${completedQuiz.accuracy}% accuracy. Passed: ${passedQuiz}`);
+          
+          if (passedQuiz) {
+            try {
+              console.log('Marking lesson as complete...');
+              const progressResponse = await fetch(`${API_BASE}/progress/complete-lesson`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  roadmapId,
+                  lessonId,
+                  timeSpent: Math.floor((Date.now() - new Date(completedQuiz.startedAt)) / 1000 / 60) || 15,
+                  quizScore: completedQuiz.accuracy
+                })
+              });
+              
+              const progressData = await progressResponse.json();
+              console.log('Lesson completion response:', progressData);
+              
+              if (progressData.success) {
+                console.log('✅ Lesson marked as complete!');
+                // Show success message
+                setTimeout(() => {
+                  alert(`Congratulations! You passed with ${completedQuiz.accuracy}% and completed this lesson!`);
+                }, 1000);
+              } else {
+                console.error('Failed to mark lesson complete:', progressData.message);
+              }
+            } catch (progressError) {
+              console.error('Error updating lesson progress:', progressError);
+            }
+          } else {
+            console.log(`Quiz score ${completedQuiz.accuracy}% is below 60% threshold. Lesson not marked as complete.`);
+            setTimeout(() => {
+              alert(`You scored ${completedQuiz.accuracy}%. You need at least 60% to complete this lesson. Try again!`);
+            }, 1000);
+          }
+        }
       }
     } catch (error) {
       console.error('Error completing quiz:', error);
@@ -338,6 +486,41 @@ export default function Quiz() {
                   <p className="text-gray-600 dark:text-cream-200">Quiz Results</p>
                 </div>
               </div>
+
+          {/* Lesson Completion Status */}
+          {lessonId && roadmapId && (
+            <div className="mb-6">
+              {quiz.accuracy >= 60 ? (
+                <div className="bg-green-50 dark:bg-green-400/20 border border-green-200 dark:border-green-400/30 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-green-800 dark:text-green-400">Lesson Completed! 🎉</h3>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        You scored {quiz.accuracy}% and passed the 60% threshold. This day is now marked as complete!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-orange-50 dark:bg-orange-400/20 border border-orange-200 dark:border-orange-400/30 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                      <Target className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-orange-800 dark:text-orange-400">Keep Trying! 💪</h3>
+                      <p className="text-sm text-orange-700 dark:text-orange-300">
+                        You scored {quiz.accuracy}%. You need at least 60% to complete this lesson. Take the quiz again to improve your score!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
               <div className="flex items-center gap-6">
                 <div className="text-center bg-amber-50 dark:bg-amber-400/20 border border-amber-200 dark:border-amber-400/30 rounded-lg p-4">

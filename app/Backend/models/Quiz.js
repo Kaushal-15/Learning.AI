@@ -14,6 +14,11 @@ const quizSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  source: {
+    type: String,
+    enum: ['roadmap', 'custom'],
+    default: 'roadmap'
+  },
   difficulty: {
     type: String,
     enum: ['easy', 'medium', 'hard', 'advanced', 'mixed'],
@@ -106,25 +111,25 @@ const quizSchema = new mongoose.Schema({
 });
 
 // Method to adjust difficulty based on real-time performance
-quizSchema.methods.adjustAdaptiveDifficulty = function(questionIndex, isCorrect, timeSpent) {
+quizSchema.methods.adjustAdaptiveDifficulty = function (questionIndex, isCorrect, timeSpent) {
   if (!this.isAdaptive) return null;
-  
+
   const settings = this.adaptiveSettings;
   const currentDifficulty = settings.currentDifficulty;
   const difficultyLevels = ['easy', 'medium', 'hard', 'advanced'];
   const currentIndex = difficultyLevels.indexOf(currentDifficulty);
-  
+
   let newDifficulty = currentDifficulty;
   let reason = '';
-  
+
   if (isCorrect) {
     settings.consecutiveCorrect++;
     settings.consecutiveIncorrect = 0;
-    
+
     // Check for fast, confident answers (increase difficulty)
     const isFastAnswer = timeSpent <= settings.fastAnswerThreshold;
     const hasConsecutiveCorrect = settings.consecutiveCorrect >= settings.confidenceBoostThreshold;
-    
+
     if (isFastAnswer && hasConsecutiveCorrect && currentIndex < difficultyLevels.length - 1) {
       newDifficulty = difficultyLevels[currentIndex + 1];
       reason = `Fast and confident: ${settings.consecutiveCorrect} correct in ${timeSpent}s`;
@@ -133,7 +138,7 @@ quizSchema.methods.adjustAdaptiveDifficulty = function(questionIndex, isCorrect,
   } else {
     settings.consecutiveIncorrect++;
     settings.consecutiveCorrect = 0;
-    
+
     // Immediate difficulty drop after incorrect answer (if not at easiest level)
     if (settings.consecutiveIncorrect >= settings.difficultyDropThreshold && currentIndex > 0) {
       newDifficulty = difficultyLevels[currentIndex - 1];
@@ -141,7 +146,7 @@ quizSchema.methods.adjustAdaptiveDifficulty = function(questionIndex, isCorrect,
       settings.consecutiveIncorrect = 0; // Reset after difficulty decrease
     }
   }
-  
+
   // Record difficulty change if it occurred
   if (newDifficulty !== currentDifficulty) {
     settings.difficultyChanges.push({
@@ -151,9 +156,9 @@ quizSchema.methods.adjustAdaptiveDifficulty = function(questionIndex, isCorrect,
       reason,
       timestamp: new Date()
     });
-    
+
     settings.currentDifficulty = newDifficulty;
-    
+
     return {
       changed: true,
       from: currentDifficulty,
@@ -161,18 +166,18 @@ quizSchema.methods.adjustAdaptiveDifficulty = function(questionIndex, isCorrect,
       reason
     };
   }
-  
+
   return { changed: false, current: currentDifficulty };
 };
 
 // Method to update quiz statistics in real-time
-quizSchema.methods.updateStats = function() {
+quizSchema.methods.updateStats = function () {
   const answeredQuestions = this.questions.filter(q => q.status === 'answered');
   const correctCount = answeredQuestions.filter(q => q.isCorrect).length;
-  
+
   this.correctAnswers = correctCount;
   this.accuracy = answeredQuestions.length > 0 ? Math.round((correctCount / answeredQuestions.length) * 100) : 0;
-  
+
   // Calculate points (correct answers get points based on difficulty)
   this.points = this.questions.reduce((total, q) => {
     if (q.isCorrect) {
@@ -189,7 +194,7 @@ quizSchema.methods.updateStats = function() {
 };
 
 // Calculate accuracy and points before saving
-quizSchema.pre('save', function(next) {
+quizSchema.pre('save', function (next) {
   this.updateStats();
   next();
 });

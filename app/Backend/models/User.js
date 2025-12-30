@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
   learningTimeline: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
   refreshToken: { type: String }, // optional store for refresh token validation
+  isVerified: { type: Boolean, default: false },
+  verificationCode: { type: String },
+  verificationExpires: { type: Date },
   settings: {
     theme: { type: String, default: 'light' },
     notifications: { type: Boolean, default: true }

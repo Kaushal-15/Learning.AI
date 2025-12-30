@@ -31,6 +31,12 @@ const progressRoutes = require('./routes/progressRoutes');
 const dailyLearningRoutes = require('./routes/dailyLearningRoutes');
 const contentRoutes = require('./routes/contentRoutes');
 const userRoutes = require('./routes/userRoutes');
+const roadmapSelectionRoutes = require('./routes/roadmapSelectionRoutes');
+const newProgressRoutes = require('./routes/progress.routes');
+const xpRoutes = require('./routes/xp.routes');
+const projectRoutes = require('./routes/project.routes');
+const customLearningRoutes = require('./routes/customLearningRoutes');
+
 
 // ===============================
 // Initialize App
@@ -115,8 +121,11 @@ app.use('/api/daily-learning', dailyLearningRoutes); // Daily learning (public f
 // PROTECTED ROUTES (Require Login)
 // ===============================
 app.use('/api/users', userRoutes); // User profile and settings
+app.use('/api/roadmap-selection', authMiddleware, roadmapSelectionRoutes); // Roadmap selection and changes
 app.use('/api/profile', authMiddleware, profileRoutes);
-app.use('/api/progress', authMiddleware, progressRoutes);
+app.use('/api/progress', authMiddleware, progressRoutes); // Legacy progress routes
+app.use('/api/progress-tracking', authMiddleware, newProgressRoutes); // New XP-based progress tracking
+app.use('/api/xp', authMiddleware, xpRoutes); // XP and League system
 app.use('/api/questions', authMiddleware, questionRoutes);
 app.use('/api/quiz', authMiddleware, quizRoutes); // Dynamic MCQ Quiz system
 app.use('/api/test-results', authMiddleware, testResultRoutes);
@@ -124,6 +133,8 @@ app.use('/api/assessment', authMiddleware, assessmentRoutes);
 app.use('/api/learners', authMiddleware, learnerRoutes);
 app.use('/api/performance', authMiddleware, performanceRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes);
+app.use('/api/projects', authMiddleware, projectRoutes);
+app.use('/api/custom-learning', customLearningRoutes); // Auth handled in routes
 
 // ===============================
 // 404 Handler

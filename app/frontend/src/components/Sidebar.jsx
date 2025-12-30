@@ -1,9 +1,10 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
     Home, BookOpen, FolderKanban, Settings, LogOut,
-    Moon, Sun, History
+    Moon, Sun, History, FileText
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
+import ProgressTracker from "./ProgressTracker";
 import "../styles/DevvoraStyles.css";
 
 export default function Sidebar() {
@@ -60,12 +61,23 @@ export default function Sidebar() {
                         <History className="nav-icon" />
                     </button>
                     <button
+                        className={`nav-item ${isActive("/custom-learning") ? "active" : ""}`}
+                        onClick={() => navigate("/custom-learning")}
+                        title="Custom Learning"
+                    >
+                        <FileText className="nav-icon" />
+                    </button>
+                    {/* <button
                         className={`nav-item ${isActive("/projects") ? "active" : ""}`}
-                        onClick={() => navigate("/projects")}
+                        onClick={() => navigate("/Projects")}
                         title="Projects"
                     >
                         <FolderKanban className="nav-icon" />
-                    </button>
+                    </button> */}
+
+                    {/* Progress Tracker */}
+                    <ProgressTracker />
+
                     <button
                         className={`nav-item ${isActive("/settings") ? "active" : ""}`}
                         onClick={() => navigate("/settings")}

@@ -16,6 +16,8 @@ import Quiz from "./components/Quiz";
 import ContentGeneratorDemo from "./components/ContentGeneratorDemo";
 import AdaptiveQuizTest from "./components/AdaptiveQuizTest";
 import Settings from "./components/Settings";
+import CustomLearning from "./components/CustomLearning";
+import CustomQuizHistory from "./components/CustomQuizHistory";
 
 export default function App() {
   return (
@@ -41,6 +43,8 @@ export default function App() {
           <Route path="/content-demo" element={<ContentGeneratorDemo />} />
           <Route path="/adaptive-quiz-test" element={<AdaptiveQuizTest />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/custom-learning" element={<CustomLearning />} />
+          <Route path="/custom-quiz-history" element={<CustomQuizHistory />} />
         </Route>
       </Routes>
     </BrowserRouter>

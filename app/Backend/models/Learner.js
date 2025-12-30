@@ -134,7 +134,34 @@ const learnerSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     }
-  }
+  },
+  currentRoadmapId: {
+    type: String,
+    default: null
+  },
+  roadmapHistory: [{
+    roadmapId: {
+      type: String,
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['active', 'paused', 'completed'],
+      default: 'active'
+    },
+    startedAt: {
+      type: Date,
+      default: Date.now
+    },
+    pausedAt: {
+      type: Date,
+      default: null
+    },
+    completedAt: {
+      type: Date,
+      default: null
+    }
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -147,7 +174,7 @@ learnerSchema.index({ lastActive: -1 });
 learnerSchema.index({ overallAccuracy: -1 });
 
 // Virtual for weak areas (categories with mastery level < 60)
-learnerSchema.virtual('weakAreas').get(function() {
+learnerSchema.virtual('weakAreas').get(function () {
   const weakAreas = [];
   for (const [category, mastery] of this.categoryMastery) {
     if (mastery.level < 60) {
@@ -158,7 +185,7 @@ learnerSchema.virtual('weakAreas').get(function() {
 });
 
 // Virtual for strong areas (categories with mastery level >= 80)
-learnerSchema.virtual('strongAreas').get(function() {
+learnerSchema.virtual('strongAreas').get(function () {
   const strongAreas = [];
   for (const [category, mastery] of this.categoryMastery) {
     if (mastery.level >= 80) {
@@ -169,13 +196,13 @@ learnerSchema.virtual('strongAreas').get(function() {
 });
 
 // Virtual for average session time
-learnerSchema.virtual('averageSessionTime').get(function() {
+learnerSchema.virtual('averageSessionTime').get(function () {
   if (this.totalQuestionsAnswered === 0) return 0;
   return this.totalTimeSpent / this.totalQuestionsAnswered;
 });
 
 // Pre-save middleware to update lastActive
-learnerSchema.pre('save', function(next) {
+learnerSchema.pre('save', function (next) {
   if (this.isModified() && !this.isModified('lastActive')) {
     this.lastActive = new Date();
   }
@@ -183,7 +210,7 @@ learnerSchema.pre('save', function(next) {
 });
 
 // Static method to find learners by performance level
-learnerSchema.statics.findByPerformanceLevel = function(minAccuracy, maxAccuracy) {
+learnerSchema.statics.findByPerformanceLevel = function (minAccuracy, maxAccuracy) {
   return this.find({
     overallAccuracy: { $gte: minAccuracy, $lte: maxAccuracy },
     totalQuestionsAnswered: { $gte: 10 } // Only include learners with sufficient data
@@ -191,7 +218,7 @@ learnerSchema.statics.findByPerformanceLevel = function(minAccuracy, maxAccuracy
 };
 
 // Static method to get learner analytics
-learnerSchema.statics.getAnalytics = function(learnerId) {
+learnerSchema.statics.getAnalytics = function (learnerId) {
   return this.aggregate([
     { $match: { _id: mongoose.Types.ObjectId(learnerId) } },
     {
@@ -217,7 +244,7 @@ learnerSchema.statics.getAnalytics = function(learnerId) {
 };
 
 // Instance method to update category mastery
-learnerSchema.methods.updateCategoryMastery = function(category, wasCorrect, timeSpent) {
+learnerSchema.methods.updateCategoryMastery = function (category, wasCorrect, timeSpent) {
   if (!this.categoryMastery.has(category)) {
     this.categoryMastery.set(category, {
       level: 0,
@@ -231,52 +258,52 @@ learnerSchema.methods.updateCategoryMastery = function(category, wasCorrect, tim
   }
 
   const mastery = this.categoryMastery.get(category);
-  
+
   // Update questions answered
   mastery.questionsAnswered += 1;
-  
+
   // Update average accuracy
   const previousCorrect = Math.round(mastery.averageAccuracy * (mastery.questionsAnswered - 1));
   const newCorrect = previousCorrect + (wasCorrect ? 1 : 0);
   mastery.averageAccuracy = newCorrect / mastery.questionsAnswered;
-  
+
   // Update average time per question
   mastery.averageTimePerQuestion = ((mastery.averageTimePerQuestion * (mastery.questionsAnswered - 1)) + timeSpent) / mastery.questionsAnswered;
-  
+
   // Update streak
   if (wasCorrect) {
     mastery.streakCount += 1;
   } else {
     mastery.streakCount = 0;
   }
-  
+
   // Calculate mastery level (0-100) based on accuracy, consistency, and speed
   const accuracyScore = mastery.averageAccuracy * 60; // Max 60 points for accuracy
   const consistencyScore = Math.min(mastery.streakCount * 2, 25); // Max 25 points for consistency
   const speedScore = Math.max(0, 15 - (mastery.averageTimePerQuestion / 10)); // Max 15 points for speed
-  
+
   mastery.level = Math.min(100, Math.round(accuracyScore + consistencyScore + speedScore));
-  
+
   // Update confidence based on recent performance and question count
   const experienceFactor = Math.min(1, mastery.questionsAnswered / 20); // Full confidence after 20 questions
   mastery.confidence = mastery.averageAccuracy * experienceFactor;
-  
+
   mastery.lastAssessed = new Date();
-  
+
   this.categoryMastery.set(category, mastery);
   return this.save();
 };
 
 // Instance method to update overall statistics
-learnerSchema.methods.updateOverallStats = function(wasCorrect, timeSpent) {
+learnerSchema.methods.updateOverallStats = function (wasCorrect, timeSpent) {
   this.totalQuestionsAnswered += 1;
   this.totalTimeSpent += timeSpent;
-  
+
   // Update overall accuracy
   const previousCorrect = Math.round(this.overallAccuracy * (this.totalQuestionsAnswered - 1));
   const newCorrect = previousCorrect + (wasCorrect ? 1 : 0);
   this.overallAccuracy = newCorrect / this.totalQuestionsAnswered;
-  
+
   // Update streaks
   if (wasCorrect) {
     this.currentStreak += 1;
@@ -284,22 +311,22 @@ learnerSchema.methods.updateOverallStats = function(wasCorrect, timeSpent) {
   } else {
     this.currentStreak = 0;
   }
-  
+
   return this.save();
 };
 
 // Instance method to get recommended difficulty
-learnerSchema.methods.getRecommendedDifficulty = function(category) {
+learnerSchema.methods.getRecommendedDifficulty = function (category) {
   if (!this.categoryMastery.has(category)) {
     return this.difficultyPreference;
   }
-  
+
   const mastery = this.categoryMastery.get(category);
   const masteryLevel = mastery.level;
-  
+
   // Adjust difficulty based on mastery level
   let recommendedDifficulty = this.difficultyPreference;
-  
+
   if (masteryLevel < 30) {
     recommendedDifficulty = Math.max(1, this.difficultyPreference - 2);
   } else if (masteryLevel < 60) {
@@ -309,7 +336,7 @@ learnerSchema.methods.getRecommendedDifficulty = function(category) {
   } else if (masteryLevel > 90) {
     recommendedDifficulty = Math.min(10, this.difficultyPreference + 2);
   }
-  
+
   return recommendedDifficulty;
 };
 

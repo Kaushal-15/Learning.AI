@@ -1,0 +1,417 @@
+/* Progress Tracker Styles */
+.progress-tracker-container {
+    position: relative;
+}
+
+.progress-tracker-button {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.progress-tracker-button:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.progress-tracker-button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.progress-tracker-icon {
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.xp-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    border: 2px solid var(--bg-primary, #fff);
+    box-shadow: 0 2px 8px rgba(245, 87, 108, 0.4);
+    animation: badge-pop 0.3s ease-out;
+}
+
+@keyframes badge-pop {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.progress-tracker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    animation: fade-in 0.2s ease-out;
+}
+
+.progress-tracker-panel {
+    position: fixed;
+    right: 80px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 320px;
+    max-height: 90vh;
+    background: var(--bg-primary, #ffffff);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    overflow: hidden;
+    animation: slide-in-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slide-in-right {
+    from {
+        transform: translateY(-50%) translateX(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(-50%) translateX(0);
+        opacity: 1;
+    }
+}
+
+.tracker-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.league-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 2px solid;
+}
+
+.league-emoji {
+    font-size: 20px;
+}
+
+.league-name {
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+.tracker-stats {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.stat-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary, #111827);
+    margin-top: 2px;
+}
+
+.rank-info {
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.rank-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.rank-label {
+    font-size: 11px;
+    color: var(--text-secondary, #6b7280);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.rank-value {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.next-league {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.next-league-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+}
+
+.xp-needed {
+    color: var(--text-secondary, #6b7280);
+    font-size: 12px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--bg-secondary, #f3f4f6);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.category-xp {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.category-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.category-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.category-name {
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+}
+
+.category-xp {
+    font-weight: 700;
+    color: #667eea;
+}
+
+.streak-bonus {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.streak-bonus svg {
+    color: white;
+    animation: flame-flicker 1.5s infinite;
+}
+
+@keyframes flame-flicker {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.1) rotate(-5deg);
+    }
+    75% {
+        transform: scale(1.1) rotate(5deg);
+    }
+}
+
+/* Dark Mode Support */
+.dashboard-dark .progress-tracker-panel {
+    background: var(--dark-400, #1f2937);
+}
+
+.dashboard-dark .stat-item {
+    background: var(--dark-300, #374151);
+}
+
+.dashboard-dark .stat-label {
+    color: var(--cream-200, #d1d5db);
+}
+
+.dashboard-dark .stat-value {
+    color: var(--cream-100, #f3f4f6);
+}
+
+.dashboard-dark .category-item {
+    background: var(--dark-300, #374151);
+}
+
+.dashboard-dark .category-name {
+    color: var(--cream-100, #f3f4f6);
+}
+
+.dashboard-dark .next-league-header {
+    color: var(--cream-100, #f3f4f6);
+}
+
+.dashboard-dark .xp-badge {
+    border-color: var(--dark-400, #1f2937);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .progress-tracker-panel {
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+}

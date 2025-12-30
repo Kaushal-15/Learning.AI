@@ -117,12 +117,29 @@ export default function Signup() {
       const data = await res.json();
 
       if (res.ok) {
-        setMessage({
-          type: "success",
-          text: `Account created successfully! Your Learner ID: ${data.learnerId}. Redirecting to login...`
+        // Auto-login after successful signup
+        const loginRes = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email: form.email.trim(), password: form.password })
         });
-        setForm({ name: "", email: "", password: "" });
-        setTimeout(() => navigate("/login"), 2000);
+
+        if (loginRes.ok) {
+          setMessage({
+            type: "success",
+            text: `Account created successfully! Your Learner ID: ${data.learnerId}. Redirecting to roadmap selection...`
+          });
+          setForm({ name: "", email: "", password: "" });
+          setTimeout(() => navigate("/roadmap"), 2000);
+        } else {
+          setMessage({
+            type: "success",
+            text: `Account created successfully! Your Learner ID: ${data.learnerId}. Please login to continue.`
+          });
+          setForm({ name: "", email: "", password: "" });
+          setTimeout(() => navigate("/login"), 2000);
+        }
       } else {
         if (data.message.includes('Username already taken')) {
           setErrors({ name: data.message });

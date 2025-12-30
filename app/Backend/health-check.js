@@ -1,54 +1,53 @@
 #!/usr/bin/env node
-
 /**
- * Startup Health Check
- * Runs before server start to ensure all components are ready
+ * Health Check Script
+ * Validates environment and checks if port 3000 is available
  */
 
-const mongoose = require('mongoose');
-require('dotenv').config();
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
-async function healthCheck() {
-  console.log('🏥 Running startup health check...\n');
-  
-  let issues = [];
-  
-  // Check environment variables
-  const requiredVars = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
-  requiredVars.forEach(varName => {
-    if (!process.env[varName]) {
-      issues.push(`Missing environment variable: ${varName}`);
-    }
-  });
-  
-  // Check MongoDB connection
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
-    });
-    console.log('✅ MongoDB: Connection successful');
-    await mongoose.connection.close();
-  } catch (error) {
-    issues.push(`MongoDB connection failed: ${error.message}`);
-  }
-  
-  // Check AI service
-  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes('your_')) {
-    console.log('⚠️  Gemini API: Not configured (will use fallback content)');
-  } else {
-    console.log('✅ Gemini API: Configured');
-  }
-  
-  if (issues.length > 0) {
-    console.log('\n❌ Health check failed:');
-    issues.forEach(issue => console.log(`   - ${issue}`));
-    process.exit(1);
-  } else {
-    console.log('\n✅ All systems ready!');
-  }
+// Check if .env file exists
+const envPath = path.join(__dirname, '.env');
+if (!fs.existsSync(envPath)) {
+  console.error('❌ .env file not found! Copy .env.example to .env and configure it.');
+  process.exit(1);
 }
 
-healthCheck().catch(error => {
-  console.error('❌ Health check error:', error.message);
+// Load environment variables
+require('dotenv').config();
+
+// Check required environment variables
+const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missingVars.join(', ')}`);
   process.exit(1);
+}
+
+// Check if port 3000 is already in use
+const PORT = 3000;
+const server = http.createServer();
+
+server.once('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`⚠️  Port ${PORT} is already in use. Attempting to free it...`);
+    // The kill-port command in package.json will handle this
+    server.close();
+    process.exit(0);
+  } else {
+    console.error('❌ Health check failed:', err.message);
+    server.close();
+    process.exit(1);
+  }
 });
+
+server.once('listening', () => {
+  console.log('✅ Health check passed - port is available');
+  server.close();
+  process.exit(0);
+});
+
+server.listen(PORT);

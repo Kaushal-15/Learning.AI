@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
+const youtubeService = require('./youtube.service');
 
 /**
  * Multi-Tier Content Generator Service
@@ -130,14 +131,14 @@ class ContentGenerator {
 
     if (firstOpen !== -1 && lastClose !== -1) {
       let jsonText = text.substring(firstOpen, lastClose + 1);
-      
+
       try {
         return JSON.parse(jsonText);
       } catch (error) {
         // Try to fix common JSON issues
         // Fix unescaped newlines in strings
         jsonText = jsonText.replace(/([^\\])\n/g, '$1\\n');
-        
+
         // Fix unescaped quotes in strings (be careful not to break valid JSON)
         // This is a simple heuristic - may need refinement
         jsonText = jsonText.replace(/([^\\])"/g, (match, p1, offset) => {
@@ -150,7 +151,7 @@ class ContentGenerator {
           }
           return match;
         });
-        
+
         try {
           return JSON.parse(jsonText);
         } catch (secondError) {
@@ -227,7 +228,7 @@ class ContentGenerator {
           `${topic} best practices`,
           `${topic} project tutorial`
         ];
-        
+
         return {
           videoQueries,
           videos: videoQueries.map((query, index) => ({
@@ -588,7 +589,7 @@ Make queries specific and likely to find quality educational content. Respond ON
         embedUrl: `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`,
         query: query
       }));
-      
+
       // Keep links for backward compatibility
       content.links = content.videos.map(v => ({
         title: v.title,
