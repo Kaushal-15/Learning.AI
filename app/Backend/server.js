@@ -1,12 +1,16 @@
 // ===============================
 // Learning.AI Backend Server
 // ===============================
+// CRITICAL: Load environment variables FIRST before any other imports
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-require('dotenv').config();
+const session = require('express-session');
+const passport = require('./config/passport-config');
 
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
@@ -26,6 +30,7 @@ const profileRoutes = require('./routes/profileRoutes');
 const performanceRoutes = require('./routes/performanceRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const authRoutes = require('./routes/auth');
+const googleAuthRoutes = require('./routes/googleAuth');
 const roadmapRoutes = require('./routes/roadmapRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const dailyLearningRoutes = require('./routes/dailyLearningRoutes');
@@ -81,6 +86,25 @@ app.use(
 app.use(helmet());
 
 // ===============================
+// Session + Passport Middleware (for OAuth)
+// ===============================
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ===============================
 // Core Middleware
 // ===============================
 app.use(express.json({ limit: '10mb' }));
@@ -113,6 +137,7 @@ app.get('/health', (req, res) => {
 // PUBLIC ROUTES (No Auth Required)
 // ===============================
 app.use('/api/auth', authRoutes); // signup/login/logout
+app.use('/auth', googleAuthRoutes); // Google OAuth routes
 app.use('/api/content', contentRoutes); // Content generation (public for testing)
 app.use('/api/roadmaps', roadmapRoutes); // Roadmaps (public for viewing)
 app.use('/api/daily-learning', dailyLearningRoutes); // Daily learning (public for viewing)

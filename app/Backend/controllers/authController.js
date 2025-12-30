@@ -241,3 +241,51 @@ exports.logoutUser = async (req, res) => {
         });
     }
 };
+
+/**
+ * Google OAuth Callback Handler
+ * Called after successful Google authentication
+ * Generates JWT tokens and sets cookies
+ */
+exports.googleCallback = async (req, res) => {
+    try {
+        const user = req.user;
+
+        if (!user) {
+            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed`);
+        }
+
+        // Generate JWT tokens
+        const accessToken = signAccessToken({ id: user._id, email: user.email });
+        const refreshToken = signRefreshToken({ id: user._id, email: user.email });
+
+        // Store refresh token in user document
+        await User.findByIdAndUpdate(user._id, { refreshToken }, { runValidators: false });
+
+        // Set access token cookie
+        res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: process.env.COOKIE_SECURE === "true",
+            sameSite: process.env.COOKIE_SAMESITE || "lax",
+            path: "/",
+            maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+
+        // Set refresh token cookie
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: process.env.COOKIE_SECURE === "true",
+            sameSite: process.env.COOKIE_SAMESITE || "lax",
+            path: "/",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+
+        // Redirect to frontend dashboard
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
+
+    } catch (error) {
+        console.error("Google OAuth Callback Error:", error);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=server_error`);
+    }
+};
+
