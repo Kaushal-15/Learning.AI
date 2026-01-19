@@ -1545,6 +1545,9 @@ exports.getNextQuestion = async (req, res) => {
             // But first, let's just get the pool of unanswered questions
             const availableQuestionIds = session.questionIds.filter(id => !answeredIds.includes(id.toString()));
 
+            console.log(`🎯 [ADAPTIVE] Requesting difficulty: ${difficulty}`);
+            console.log(`📊 [ADAPTIVE] Total pool: ${session.questionIds.length}, Answered: ${answeredIds.length}, Available: ${availableQuestionIds.length}`);
+
             if (availableQuestionIds.length === 0) {
                 return res.status(200).json({
                     success: true,
@@ -1557,32 +1560,43 @@ exports.getNextQuestion = async (req, res) => {
             // We only fetch a subset to optimize, or all if small number
             const poolQuestions = await Question.find({ _id: { $in: availableQuestionIds } });
 
+            console.log(`🔍 [ADAPTIVE] Fetched ${poolQuestions.length} available questions from DB`);
+
             // Filter by difficulty
             let difficultyMatches = [];
 
             if (difficulty === 'easy') {
                 difficultyMatches = poolQuestions.filter(q => q.difficulty <= 3);
+                console.log(`📉 [ADAPTIVE] Easy (≤3): Found ${difficultyMatches.length} questions`);
             } else if (difficulty === 'medium') {
                 difficultyMatches = poolQuestions.filter(q => q.difficulty > 3 && q.difficulty <= 6);
+                console.log(`📊 [ADAPTIVE] Medium (4-6): Found ${difficultyMatches.length} questions`);
             } else {
                 difficultyMatches = poolQuestions.filter(q => q.difficulty > 6);
+                console.log(`📈 [ADAPTIVE] Hard (>6): Found ${difficultyMatches.length} questions`);
             }
 
             if (difficultyMatches.length > 0) {
                 questions = difficultyMatches;
+                console.log(`✅ [ADAPTIVE] Using ${questions.length} questions matching difficulty: ${difficulty}`);
             } else {
                 // Fallback: if no questions of desired difficulty, use ANY available question from the pool
                 // This ensures we don't get stuck if the pool runs out of 'hard' questions
+                console.warn(`⚠️ [ADAPTIVE] No questions found for difficulty ${difficulty}, falling back to ANY available question`);
                 questions = poolQuestions;
+                console.log(`🔄 [ADAPTIVE] Fallback: Using ${questions.length} questions of any difficulty from pool`);
             }
         }
         // 2. Legacy/Fallback: Fetch from DB based on tags (Old Dynamic/Adaptive Logic)
         else if (exam.examType === 'dynamic' || exam.isAdaptive) {
+            console.log(`🔍 [ADAPTIVE - LEGACY] Using tag-based question selection for difficulty: ${difficulty}`);
+
             const query = {};
 
             // Filter by tags if specified
             if (exam.dynamicConfig?.tags && exam.dynamicConfig.tags.length > 0) {
                 query.tags = { $in: exam.dynamicConfig.tags };
+                console.log(`🏷️ [ADAPTIVE] Filtering by tags:`, exam.dynamicConfig.tags);
             }
 
             // Exclude answered questions
@@ -1602,13 +1616,17 @@ exports.getNextQuestion = async (req, res) => {
             }
 
             questions = await Question.find(difficultyQuery);
+            console.log(`📊 [ADAPTIVE] Found ${questions.length} questions for difficulty ${difficulty} with tags`);
 
             // If no questions of this difficulty, try without difficulty filter
             if (questions.length === 0) {
+                console.warn(`⚠️ [ADAPTIVE] No questions for difficulty ${difficulty}, trying without difficulty filter`);
                 questions = await Question.find(query);
+                console.log(`🔄 [ADAPTIVE] Fallback found ${questions.length} questions (any difficulty)`);
             }
         } else {
             // For static exams, use ExamQuestion
+            console.log(`📋 [STATIC EXAM] Using ExamQuestion model`);
             questions = await ExamQuestion.find({ examId }).sort('order');
             // For static, we usually just pick by index/order, but here we are randomizing?
             // Actually static exams usually follow order. 
@@ -1622,6 +1640,7 @@ exports.getNextQuestion = async (req, res) => {
         }
 
         if (!question && (!questions || questions.length === 0)) {
+            console.error(`❌ [ADAPTIVE] No questions available for difficulty: ${difficulty}`);
             return res.status(500).json({ success: false, message: 'No questions available' });
         }
 
@@ -1629,9 +1648,11 @@ exports.getNextQuestion = async (req, res) => {
         if (!question) {
             const questionIndex = Math.floor(Math.random() * questions.length);
             question = questions[questionIndex];
+            console.log(`🎲 [ADAPTIVE] Selected random question ${questionIndex + 1}/${questions.length} (ID: ${question._id})`);
         }
 
         if (!question) {
+            console.error(`❌ [ADAPTIVE] Failed to select question despite having ${questions.length} available`);
             return res.status(500).json({ success: false, message: 'No questions available' });
         }
 
@@ -1641,7 +1662,12 @@ exports.getNextQuestion = async (req, res) => {
             session.currentDifficulty = difficulty;
             session.questionStartTime = new Date();
             await session.save();
+            console.log(`💾 [ADAPTIVE] Session updated - Q${nextQuestionNumber}, Difficulty: ${difficulty}`);
+        } else {
+            console.log(`🔄 [ADAPTIVE] Resuming Q${nextQuestionNumber}, Time remaining: ${timeRemaining}s`);
         }
+
+        console.log(`✅ [ADAPTIVE] Returning question - Q${nextQuestionNumber}/${exam.totalQuestions}, Difficulty: ${difficulty}`);
 
         // Return question without correct answer
         res.status(200).json({

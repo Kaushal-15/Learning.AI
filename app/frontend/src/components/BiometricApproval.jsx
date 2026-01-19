@@ -12,6 +12,13 @@ export default function BiometricApproval({ examId = null }) {
     const [selectedVerification, setSelectedVerification] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
 
+    // Helper function to ensure base64 data has proper prefix
+    const ensureBase64Prefix = (base64Data) => {
+        if (!base64Data) return '';
+        if (base64Data.startsWith('data:image')) return base64Data;
+        return `data:image/jpeg;base64,${base64Data}`;
+    };
+
     useEffect(() => {
         fetchPendingVerifications();
     }, [examId]);
@@ -148,7 +155,7 @@ export default function BiometricApproval({ examId = null }) {
                         >
                             <div className="verification-photo">
                                 <img
-                                    src={verification.referencePhoto}
+                                    src={ensureBase64Prefix(verification.referencePhoto)}
                                     alt={verification.studentName}
                                     className="photo-preview"
                                 />

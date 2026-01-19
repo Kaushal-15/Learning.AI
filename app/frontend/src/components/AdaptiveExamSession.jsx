@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { ArrowLeft, Clock, Send, Target, TrendingUp } from "lucide-react";
+import { ArrowLeft, Clock, Send, Target, TrendingUp, Shield, AlertTriangle } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import AdaptiveWaitScreen from "./AdaptiveWaitScreen";
 import CameraMonitor from "./CameraMonitor";
+import ProctoringService from "../services/ProctoringService";
 import "../styles/DevvoraStyles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
@@ -31,6 +32,7 @@ export default function AdaptiveExamSession() {
     const [examComplete, setExamComplete] = useState(false);
     const [sessionId, setSessionId] = useState(null);
     const [cameraRequired, setCameraRequired] = useState(false);
+    const [studentInfo, setStudentInfo] = useState(null);
 
     // Global exam timer for total exam duration
     const [totalExamTime, setTotalExamTime] = useState(0);
@@ -41,6 +43,12 @@ export default function AdaptiveExamSession() {
     const [isWaitingRoom, setIsWaitingRoom] = useState(false);
     const [timeToStart, setTimeToStart] = useState(0);
 
+    // Proctoring State
+    const [proctoring, setProctoring] = useState(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showFullscreenWarning, setShowFullscreenWarning] = useState(false);
+    const [violations, setViolations] = useState(0);
+
     // Initialize session if needed
     const initializeSession = useCallback(async () => {
         try {
@@ -48,8 +56,16 @@ export default function AdaptiveExamSession() {
             if (location.state?.exam && location.state?.session) {
                 setExam(location.state.exam);
                 setSessionId(location.state.session._id);
-                setCameraRequired(location.state.exam.requireCamera || false);
+                // CRITICAL: FORCE ENABLE CAMERA MONITORING FOR ALL ADAPTIVE EXAMS
+                setCameraRequired(true);  // FORCE ON - matches ExamSession.jsx behavior
+                console.log('✅ Adaptive Exam - Camera FORCED ON');
                 setTotalQuestions(location.state.exam.totalQuestions);
+
+                // Get student info from location state (passed from verification)
+                if (location.state?.studentInfo) {
+                    setStudentInfo(location.state.studentInfo);
+                    console.log('✅ Student info loaded:', location.state.studentInfo);
+                }
 
                 // Set global exam timer from session
                 if (location.state.session.expiryTime) {
@@ -91,7 +107,9 @@ export default function AdaptiveExamSession() {
 
             setExam(exam);
             setSessionId(session._id);
-            setCameraRequired(exam.requireCamera || false);
+            // CRITICAL: FORCE ENABLE CAMERA MONITORING FOR ALL ADAPTIVE EXAMS
+            setCameraRequired(true);  // FORCE ON - matches ExamSession.jsx behavior
+            console.log('✅ Adaptive Exam (backend init) - Camera FORCED ON');
             setTotalQuestions(exam.totalQuestions);
 
             // Check for Waiting Room
@@ -172,7 +190,18 @@ export default function AdaptiveExamSession() {
                 // Exam finished
                 setExamComplete(true);
                 setTimeout(() => {
-                    navigate(`/exam/${examId}/result`);
+                    navigate(`/exam/${examId}/result`, {
+                        state: {
+                            examTitle: exam?.title || 'Adaptive Exam',
+                            examStartTime: exam?.startTime,
+                            examEndTime: exam?.endTime,
+                            studentInfo: studentInfo || {
+                                name: 'Student',
+                                registerNumber: 'N/A'
+                            },
+                            submittedAt: new Date().toISOString()
+                        }
+                    });
                 }, 2000);
                 return;
             }
@@ -257,6 +286,27 @@ export default function AdaptiveExamSession() {
         }
     };
 
+    // Violation handler for proctoring
+    const handleViolation = useCallback(async (type) => {
+        setViolations(prev => prev + 1);
+        console.warn(`⚠️ Violation detected: ${type}`);
+
+        try {
+            // Log violation to backend
+            await fetch(`${API_BASE}/exams/${examId}/log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventType: type,
+                    details: `Adaptive exam violation: ${type}`
+                }),
+                credentials: 'include'
+            });
+        } catch (error) {
+            console.error('Error logging violation:', error);
+        }
+    }, [examId]);
+
     // Timer countdown
     useEffect(() => {
         if (loading || isWaiting || examComplete) return;
@@ -299,7 +349,18 @@ export default function AdaptiveExamSession() {
             if (remaining <= 0) {
                 setExamComplete(true);
                 setTimeout(() => {
-                    navigate(`/exam/${examId}/result`);
+                    navigate(`/exam/${examId}/result`, {
+                        state: {
+                            examTitle: exam?.title || 'Adaptive Exam',
+                            examStartTime: exam?.startTime,
+                            examEndTime: exam?.endTime,
+                            studentInfo: studentInfo || {
+                                name: 'Student',
+                                registerNumber: 'N/A'
+                            },
+                            submittedAt: new Date().toISOString()
+                        }
+                    });
                 }, 1000);
             }
         };
@@ -322,6 +383,57 @@ export default function AdaptiveExamSession() {
             window.removeEventListener('popstate', handlePopState);
         };
     }, []);
+
+    // Fullscreen enforcement for proctored exams
+    useEffect(() => {
+        if (!loading && exam && !isWaitingRoom && !examComplete) {
+            // Request fullscreen mode
+            const requestFullscreen = async () => {
+                try {
+                    if (document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                        setIsFullscreen(true);
+                        console.log('✅ Fullscreen entered');
+                    }
+                } catch (err) {
+                    console.warn('Fullscreen request failed:', err);
+                    setShowFullscreenWarning(true);
+                }
+            };
+
+            requestFullscreen();
+
+            // Monitor fullscreen changes
+            const handleFullscreenChange = () => {
+                const isCurrentlyFullscreen = !!document.fullscreenElement;
+                setIsFullscreen(isCurrentlyFullscreen);
+
+                if (!isCurrentlyFullscreen && !examComplete && !loading) {
+                    setShowFullscreenWarning(true);
+                    handleViolation('fullscreen_exit');
+                }
+            };
+
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            return () => {
+                document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            };
+        }
+    }, [loading, exam, isWaitingRoom, examComplete, handleViolation]);
+
+    // Initialize ProctoringService for violation detection
+    useEffect(() => {
+        if (!loading && exam && !isWaitingRoom && !examComplete) {
+            console.log('🔒 Initializing proctoring service');
+            const p = new ProctoringService(examId, handleViolation);
+            p.start();
+            setProctoring(p);
+            return () => {
+                console.log('🔓 Stopping proctoring service');
+                p.stop();
+            };
+        }
+    }, [loading, exam, isWaitingRoom, examComplete, examId, handleViolation]);
 
     // Initial load
     useEffect(() => {
@@ -472,6 +584,24 @@ export default function AdaptiveExamSession() {
                         <Target size={20} />
                         <span>Question {questionNumber} of {totalQuestions}</span>
                     </div>
+
+                    {/* Proctoring Status */}
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium ${isFullscreen
+                        ? 'bg-green-50 border border-green-200 text-green-700 dark:bg-green-500/10 dark:border-green-500/20 dark:text-green-400'
+                        : 'bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400 animate-pulse'
+                        }`}>
+                        <Shield size={14} />
+                        <span>{isFullscreen ? 'Proctored' : 'Fullscreen Required'}</span>
+                    </div>
+
+                    {/* Violation Counter */}
+                    {violations > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-600 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400 rounded-lg text-xs font-medium">
+                            <AlertTriangle size={14} />
+                            <span>Violations: {violations}/3</span>
+                        </div>
+                    )}
+
                     <div className={`difficulty-badge ${difficulty}`}>
                         <TrendingUp size={16} />
                         {difficulty}
@@ -515,6 +645,41 @@ export default function AdaptiveExamSession() {
                 </button>
             </div>
 
+            {/* Fullscreen Warning Modal */}
+            {showFullscreenWarning && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-dark-400 rounded-2xl p-8 max-w-md mx-4 border-2 border-red-500 shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center">
+                                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-cream-100">Fullscreen Required</h2>
+                        </div>
+                        <p className="text-gray-600 dark:text-cream-200 mb-6">
+                            This exam requires fullscreen mode for proctoring. Exiting fullscreen is considered a violation.
+                        </p>
+                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg p-3 mb-6">
+                            <p className="text-sm text-amber-800 dark:text-amber-300">
+                                <strong>Warning:</strong> You have {violations} violation(s). After 3 violations, your exam will be automatically submitted.
+                            </p>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await document.documentElement.requestFullscreen();
+                                    setShowFullscreenWarning(false);
+                                } catch (err) {
+                                    console.error('Failed to enter fullscreen:', err);
+                                }
+                            }}
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all"
+                        >
+                            Return to Fullscreen
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Global Exam Time Expiry Warning - Shows at 10 seconds */}
             {showTimeWarning && totalExamTime > 0 && totalExamTime <= 10 && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
@@ -537,15 +702,17 @@ export default function AdaptiveExamSession() {
                 </div>
             )}
 
-            {/* Camera Monitor */}
-            {sessionId && cameraRequired && (
+            {/* Camera Monitor - FORCE ENABLED FOR ALL ADAPTIVE EXAMS */}
+            {sessionId && (
                 <CameraMonitor
                     sessionId={sessionId}
                     examId={examId}
-                    isRequired={cameraRequired}
-                    onCameraStatus={(status) => console.log('Camera status:', status)}
+                    isRequired={true}
+                    onCameraStatus={(status) => console.log('📹 Adaptive Exam Camera status:', status)}
                 />
             )}
+            {!sessionId && console.log('⚠️ Camera not rendering - session is null')}
+            {sessionId && console.log('✅ Camera Monitor rendering with sessionId:', sessionId)}
         </div>
     );
 }
