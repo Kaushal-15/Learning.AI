@@ -267,6 +267,11 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
                                 <Disc size={16} className="recording-icon" />
                             )}
                         </div>
+                        <div className="proctoring-overlay">
+                            <div className="proctoring-badge">
+                                PROCTORING ACTIVE
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
@@ -392,6 +397,38 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
                 .recording-icon {
                     color: #ef4444;
                     animation: blink 1s infinite;
+                }
+
+                .proctoring-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    pointer-events: none;
+                    display: flex;
+                    align-items: flex-end;
+                    justify-content: center;
+                    padding-bottom: 2rem;
+                }
+
+                .proctoring-badge {
+                    background: rgba(220, 38, 38, 0.8);
+                    color: white;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 9999px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    backdrop-filter: blur(4px);
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    animation: pulse-slow 3s infinite;
+                }
+
+                @keyframes pulse-slow {
+                    0%, 100% { opacity: 0.8; }
+                    50% { opacity: 1; }
                 }
 
                 @keyframes pulse {

@@ -235,8 +235,17 @@ export default function ExamVerification() {
                             <div className="verification-item">
                                 <Calendar className="w-5 h-5 text-green-500" />
                                 <div>
-                                    <span className="verification-label">Start Time</span>
+                                    <span className="verification-label">Exam Start</span>
                                     <span className="verification-value">{formatDate(examData.startTime)}</span>
+                                </div>
+                            </div>
+                            <div className="verification-item">
+                                <Clock className="w-5 h-5 text-blue-500" />
+                                <div>
+                                    <span className="verification-label">Verification Starts</span>
+                                    <span className="verification-value">
+                                        {formatDate(new Date(new Date(examData.startTime).getTime() - (examData.verificationDuration || 15) * 60000))}
+                                    </span>
                                 </div>
                             </div>
                             <div className="verification-item">

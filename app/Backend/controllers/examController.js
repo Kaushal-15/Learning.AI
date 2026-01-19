@@ -29,6 +29,7 @@ exports.createExam = async (req, res) => {
     try {
         const {
             title, description, examCode, startTime, endTime, duration,
+            verificationDuration,
             totalQuestions, passingScore, questionIds, rawQuestions,
             examType, documentId, dynamicSettings, mixedQuestions,
             students, requireStudentVerification,
@@ -75,6 +76,7 @@ exports.createExam = async (req, res) => {
             startTime,
             endTime,
             duration,
+            verificationDuration: verificationDuration || 15,
             totalQuestions,
             passingScore,
             createdBy: userId,
@@ -361,16 +363,18 @@ exports.validateEntry = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Invalid Exam Code' });
         }
 
-        // STRICT TIME ENFORCEMENT
+        // STRICT TIME ENFORCEMENT (With Verification Window)
         const now = new Date();
         const examStart = new Date(exam.startTime);
         const examEnd = new Date(exam.endTime);
+        const verificationStart = new Date(examStart.getTime() - (exam.verificationDuration || 15) * 60000);
 
-        if (now < examStart) {
+        if (now < verificationStart) {
             return res.status(403).json({
                 success: false,
-                message: `Exam starts at ${examStart.toLocaleString()}. Please wait until the scheduled time.`,
-                startTime: examStart
+                message: `Exam verification starts at ${verificationStart.toLocaleString()}. Please wait until then.`,
+                startTime: examStart,
+                verificationStart
             });
         }
 
@@ -414,16 +418,18 @@ exports.startSession = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Exam not found' });
         }
 
-        // STRICT TIMING ENFORCEMENT
+        // STRICT TIMING ENFORCEMENT (With Verification Window)
         const now = new Date();
         const examStart = new Date(exam.startTime);
         const examEnd = new Date(exam.endTime);
+        const verificationStart = new Date(examStart.getTime() - (exam.verificationDuration || 15) * 60000);
 
-        if (now < examStart) {
+        if (now < verificationStart) {
             return res.status(403).json({
                 success: false,
-                message: `Exam starts at ${examStart.toLocaleString()}. Please wait until the scheduled time.`,
-                startTime: examStart
+                message: `Exam verification starts at ${verificationStart.toLocaleString()}. Please wait until then.`,
+                startTime: examStart,
+                verificationStart
             });
         }
 
@@ -2103,7 +2109,8 @@ exports.getSynchronizedQuestion = async (req, res) => {
         return res.status(200).json({
             success: true,
             isWaiting: true,
-            message: 'Waiting for exam to start'
+            message: 'Waiting for exam to start',
+            startTime: exam.startTime
         });
 
     } catch (error) {
