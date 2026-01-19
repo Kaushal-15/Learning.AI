@@ -45,10 +45,23 @@ export default function BiometricCapture({ examId, studentName, registerNumber, 
 
     // Capture photo
     const capturePhoto = () => {
-        if (!videoRef.current || !canvasRef.current) return;
+        console.log('Capture photo clicked');
+
+        if (!videoRef.current || !canvasRef.current) {
+            console.error('Refs not available:', { video: !!videoRef.current, canvas: !!canvasRef.current });
+            setError('Camera not ready. Please try again.');
+            return;
+        }
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
+
+        console.log('Video state:', {
+            readyState: video.readyState,
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight
+        });
+
         const context = canvas.getContext('2d');
 
         // Set canvas dimensions to match video
@@ -60,6 +73,9 @@ export default function BiometricCapture({ examId, studentName, registerNumber, 
 
         // Convert to base64
         const photoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+        console.log('Photo captured successfully, base64 length:', photoBase64.length);
+
         setCapturedPhoto(photoBase64);
         stopCamera();
     };

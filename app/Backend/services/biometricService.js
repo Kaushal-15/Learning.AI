@@ -17,9 +17,7 @@ async function uploadReferencePhoto({ examId, studentName, registerNumber, photo
             throw new Error('Exam not found');
         }
 
-        if (!exam.requireBiometric) {
-            throw new Error('This exam does not require biometric verification');
-        }
+        // FORCED SECURITY: Accept biometric for ALL exams (frontend enforcement)
 
         // Check if student is registered for this exam
         const studentExists = exam.students.some(
@@ -154,10 +152,29 @@ async function getPendingVerifications(examId = null) {
         }
 
         const verifications = await BiometricVerification.find(query)
-            .populate('examId', 'title examCode')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
-        return verifications;
+        // Manually populate examId with ExamMaster details
+        const populatedVerifications = await Promise.all(
+            verifications.map(async (verification) => {
+                try {
+                    const exam = await ExamMaster.findById(verification.examId)
+                        .select('title examCode')
+                        .lean();
+                    
+                    return {
+                        ...verification,
+                        examId: exam || verification.examId
+                    };
+                } catch (err) {
+                    console.error('Error populating exam for verification:', err);
+                    return verification;
+                }
+            })
+        );
+
+        return populatedVerifications;
     } catch (error) {
         console.error('Error getting pending verifications:', error);
         throw error;

@@ -19,6 +19,15 @@ export default function AdminBiometricApproval() {
     const [searchTerm, setSearchTerm] = useState('');
     const [processingId, setProcessingId] = useState(null);
 
+    // Helper function to ensure base64 image has data URL prefix
+    const getImageSrc = (base64String) => {
+        if (!base64String) return '';
+        // If already has data URL prefix, return as is
+        if (base64String.startsWith('data:')) return base64String;
+        // Otherwise, add the prefix
+        return `data:image/jpeg;base64,${base64String}`;
+    };
+
     // Fetch verifications
     const fetchVerifications = async () => {
         try {
@@ -180,9 +189,13 @@ export default function AdminBiometricApproval() {
                                 <div className="photo-box">
                                     <span className="photo-label">Reference Photo</span>
                                     <img
-                                        src={verification.referencePhoto}
+                                        src={getImageSrc(verification.referencePhoto)}
                                         alt="Reference"
                                         className="student-photo"
+                                        onError={(e) => {
+                                            console.error('Failed to load image');
+                                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="14" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                        }}
                                     />
                                 </div>
                                 {/* If we had a live photo to compare against, show it here */}

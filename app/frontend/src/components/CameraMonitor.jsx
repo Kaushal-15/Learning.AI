@@ -170,11 +170,14 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
 
     // Initialize camera on mount if required
     useEffect(() => {
+        console.log('🎥 CameraMonitor useEffect - isRequired:', isRequired, 'sessionId:', sessionId);
+
         let checkInterval;
-        
+
         if (isRequired) {
+            console.log('📸 Auto-starting camera (isRequired=true)');
             startCamera();
-            
+
             // AUTO-RESTART: Check camera status every 5 seconds
             checkInterval = setInterval(() => {
                 if (!cameraActive && isRequired && !permissionDenied) {
@@ -182,21 +185,31 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
                     startCamera();
                 }
             }, 5000);
+        } else {
+            console.log('⏭️ Camera not required - skipping auto-start');
         }
 
         // Check for active recording
-        checkActiveRecording();
+        if (sessionId) {
+            console.log('🔍 Checking for active recording...');
+            checkActiveRecording();
+        }
 
         // Poll for recording status every 5 seconds
-        const interval = setInterval(checkActiveRecording, 5000);
+        const interval = setInterval(() => {
+            if (sessionId) {
+                checkActiveRecording();
+            }
+        }, 5000);
 
         return () => {
+            console.log('🧹 CameraMonitor cleanup');
             if (checkInterval) clearInterval(checkInterval);
             clearInterval(interval);
             stopRecording();
             stopCamera();
         };
-    }, [isRequired]);
+    }, [isRequired, sessionId]);
 
     // Auto-start recording when recording ID is detected
     useEffect(() => {

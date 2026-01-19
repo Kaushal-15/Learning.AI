@@ -61,8 +61,17 @@ export default function ExamSession() {
                     return;
                 }
 
-                setExam(exam);
+                // CRITICAL: FORCE ENABLE CAMERA MONITORING FOR ALL EXAMS
+                const secureExam = {
+                    ...exam,
+                    requireCamera: true  // FORCE ON
+                };
+
+                setExam(secureExam);  // Use secure version
                 setSession(session);  // Store session for camera monitoring
+
+                console.log('✅ Exam loaded - requireCamera:', secureExam.requireCamera);
+                console.log('✅ Session set:', session._id);
                 setQuestions(questions);
                 setCurrentQuestionIndex(session.currentQuestionIndex || 0);
                 setAnswers(session.answers || {});
@@ -499,15 +508,17 @@ export default function ExamSession() {
                 </div>
             )}
 
-            {/* Camera Monitor - Always on for proctored exams */}
-            {session && exam?.requireCamera && (
+            {/* Camera Monitor - FORCE ENABLED FOR ALL EXAMS */}
+            {session && (
                 <CameraMonitor
                     sessionId={session._id}
                     examId={examId}
                     isRequired={true}
-                    onCameraStatus={(status) => console.log('Camera status:', status)}
+                    onCameraStatus={(status) => console.log('📹 Camera status:', status)}
                 />
             )}
+            {!session && console.log('⚠️ Camera not rendering - session is null')}
+            {session && !exam?.requireCamera && console.log('⚠️ Camera check - requireCamera:', exam?.requireCamera)}
         </div>
     );
 }

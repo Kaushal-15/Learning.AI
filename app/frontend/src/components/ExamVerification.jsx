@@ -29,9 +29,17 @@ export default function ExamVerification() {
         return null;
     }
 
+    // CRITICAL SECURITY ENFORCEMENT - FORCE ENABLE ALL SECURITY FEATURES
+    // Override exam settings to ALWAYS require biometric and camera
+    const secureExamData = {
+        ...examData,
+        requireBiometric: true,  // FORCE ENABLE
+        requireCamera: true       // FORCE ENABLE
+    };
+
     // Check biometric status on mount
     useEffect(() => {
-        if (examData.requireBiometric) {
+        if (secureExamData.requireBiometric) {
             checkBiometricStatus();
         }
     }, []);
@@ -105,23 +113,23 @@ export default function ExamVerification() {
             return;
         }
 
-        // Check biometric requirement
-        if (examData.requireBiometric) {
+        // CRITICAL: ALWAYS CHECK BIOMETRIC (FORCED FOR ALL EXAMS)
+        if (secureExamData.requireBiometric) {
             if (!biometricStatus || !biometricStatus.exists) {
-                setError('Please complete biometric verification first');
+                setError('❌ BIOMETRIC REQUIRED: Please complete biometric verification first');
                 setShowBiometric(true);
                 setLoading(false);
                 return;
             }
 
             if (biometricStatus.status === 'pending') {
-                setError('Your biometric verification is pending admin approval. Please contact the invigilator.');
+                setError('⏳ BIOMETRIC PENDING: Your biometric verification is pending admin approval. Please contact the invigilator.');
                 setLoading(false);
                 return;
             }
 
             if (biometricStatus.status === 'rejected') {
-                setError('Your biometric verification was rejected. Please submit a new photo.');
+                setError('❌ BIOMETRIC REJECTED: Your biometric verification was rejected. Please submit a new photo.');
                 setShowBiometric(true);
                 setLoading(false);
                 return;
@@ -365,14 +373,14 @@ export default function ExamVerification() {
                                     Time Restrictions
                                 </h3>
                                 <ul className="text-sm text-red-800 dark:text-red-200 space-y-1">
-                                    <li>• <strong>Duration:</strong> {examData.duration} minutes</li>
+                                    <li>• <strong>Duration:</strong> {secureExamData.duration} minutes</li>
                                     <li>• <strong>Auto-Submit:</strong> Exam will automatically submit when time expires</li>
                                     <li>• <strong>No Extensions:</strong> Time cannot be paused or extended</li>
                                     <li>• <strong>Late Join Blocked:</strong> You cannot join after the exam end time</li>
                                 </ul>
                             </div>
 
-                            {examData.requireBiometric && (
+                            {secureExamData.requireBiometric && (
                                 <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg p-4">
                                     <h3 className="font-bold text-blue-900 dark:text-blue-300 mb-2 flex items-center gap-2">
                                         <Camera className="w-5 h-5" />
