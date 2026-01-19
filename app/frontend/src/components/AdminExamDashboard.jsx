@@ -92,8 +92,8 @@ export default function AdminExamDashboard() {
         <div className="dashboard-container">
             <header className="dashboard-header">
                 <div className="header-content">
-                    <h1>Exam Management</h1>
-                    <p>Create and manage your examination sessions</p>
+                    <h1 className="text-gray-900 dark:text-cream-100">Exam Management</h1>
+                    <p className="text-gray-600 dark:text-cream-200">Create and manage your examination sessions</p>
                 </div>
                 <div className="header-actions">
                     <button className="secondary-btn" onClick={() => navigate('/admin/biometrics')}>
@@ -109,11 +109,11 @@ export default function AdminExamDashboard() {
 
             {exams.length === 0 ? (
                 <div className="empty-state">
-                    <div className="empty-state-icon">
+                    <div className="empty-state-icon dark:bg-dark-500 dark:text-gray-400">
                         <BarChart2 size={48} />
                     </div>
-                    <h3>No exams yet</h3>
-                    <p>Create your first exam to get started</p>
+                    <h3 className="dark:text-cream-100">No exams yet</h3>
+                    <p className="dark:text-gray-400">Create your first exam to get started</p>
                     <button className="create-btn" onClick={() => navigate('/admin/exams/create')}>
                         <Plus size={20} />
                         Create Exam
@@ -125,7 +125,7 @@ export default function AdminExamDashboard() {
                         <div key={exam._id} className="exam-card premium-card">
                             <div className="exam-card-header">
                                 <div className="exam-info">
-                                    <h3>{exam.title}</h3>
+                                    <h3 className="text-gray-900 dark:text-cream-100">{exam.title}</h3>
                                     <span className={`status-badge ${exam.status}`}>
                                         {exam.status.toUpperCase()}
                                     </span>
@@ -141,20 +141,20 @@ export default function AdminExamDashboard() {
 
                             <div className="exam-code-box">
                                 <span className="code-label">Access Code</span>
-                                <div className="code-value">
-                                    <code>{exam.examCode}</code>
-                                    <button onClick={() => handleRegenerateCode(exam._id)} title="Regenerate Code">
+                                <div className="code-value dark:bg-dark-500">
+                                    <code className="dark:text-orange-400">{exam.examCode}</code>
+                                    <button onClick={() => handleRegenerateCode(exam._id)} title="Regenerate Code" className="dark:text-gray-400 dark:hover:text-cream-100">
                                         <RefreshCw size={14} />
                                     </button>
                                 </div>
                             </div>
 
                             <div className="exam-stats">
-                                <div className="stat-item">
+                                <div className="stat-item dark:text-gray-400">
                                     <Users size={16} />
                                     <span>{exam.activeSessions} Active</span>
                                 </div>
-                                <div className="stat-item">
+                                <div className="stat-item dark:text-gray-400">
                                     <BarChart2 size={16} />
                                     <span>{exam.totalAttempts} Submissions</span>
                                 </div>
@@ -200,19 +200,19 @@ export default function AdminExamDashboard() {
             {deleteModal.show && (
                 <div className="modal-overlay" onClick={handleDeleteCancel}>
                     <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
+                        <div className="modal-header dark:border-dark-300">
                             <div className="modal-icon warning">
                                 <AlertTriangle size={24} />
                             </div>
-                            <h3>Delete Exam</h3>
-                            <button className="modal-close" onClick={handleDeleteCancel}>
+                            <h3 className="dark:text-cream-100">Delete Exam</h3>
+                            <button className="modal-close dark:text-gray-400 dark:hover:bg-dark-300" onClick={handleDeleteCancel}>
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="modal-body">
-                            <p>Are you sure you want to delete <strong>"{deleteModal.examTitle}"</strong>?</p>
+                            <p className="dark:text-gray-300">Are you sure you want to delete <strong className="dark:text-cream-100">"{deleteModal.examTitle}"</strong>?</p>
                             <p className="warning-text">This will permanently delete:</p>
-                            <ul className="warning-list">
+                            <ul className="warning-list dark:text-gray-400">
                                 <li>All exam questions</li>
                                 <li>All student sessions</li>
                                 <li>All exam attempts and results</li>

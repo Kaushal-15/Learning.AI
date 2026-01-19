@@ -72,6 +72,9 @@ export default function ExamSession() {
                 setExam(secureExam);  // Use secure version
                 setSession(session);  // Store session for camera monitoring
 
+                // Ensure questions is an array
+                setQuestions(questions || []);
+
                 // Check for Waiting Room
                 const now = new Date();
                 const start = new Date(exam.startTime);
@@ -82,7 +85,7 @@ export default function ExamSession() {
 
                 console.log('✅ Exam loaded - requireCamera:', secureExam.requireCamera);
                 console.log('✅ Session set:', session._id);
-                setQuestions(questions);
+                // questions set above
                 setCurrentQuestionIndex(session.currentQuestionIndex || 0);
                 setAnswers(session.answers || {});
 
@@ -398,6 +401,18 @@ export default function ExamSession() {
     }
 
     const currentQuestion = questions[currentQuestionIndex];
+
+    if (!currentQuestion) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark flex items-center justify-center">
+                <AnimatedBackground />
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-cream-100 text-lg">Loading question...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative">

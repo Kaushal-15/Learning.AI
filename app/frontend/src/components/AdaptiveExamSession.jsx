@@ -93,8 +93,8 @@ export default function AdaptiveExamSession() {
 
             const sessionData = await sessionResponse.json();
 
-            if (!sessionData.success) {
-                throw new Error(sessionData.message);
+            if (!sessionData.success || !sessionData.data) {
+                throw new Error(sessionData.message || "Invalid session data");
             }
 
             // Check if this is actually an adaptive exam

@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
     Home, BookOpen, FolderKanban, Settings, LogOut,
-    Moon, Sun, History, FileText, Shield
+    Moon, Sun, History, FileText, Shield, ClipboardList
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import ProgressTracker from "./ProgressTracker";
@@ -61,6 +61,13 @@ export default function Sidebar() {
                         title="Quiz History"
                     >
                         <History className="nav-icon" />
+                    </button>
+                    <button
+                        className={`nav-item ${isActive("/exam") ? "active" : ""}`}
+                        onClick={() => navigate("/exam")}
+                        title="Exams"
+                    >
+                        <ClipboardList className="nav-icon" />
                     </button>
                     <button
                         className={`nav-item ${isActive("/custom-learning") ? "active" : ""}`}

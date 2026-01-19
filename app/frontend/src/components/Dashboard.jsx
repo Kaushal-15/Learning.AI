@@ -19,15 +19,6 @@ export default function Dashboard() {
     const [showRoadmapModal, setShowRoadmapModal] = useState(false);
     const { isDarkMode } = useTheme();
 
-    // Apply dashboard-dark class when theme changes
-    useEffect(() => {
-        if (isDarkMode) {
-            document.documentElement.classList.add('dashboard-dark');
-        } else {
-            document.documentElement.classList.remove('dashboard-dark');
-        }
-    }, [isDarkMode]);
-
     useEffect(() => {
         const fetchUser = async () => {
             try {
