@@ -509,6 +509,7 @@ router.get("/me", authMiddleware, async (req, res) => {
         email: user.email,
         name: user.name,
         learnerId: user.learnerId,
+        role: user.role,
         hasCompletedOnboarding: user.hasCompletedOnboarding,
         selectedRoadmap: user.selectedRoadmap,
         skillLevel: user.skillLevel,
@@ -528,7 +529,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 router.post("/onboarding", authMiddleware, async (req, res) => {
   try {
     const { selectedRoadmap, skillLevel, learningTimeline } = req.body;
-    
+
     if (!selectedRoadmap || !skillLevel || !learningTimeline) {
       return res.status(400).json({
         success: false,
@@ -600,6 +601,7 @@ router.post("/onboarding", authMiddleware, async (req, res) => {
         selectedRoadmap: user.selectedRoadmap,
         skillLevel: user.skillLevel,
         learningTimeline: user.learningTimeline,
+        role: user.role,
         hasCompletedOnboarding: user.hasCompletedOnboarding,
       },
     });
@@ -617,7 +619,7 @@ router.post("/reset-progress", authMiddleware, async (req, res) => {
   try {
     const User = require("../models/User");
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,

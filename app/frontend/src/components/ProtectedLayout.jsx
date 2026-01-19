@@ -11,6 +11,7 @@ import { Navigate, Outlet } from "react-router-dom";
 export default function ProtectedLayout() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("Checking authentication...");
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
@@ -25,11 +26,16 @@ export default function ProtectedLayout() {
 
         // ✅ If authenticated
         if (res.ok) {
+          const data = await res.json();
           setIsAuthenticated(true);
+          setUser(data.user);
+          // Store user in localStorage for easy access in other components
+          localStorage.setItem('user', JSON.stringify(data.user));
         } else {
           // ❌ If unauthorized, redirect to login after a short delay
           console.warn("User not authenticated:", res.status);
           setIsAuthenticated(false);
+          localStorage.removeItem('user');
         }
       } catch (err) {
         console.error("Auth check failed:", err);

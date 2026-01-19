@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   name: { type: String, required: true, unique: true, trim: true },
   learnerId: { type: String, required: true, unique: true },
+  role: { type: String, enum: ['student', 'admin'], default: 'student' },
 
   // Authentication fields - optional for OAuth users
   passwordHash: { type: String }, // Required only for local auth

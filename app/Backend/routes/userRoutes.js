@@ -21,7 +21,12 @@ function requireAuth(req, res, next) {
 router.get('/profile', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-passwordHash -salt -refreshToken');
-    res.json({ user });
+    res.json({
+      user: {
+        ...user.toObject(),
+        id: user._id
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -46,6 +51,7 @@ router.get('/me', requireAuth, async (req, res) => {
         email: user.email,
         name: user.name,
         learnerId: user.learnerId,
+        role: user.role,
         settings: user.settings
       }
     });

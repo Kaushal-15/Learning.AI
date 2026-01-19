@@ -200,7 +200,13 @@ exports.loginUser = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Login successful",
-            user: { id: user._id, email: user.email, isVerified: user.isVerified },
+            user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                isVerified: user.isVerified
+            },
         });
 
     } catch (err) {

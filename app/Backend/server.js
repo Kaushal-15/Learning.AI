@@ -41,6 +41,9 @@ const newProgressRoutes = require('./routes/progress.routes');
 const xpRoutes = require('./routes/xp.routes');
 const projectRoutes = require('./routes/project.routes');
 const customLearningRoutes = require('./routes/customLearningRoutes');
+const examRoutes = require('./routes/examRoutes');
+const biometricRoutes = require('./routes/biometricRoutes');
+const cameraRoutes = require('./routes/cameraRoutes');
 
 
 // ===============================
@@ -160,6 +163,9 @@ app.use('/api/performance', authMiddleware, performanceRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/projects', authMiddleware, projectRoutes);
 app.use('/api/custom-learning', customLearningRoutes); // Auth handled in routes
+app.use('/api/exams', examRoutes);
+app.use('/api/biometric', biometricRoutes); // Biometric verification
+app.use('/api/camera', cameraRoutes); // Camera monitoring and recording
 
 // ===============================
 // 404 Handler

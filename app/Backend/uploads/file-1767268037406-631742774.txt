@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "New User Created",
+      "type": "n8n-nodes-base.mongoDbTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "collection": "users",
+        "operation": "insert"
+      },
+      "credentials": {
+        "mongoDb": {
+          "id": "YOUR_MONGO_CREDENTIAL_ID",
+          "name": "MongoDB"
+        }
+      }
+    },
+    {
+      "id": "filter",
+      "name": "Check welcomeEmailSent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [420, 300],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"welcomeEmailSent\"]}}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendMail",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "parameters": {
+        "fromEmail": "yourmail@gmail.com",
+        "toEmail": "={{$json.email}}",
+        "subject": "🎉 Welcome to LearningAI!",
+        "text": "Hi {{$json.name}},\n\nWelcome to LearningAI! We're excited to have you onboard.\n\nHappy learning 🚀"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "SMTP"
+        }
+      }
+    },
+    {
+      "id": "updateUser",
+      "name": "Mark Welcome Sent",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "parameters": {
+        "operation": "update",
+        "collection": "users",
+        "updateKey": {
+          "_id": "={{$json._id}}"
+        },
+        "update": {
+          "$set": {
+            "welcomeEmailSent": true
+          }
+        }
+      },
+      "credentials": {
+        "mongoDb": {
+          "id": "YOUR_MONGO_CREDENTIAL_ID",
+          "name": "MongoDB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "New User Created": {
+      "main": [[{ "node": "Check welcomeEmailSent", "type": "main", "index": 0 }]]
+    },
+    "Check welcomeEmailSent": {
+      "main": [[{ "node": "Send Welcome Email", "type": "main", "index": 0 }]]
+    },
+    "Send Welcome Email": {
+      "main": [[{ "node": "Mark Welcome Sent", "type": "main", "index": 0 }]]
+    }
+  }
+}
+

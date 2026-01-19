@@ -1,6 +1,8 @@
 const Chunk = require('../models/Chunk');
 const Question = require('../models/Question');
 const Groq = require('groq-sdk');
+const fs = require('fs');
+const { parse } = require('csv-parse/sync');
 
 // Initialize Groq AI (preferred) or fallback to Gemini
 let aiClient = null;
@@ -29,14 +31,24 @@ const generateQuestionsFromChunks = async (chunks, count, difficulty) => {
         // Combine chunk content
         const context = chunks.map(c => c.content).join('\n\n');
 
+        // Calculate difficulty distribution for comprehensive coverage
+        const easyCount = Math.ceil(count * 0.3);    // 30% easy
+        const mediumCount = Math.ceil(count * 0.4);  // 40% medium  
+        const hardCount = count - easyCount - mediumCount; // 30% hard
+
         const prompt = `Generate EXACTLY ${count} UNIQUE multiple-choice questions based on the following text.
-Difficulty level: ${difficulty}.
+Generate questions across ALL difficulty levels:
+- ${easyCount} EASY questions (basic recall, definitions)
+- ${mediumCount} MEDIUM questions (understanding, application)
+- ${hardCount} HARD questions (analysis, synthesis, evaluation)
 
 IMPORTANT: 
 - Each question MUST be completely different and unique
 - Questions should test understanding of the concepts in the text
 - DO NOT generate questions about CSS, HTML, or web development unless that's what the text is about
 - Base ALL questions on the actual content provided below
+- Cover ALL major topics and concepts from the text
+- Tag each question with appropriate difficulty level and topic
 
 Text:
 ${context.substring(0, 8000)}
@@ -47,7 +59,10 @@ Format the output as a JSON array with EXACTLY ${count} objects:
     "question": "Unique question text based on the content above",
     "options": ["Option A", "Option B", "Option C", "Option D"],
     "correctAnswer": "The correct option text (must match one of the options exactly)",
-    "explanation": "Brief explanation of the answer"
+    "explanation": "Brief explanation of the answer",
+    "difficulty": "easy|medium|hard",
+    "topic": "Main topic/concept this question covers",
+    "tags": ["tag1", "tag2", "tag3"]
   }
 ]
 
@@ -75,6 +90,37 @@ Return ONLY the JSON array, no other text or markdown.`;
 
         const questions = JSON.parse(jsonStr);
 
+        // VALIDATE AND FIX DIFFICULTY TAGS
+        questions.forEach((q, idx) => {
+            // Ensure difficulty field exists
+            if (!q.difficulty || !['easy', 'medium', 'hard'].includes(q.difficulty)) {
+                // Auto-assign based on position to ensure distribution
+                if (idx < easyCount) {
+                    q.difficulty = 'easy';
+                } else if (idx < easyCount + mediumCount) {
+                    q.difficulty = 'medium';
+                } else {
+                    q.difficulty = 'hard';
+                }
+            }
+            
+            // Ensure difficultyScore exists
+            if (!q.difficultyScore) {
+                q.difficultyScore = q.difficulty === 'easy' ? 2 :
+                                   q.difficulty === 'medium' ? 5 : 8;
+            }
+
+            // Ensure tags exist
+            if (!q.tags || !Array.isArray(q.tags)) {
+                q.tags = [q.topic || 'General'];
+            }
+
+            // Ensure topic exists
+            if (!q.topic) {
+                q.topic = q.tags[0] || 'General';
+            }
+        });
+
         // Ensure we have the correct number of unique questions
         if (questions.length < count) {
             console.warn(`AI generated only ${questions.length} questions, expected ${count}. Adding content-based questions.`);
@@ -83,6 +129,7 @@ Return ONLY the JSON array, no other text or markdown.`;
         }
 
         console.log(`✅ Generated ${questions.length} questions using ${aiProvider.toUpperCase()}`);
+        console.log(`📊 Distribution: ${questions.filter(q => q.difficulty === 'easy').length} easy, ${questions.filter(q => q.difficulty === 'medium').length} medium, ${questions.filter(q => q.difficulty === 'hard').length} hard`);
         return questions.slice(0, count);
     } catch (error) {
         console.error('Error generating questions with AI:', error.message);
@@ -142,7 +189,8 @@ const generateContentBasedQuestions = (chunks, count, difficulty) => {
                     `The material contradicts the importance of ${concept}`
                 ],
                 correctAnswer: `${keyPhrase}...`,
-                explanation: `This is directly stated in the source material.`
+                explanation: `This is directly stated in the source material.`,
+                difficulty: difficulty || 'medium'
             },
             {
                 question: `What is the significance of "${concept}" in the context of this material?`,
@@ -153,7 +201,8 @@ const generateContentBasedQuestions = (chunks, count, difficulty) => {
                     `It is presented as outdated`
                 ],
                 correctAnswer: `It is a fundamental concept explained in detail`,
-                explanation: `The term "${concept}" appears multiple times in the material, indicating its importance.`
+                explanation: `The term "${concept}" appears multiple times in the material, indicating its importance.`,
+                difficulty: difficulty || 'medium'
             },
             {
                 question: `Based on the text, which of the following best describes "${concept}"?`,
@@ -164,7 +213,8 @@ const generateContentBasedQuestions = (chunks, count, difficulty) => {
                     `A minor detail`
                 ],
                 correctAnswer: sentence.substring(0, 80) + '...',
-                explanation: `This description is taken directly from the source material.`
+                explanation: `This description is taken directly from the source material.`,
+                difficulty: difficulty || 'medium'
             }
         ];
 
@@ -186,7 +236,8 @@ const generateContentBasedQuestions = (chunks, count, difficulty) => {
                 `Criticism of ${concept}`
             ],
             correctAnswer: `Key concepts and principles related to ${concept}`,
-            explanation: `The material covers important aspects of ${concept}.`
+            explanation: `The material covers important aspects of ${concept}.`,
+            difficulty: difficulty || 'medium'
         });
     }
 
@@ -205,7 +256,8 @@ const generateGenericQuestions = (count) => {
                 "The material is self-contradictory"
             ],
             correctAnswer: "The material covers important concepts",
-            explanation: "This is a general question based on the uploaded content."
+            explanation: "This is a general question based on the uploaded content.",
+            difficulty: 'easy'
         });
     }
     return questions;
@@ -246,19 +298,68 @@ const generateQuiz = async (documentId, mode, config) => {
     // 2. Generate Questions
     const questionsData = await generateQuestionsFromChunks(chunks, config.questionCount, config.difficulty || 'mixed');
 
-    // 3. Format for Quiz Model - ensure unique IDs
+    // 3. Format for Quiz Model - ensure unique IDs and comprehensive tagging
     return questionsData.map((q, i) => ({
         questionId: `${Date.now()}_${i}_${Math.random().toString(36).substring(7)}`,
         question: q.question,
         options: q.options,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation,
-        topic: 'Custom Learning',
-        difficulty: config.difficulty || 'medium',
+        topic: q.topic || 'Custom Learning',
+        difficulty: q.difficulty || config.difficulty || 'medium',
+        tags: q.tags || [q.topic || 'General'],
+        difficultyScore: q.difficulty === 'easy' ? 2 : q.difficulty === 'medium' ? 5 : 8,
         status: 'unanswered'
     }));
 };
 
+const parseCSVQuestions = (filePath) => {
+    try {
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const records = parse(fileContent, {
+            columns: true,
+            skip_empty_lines: true,
+            trim: true
+        });
+
+        // Validate headers
+        if (records.length > 0) {
+            const headers = Object.keys(records[0]).map(h => h.toLowerCase());
+            const required = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'correctanswer'];
+            const missing = required.filter(r => !headers.includes(r));
+
+            if (missing.length > 0) {
+                throw new Error(`Missing required columns: ${missing.join(', ')}`);
+            }
+        }
+
+        return records.map(record => {
+            // Normalize keys to lowercase for consistent access
+            const normalized = {};
+            Object.keys(record).forEach(key => {
+                normalized[key.toLowerCase()] = record[key];
+            });
+
+            return {
+                question: normalized.question,
+                options: [
+                    normalized.optiona,
+                    normalized.optionb,
+                    normalized.optionc,
+                    normalized.optiond
+                ].filter(o => o), // Remove empty options
+                correctAnswer: normalized.correctanswer,
+                difficulty: normalized.difficulty ? normalized.difficulty.toLowerCase() : 'medium',
+                explanation: normalized.explanation || ''
+            };
+        });
+    } catch (error) {
+        console.error('Error parsing CSV:', error);
+        throw new Error(`Failed to parse CSV: ${error.message}`);
+    }
+};
+
 module.exports = {
-    generateQuiz
+    generateQuiz,
+    parseCSVQuestions
 };

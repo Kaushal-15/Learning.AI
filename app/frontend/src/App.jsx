@@ -18,6 +18,18 @@ import AdaptiveQuizTest from "./components/AdaptiveQuizTest";
 import Settings from "./components/Settings";
 import CustomLearning from "./components/CustomLearning";
 import CustomQuizHistory from "./components/CustomQuizHistory";
+import ExamDashboard from "./components/ExamDashboard";
+import ExamSession from "./components/ExamSession";
+import AdaptiveExamSession from "./components/AdaptiveExamSession";
+import ExamVerification from "./components/ExamVerification";
+import ExamResult from "./components/ExamResult";
+import AdminExamDashboard from "./components/AdminExamDashboard";
+import AdminStudentManagement from "./components/AdminStudentManagement";
+import ExamMonitor from "./components/ExamMonitor";
+import ExamAnalytics from "./components/ExamAnalytics";
+import AdminExamCreate from "./components/AdminExamCreate";
+import AdminExamManage from "./components/AdminExamManage";
+import AdminBiometricApproval from "./components/AdminBiometricApproval";
 
 export default function App() {
   return (
@@ -45,6 +57,22 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/custom-learning" element={<CustomLearning />} />
           <Route path="/custom-quiz-history" element={<CustomQuizHistory />} />
+
+          {/* Exam Routes */}
+          <Route path="/exam" element={<ExamDashboard />} />
+          <Route path="/exam/:examId/verify" element={<ExamVerification />} />
+          <Route path="/exam/:examId" element={<ExamSession />} />
+          <Route path="/exam/:examId/adaptive" element={<AdaptiveExamSession />} />
+          <Route path="/exam/:examId/result" element={<ExamResult />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin/exams" element={<AdminExamDashboard />} />
+          <Route path="/admin/exams/create" element={<AdminExamCreate />} />
+          <Route path="/admin/exams/:examId/manage" element={<AdminExamManage />} />
+          <Route path="/admin/exams/:examId/students" element={<AdminStudentManagement />} />
+          <Route path="/admin/exams/:examId/monitor" element={<ExamMonitor />} />
+          <Route path="/admin/exams/:examId/analytics" element={<ExamAnalytics />} />
+          <Route path="/admin/biometrics" element={<AdminBiometricApproval />} />
         </Route>
       </Routes>
     </BrowserRouter>

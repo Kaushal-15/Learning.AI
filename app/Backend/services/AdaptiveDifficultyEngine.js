@@ -13,24 +13,24 @@ class AdaptiveDifficultyEngine {
       // Accuracy thresholds for difficulty adjustment
       HIGH_ACCURACY_THRESHOLD: 0.8,  // 80% accuracy triggers difficulty increase
       LOW_ACCURACY_THRESHOLD: 0.5,   // 50% accuracy triggers difficulty decrease
-      
+
       // Minimum questions needed for reliable adjustment
       MIN_QUESTIONS_FOR_ADJUSTMENT: 3,
-      
+
       // Maximum difficulty adjustment per session
       MAX_DIFFICULTY_CHANGE: 2,
-      
+
       // Time-based performance factors
       FAST_ANSWER_THRESHOLD: 30,     // seconds
       SLOW_ANSWER_THRESHOLD: 120,    // seconds
-      
+
       // Streak bonuses and penalties
       STREAK_BONUS_THRESHOLD: 5,
       STREAK_PENALTY_THRESHOLD: 3,
-      
+
       // Category mastery influence
       MASTERY_INFLUENCE_FACTOR: 0.3,
-      
+
       // Learning velocity adjustment
       VELOCITY_ADJUSTMENT_FACTOR: 0.2
     };
@@ -61,8 +61,8 @@ class AdaptiveDifficultyEngine {
 
       // Get recent performance data
       const recentPerformance = await this.getRecentPerformance(
-        learnerId, 
-        category, 
+        learnerId,
+        category,
         lookbackQuestions,
         sessionId
       );
@@ -74,8 +74,8 @@ class AdaptiveDifficultyEngine {
 
       // Calculate performance metrics
       const performanceMetrics = this.calculatePerformanceMetrics(
-        recentPerformance, 
-        considerTimeSpent, 
+        recentPerformance,
+        considerTimeSpent,
         considerHints
       );
 
@@ -160,17 +160,17 @@ class AdaptiveDifficultyEngine {
 
     const correctAnswers = performances.filter(p => p.correct).length;
     const accuracy = correctAnswers / performances.length;
-    
+
     const totalTimeSpent = performances.reduce((sum, p) => sum + p.timeSpent, 0);
     const averageTimeSpent = totalTimeSpent / performances.length;
-    
+
     const totalHintsUsed = performances.reduce((sum, p) => sum + p.hintsUsed, 0);
     const averageHintsUsed = totalHintsUsed / performances.length;
 
     // Calculate current streak (consecutive correct/incorrect from most recent)
     let streak = 0;
     const isPositiveStreak = performances[0].correct;
-    
+
     for (const performance of performances) {
       if (performance.correct === isPositiveStreak) {
         streak++;
@@ -185,7 +185,7 @@ class AdaptiveDifficultyEngine {
     }
 
     // Calculate time efficiency (faster is better, normalized 0-1)
-    const timeEfficiency = considerTimeSpent ? 
+    const timeEfficiency = considerTimeSpent ?
       Math.max(0, 1 - (averageTimeSpent / this.config.SLOW_ANSWER_THRESHOLD)) : 0.5;
 
     // Calculate consistency score based on variance in performance
@@ -211,7 +211,7 @@ class AdaptiveDifficultyEngine {
    */
   getCategoryMasteryInfluence(learner, category) {
     const categoryMastery = learner.categoryMastery.get(category);
-    
+
     if (!categoryMastery) {
       return {
         masteryLevel: 0,
@@ -245,14 +245,14 @@ class AdaptiveDifficultyEngine {
     // Base adjustment on accuracy
     if (performanceMetrics.accuracy >= this.config.HIGH_ACCURACY_THRESHOLD) {
       adjustment += 1;
-      
+
       // Additional increase for very high accuracy with good time efficiency
       if (performanceMetrics.accuracy >= 0.9 && performanceMetrics.timeEfficiency > 0.7) {
         adjustment += 0.5;
       }
     } else if (performanceMetrics.accuracy <= this.config.LOW_ACCURACY_THRESHOLD) {
       adjustment -= 1;
-      
+
       // Additional decrease for very low accuracy
       if (performanceMetrics.accuracy <= 0.3) {
         adjustment -= 0.5;
@@ -287,8 +287,8 @@ class AdaptiveDifficultyEngine {
     adjustment *= (1 + (learningVelocity - 1) * this.config.VELOCITY_ADJUSTMENT_FACTOR);
 
     // Ensure adjustment is within bounds
-    return Math.max(-this.config.MAX_DIFFICULTY_CHANGE, 
-                   Math.min(this.config.MAX_DIFFICULTY_CHANGE, adjustment));
+    return Math.max(-this.config.MAX_DIFFICULTY_CHANGE,
+      Math.min(this.config.MAX_DIFFICULTY_CHANGE, adjustment));
   }
 
   /**
@@ -308,7 +308,7 @@ class AdaptiveDifficultyEngine {
     const maxDeviation = Math.abs(adjustment) > 1.5 ? 3 : 2;
     const minAllowed = Math.max(1, preferredDifficulty - maxDeviation);
     const maxAllowed = Math.min(10, preferredDifficulty + maxDeviation);
-    
+
     newDifficulty = Math.max(minAllowed, Math.min(maxAllowed, newDifficulty));
 
     return newDifficulty;
@@ -421,7 +421,7 @@ class AdaptiveDifficultyEngine {
    */
   calculateVariance(values) {
     if (values.length === 0) return 0;
-    
+
     const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
     const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
     return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
@@ -435,13 +435,13 @@ class AdaptiveDifficultyEngine {
    */
   async batchCalculateDifficulty(learnerCategories, options = {}) {
     const results = [];
-    
+
     for (const { learnerId, category, currentDifficulty } of learnerCategories) {
       try {
         const result = await this.calculateNextDifficulty(
-          learnerId, 
-          category, 
-          currentDifficulty, 
+          learnerId,
+          category,
+          currentDifficulty,
           options
         );
         results.push({
@@ -462,6 +462,173 @@ class AdaptiveDifficultyEngine {
 
     return results;
   }
-}
+
+  /**
+   * Real-time performance analysis for dynamic exams
+   * @param {Array} responses - Array of response objects
+   * @param {number} timeWindow - Time window in seconds for analysis
+   * @returns {Object} - Analysis results with recommendations
+   */
+  analyzeRealTimePerformance(responses, timeWindow = 60) {
+    const now = Date.now();
+    const recentResponses = responses.filter(r =>
+      (now - new Date(r.timestamp).getTime()) <= (timeWindow * 1000)
+    );
+
+    if (recentResponses.length === 0) {
+      return {
+        correctRate: 0.5,
+        avgResponseTime: 30,
+        recommendedDifficulty: 'medium',
+        adaptation: 'maintain'
+      };
+    }
+
+    const correctCount = recentResponses.filter(r => r.isCorrect).length;
+    const correctRate = correctCount / recentResponses.length;
+    const avgResponseTime = recentResponses.reduce((sum, r) => sum + r.responseTime, 0) / recentResponses.length;
+
+    let recommendedDifficulty = 'medium';
+    let adaptation = 'maintain';
+
+    // Adaptation logic based on performance
+    if (correctRate >= 0.8 && avgResponseTime < 30) {
+      recommendedDifficulty = 'hard';
+      adaptation = 'increase';
+    } else if (correctRate >= 0.7) {
+      recommendedDifficulty = 'medium';
+      adaptation = 'maintain';
+    } else if (correctRate < 0.5) {
+      recommendedDifficulty = 'easy';
+      adaptation = 'decrease';
+    }
+
+    return {
+      correctRate,
+      avgResponseTime,
+      recommendedDifficulty,
+      adaptation,
+      sampleSize: recentResponses.length
+    };
+  }
+
+  /**
+   * Get next question based on current performance
+   * @param {string} examId - Exam ID
+   * @param {string} currentDifficulty - Current difficulty level
+   * @param {Array} excludeQuestions - Questions to exclude
+   * @returns {Promise<Object>} - Next question object
+   */
+  async getNextDynamicQuestion(examId, currentDifficulty, excludeQuestions = []) {
+    try {
+      const ExamQuestion = require('../config/examDatabase').ExamQuestion;
+
+      const questions = await ExamQuestion.find({
+        examId,
+        difficulty: currentDifficulty,
+        _id: { $nin: excludeQuestions }
+      });
+
+      if (questions.length === 0) {
+        // Fallback to any available question
+        const fallbackQuestions = await ExamQuestion.find({
+          examId,
+          _id: { $nin: excludeQuestions }
+        });
+
+        if (fallbackQuestions.length === 0) {
+          throw new Error('No questions available for this exam');
+        }
+
+        return fallbackQuestions[Math.floor(Math.random() * fallbackQuestions.length)];
+      }
+
+      // Return random question of appropriate difficulty
+      return questions[Math.floor(Math.random() * questions.length)];
+    } catch (error) {
+      console.error('Error getting next dynamic question:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process real-time exam responses
+   * @param {string} examId - Exam ID
+   * @param {string} userId - User ID
+   * @param {string} questionId - Question ID
+   * @param {string} response - User's response
+   * @param {number} responseTime - Time taken to respond
+   * @returns {Object} - Response data object
+   */
+  processRealTimeResponse(examId, userId, questionId, response, responseTime) {
+    const responseData = {
+      examId,
+      userId,
+      questionId,
+      response,
+      responseTime,
+      timestamp: new Date(),
+      isCorrect: false // Will be determined by comparing with correct answer
+    };
+
+    // Store response for analysis
+    this.storeResponse(responseData);
+
+    return responseData;
+  }
+
+  /**
+   * Store response for real-time analysis
+   * @param {Object} responseData - Response data to store
+   */
+  storeResponse(responseData) {
+    // In a real implementation, this would store to a fast database like Redis
+    // For now, we'll use in-memory storage
+    if (!this.realTimeResponses) {
+      this.realTimeResponses = new Map();
+    }
+
+    const examKey = responseData.examId.toString();
+    if (!this.realTimeResponses.has(examKey)) {
+      this.realTimeResponses.set(examKey, []);
+    }
+
+    this.realTimeResponses.get(examKey).push(responseData);
+
+    // Keep only recent responses (last 10 minutes)
+    const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+    const filtered = this.realTimeResponses.get(examKey).filter(r =>
+      new Date(r.timestamp).getTime() > tenMinutesAgo
+    );
+    this.realTimeResponses.set(examKey, filtered);
+  }
+
+  /**
+   * Get real-time responses for an exam
+   * @param {string} examId - Exam ID
+   * @returns {Array} - Array of recent responses
+   */
+  getRealTimeResponses(examId) {
+    if (!this.realTimeResponses) {
+      return [];
+    }
+
+    const examKey = examId.toString();
+    return this.realTimeResponses.get(examKey) || [];
+  }
+
+  /**
+   * Clear real-time responses for an exam
+   * @param {string} examId - Exam ID
+   */
+  clearRealTimeResponses(examId) {
+    if (!this.realTimeResponses) {
+      return;
+    }
+
+    const examKey = examId.toString();
+    this.realTimeResponses.delete(examKey);
+  }
+};
 
 module.exports = AdaptiveDifficultyEngine;

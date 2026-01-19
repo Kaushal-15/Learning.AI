@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
     Home, BookOpen, FolderKanban, Settings, LogOut,
-    Moon, Sun, History, FileText
+    Moon, Sun, History, FileText, Shield
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import ProgressTracker from "./ProgressTracker";
@@ -11,6 +11,8 @@ export default function Sidebar() {
     const navigate = useNavigate();
     const location = useLocation();
     const { isDarkMode, toggleTheme } = useTheme();
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isAdmin = user.role === 'admin';
 
     const logout = async () => {
         try {
@@ -67,6 +69,15 @@ export default function Sidebar() {
                     >
                         <FileText className="nav-icon" />
                     </button>
+                    {isAdmin && (
+                        <button
+                            className={`nav-item ${isActive("/admin/exams") ? "active" : ""}`}
+                            onClick={() => navigate("/admin/exams")}
+                            title="Admin Dashboard"
+                        >
+                            <Shield className="nav-icon" />
+                        </button>
+                    )}
                     {/* <button
                         className={`nav-item ${isActive("/projects") ? "active" : ""}`}
                         onClick={() => navigate("/Projects")}
