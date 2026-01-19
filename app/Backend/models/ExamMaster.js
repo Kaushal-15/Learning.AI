@@ -46,7 +46,7 @@ const examMasterSchema = new mongoose.Schema({
     adaptiveSettings: {
         increaseThreshold: { type: Number, default: 60 }, // % accuracy to increase difficulty
         decreaseThreshold: { type: Number, default: 40 }, // % accuracy to decrease difficulty
-        minQuestionsBeforeAdjust: { type: Number, default: 3 }, // minimum questions before adjusting difficulty
+        minQuestionsBeforeAdjust: { type: Number, default: 1 }, // minimum questions before adjusting difficulty
         waitTimeMin: { type: Number, default: 5 }, // minimum wait seconds
         waitTimeMax: { type: Number, default: 10 } // maximum wait seconds
     },
