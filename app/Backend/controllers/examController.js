@@ -91,6 +91,7 @@ exports.createExam = async (req, res) => {
             adaptiveSettings: adaptiveSettings || {
                 increaseThreshold: 60,
                 decreaseThreshold: 40,
+                minQuestionsBeforeAdjust: 1,
                 waitTimeMin: 5,
                 waitTimeMax: 10
             }

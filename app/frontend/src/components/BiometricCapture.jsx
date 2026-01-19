@@ -128,6 +128,13 @@ export default function BiometricCapture({ examId, studentName, registerNumber, 
         };
     }, []);
 
+    // Ensure stream is assigned to video element when it mounts
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream, cameraActive]);
+
     return (
         <div className={`biometric-capture ${isDarkMode ? 'dark' : ''}`}>
             <div className="biometric-card">
