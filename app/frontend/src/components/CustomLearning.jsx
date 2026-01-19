@@ -155,11 +155,11 @@ const CustomLearning = () => {
 
                         {/* Instructions Card */}
                         <div className="mt-6 course-progress-card">
-                            <h4 className="font-semibold text-gray-900 dashboard-dark:text-[#f5e6d3] mb-3 flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-900 dark:text-[#f5e6d3] mb-3 flex items-center gap-2">
                                 <FileText className="w-5 h-5 text-blue-500" />
                                 How it works
                             </h4>
-                            <ul className="space-y-2 text-sm text-gray-600 dashboard-dark:text-[#b8a67d]">
+                            <ul className="space-y-2 text-sm text-gray-600 dark:text-[#b8a67d]">
                                 <li className="flex items-start gap-2">
                                     <span className="text-blue-500 mt-0.5">•</span>
                                     <span>Upload PDF, DOCX, or TXT files (max 5MB)</span>
@@ -188,12 +188,12 @@ const CustomLearning = () => {
                         {uploadedDocId ? (
                             <QuizConfig documentId={uploadedDocId} onQuizGenerated={fetchQuizResults} />
                         ) : (
-                            <div className="h-full min-h-[300px] flex flex-col items-center justify-center p-8 bg-white dashboard-dark:bg-[#1a1a1a] rounded-xl border-2 border-dashed border-gray-300 dashboard-dark:border-[#2a2a2a] text-center">
-                                <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 dashboard-dark:from-blue-900/30 dashboard-dark:to-purple-900/30 rounded-full flex items-center justify-center mb-4">
+                            <div className="h-full min-h-[300px] flex flex-col items-center justify-center p-8 bg-white dark:bg-[#1a1a1a] rounded-xl border-2 border-dashed border-gray-300 dark:border-[#2a2a2a] text-center">
+                                <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center mb-4">
                                     <span className="text-3xl">⏳</span>
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 dashboard-dark:text-[#f5e6d3] mb-2">Upload a file first</h3>
-                                <p className="text-gray-500 dashboard-dark:text-[#b8a67d] text-sm">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-[#f5e6d3] mb-2">Upload a file first</h3>
+                                <p className="text-gray-500 dark:text-[#b8a67d] text-sm">
                                     Once you upload a document, the quiz configuration options will appear here.
                                 </p>
                             </div>
@@ -206,7 +206,7 @@ const CustomLearning = () => {
                     <div className="dashboard-section">
                         <div className="section-header-dashboard">
                             <h3 className="section-title-dashboard">Your Uploaded Documents</h3>
-                            <span className="text-sm text-gray-500 dashboard-dark:text-[#b8a67d]">{documents.length} document{documents.length !== 1 ? 's' : ''}</span>
+                            <span className="text-sm text-gray-500 dark:text-[#b8a67d]">{documents.length} document{documents.length !== 1 ? 's' : ''}</span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {documents.map((doc) => {
@@ -223,9 +223,9 @@ const CustomLearning = () => {
                                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-600 flex items-center justify-center">
                                                         <FileText className="w-5 h-5 text-white" />
                                                     </div>
-                                                    <h3 className="font-semibold text-gray-900 dashboard-dark:text-[#f5e6d3] truncate flex-1">{doc.originalName}</h3>
+                                                    <h3 className="font-semibold text-gray-900 dark:text-[#f5e6d3] truncate flex-1">{doc.originalName}</h3>
                                                 </div>
-                                                <div className="flex items-center gap-3 text-xs text-gray-500 dashboard-dark:text-[#b8a67d]">
+                                                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-[#b8a67d]">
                                                     <span className="flex items-center gap-1">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                                         {doc.chunkCount} chunks
@@ -235,20 +235,20 @@ const CustomLearning = () => {
                                                         {(doc.size / 1024).toFixed(1)} KB
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-gray-400 dashboard-dark:text-[#8a7a5d] mt-2">
+                                                <p className="text-xs text-gray-400 dark:text-[#8a7a5d] mt-2">
                                                     📅 {new Date(doc.uploadedAt).toLocaleDateString()}
                                                 </p>
 
                                                 {/* Quiz Stats */}
                                                 {results.length > 0 && (
-                                                    <div className="mt-3 pt-3 border-t border-gray-200 dashboard-dark:border-[#2a2a2a]">
+                                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#2a2a2a]">
                                                         <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-gray-500 dashboard-dark:text-[#b8a67d]">Quizzes taken:</span>
-                                                            <span className="font-semibold text-gray-900 dashboard-dark:text-[#f5e6d3]">{results.length}</span>
+                                                            <span className="text-gray-500 dark:text-[#b8a67d]">Quizzes taken:</span>
+                                                            <span className="font-semibold text-gray-900 dark:text-[#f5e6d3]">{results.length}</span>
                                                         </div>
                                                         <div className="flex items-center justify-between text-xs mt-1">
-                                                            <span className="text-gray-500 dashboard-dark:text-[#b8a67d]">Avg Score:</span>
-                                                            <span className={`font-semibold ${avgScore >= 80 ? 'text-green-600 dashboard-dark:text-green-400' : avgScore >= 60 ? 'text-yellow-600 dashboard-dark:text-yellow-400' : 'text-red-600 dashboard-dark:text-red-400'}`}>
+                                                            <span className="text-gray-500 dark:text-[#b8a67d]">Avg Score:</span>
+                                                            <span className={`font-semibold ${avgScore >= 80 ? 'text-green-600 dark:text-green-400' : avgScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                                                                 {avgScore}%
                                                             </span>
                                                         </div>
@@ -275,7 +275,7 @@ const CustomLearning = () => {
                                             {results.length > 0 && (
                                                 <button
                                                     onClick={() => navigate('/custom-quiz-history')}
-                                                    className="w-full py-2.5 px-4 bg-white dashboard-dark:bg-[#2a2a2a] border-2 border-gray-300 dashboard-dark:border-[#3a3a3a] hover:border-purple-500 dashboard-dark:hover:border-purple-500 text-gray-700 dashboard-dark:text-[#f5e6d3] rounded-lg text-sm font-semibold transition-all hover:shadow-lg flex items-center justify-center gap-2"
+                                                    className="w-full py-2.5 px-4 bg-white dark:bg-[#2a2a2a] border-2 border-gray-300 dark:border-[#3a3a3a] hover:border-purple-500 dark:hover:border-purple-500 text-gray-700 dark:text-[#f5e6d3] rounded-lg text-sm font-semibold transition-all hover:shadow-lg flex items-center justify-center gap-2"
                                                 >
                                                     <BarChart3 className="w-4 h-4" />
                                                     View Results ({results.length})

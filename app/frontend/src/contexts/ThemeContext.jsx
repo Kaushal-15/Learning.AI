@@ -28,8 +28,12 @@ export const ThemeProvider = ({ children }) => {
             const root = document.documentElement;
             if (isDarkMode) {
                 root.classList.add('app-dark');
+                root.classList.add('dashboard-dark');
+                root.classList.add('dark');
             } else {
                 root.classList.remove('app-dark');
+                root.classList.remove('dashboard-dark');
+                root.classList.remove('dark');
             }
         }
     }, [isDarkMode]);
