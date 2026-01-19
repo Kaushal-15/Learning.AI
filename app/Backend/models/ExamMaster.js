@@ -7,6 +7,7 @@ const examMasterSchema = new mongoose.Schema({
     startTime: { type: Date, required: true },
     endTime: { type: Date, required: true },
     duration: { type: Number, required: true }, // in minutes
+    verificationDuration: { type: Number, default: 15 }, // in minutes, time before exam start for verification
     totalQuestions: { type: Number, required: true },
     passingScore: { type: Number, default: 40 },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

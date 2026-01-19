@@ -379,6 +379,7 @@ export default function AdminExamCreate() {
                 startTime: formData.startTime,
                 endTime: formData.endTime,
                 duration: formData.duration,
+                verificationDuration: formData.verificationDuration || 15,
                 passingScore: formData.passingScore,
                 examType: formData.examType,
                 students: formData.students,
@@ -567,6 +568,18 @@ export default function AdminExamCreate() {
                                             min="5"
                                             max="300"
                                             required
+                                        />
+                                    </div>
+                                    <div className="form-field">
+                                        <label>Verification Time (Minutes)</label>
+                                        <input
+                                            type="number"
+                                            name="verificationDuration"
+                                            value={formData.verificationDuration || 15}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, verificationDuration: parseInt(e.target.value) || 0 }))}
+                                            min="0"
+                                            max="60"
+                                            placeholder="15"
                                         />
                                     </div>
                                     <div className="form-field">

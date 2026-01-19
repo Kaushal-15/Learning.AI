@@ -36,6 +36,8 @@ export default function ExamSession() {
     const [studentInfo, setStudentInfo] = useState(null);
     const [session, setSession] = useState(null);
     const [showTimeWarning, setShowTimeWarning] = useState(false);
+    const [isWaitingRoom, setIsWaitingRoom] = useState(false);
+    const [timeToStart, setTimeToStart] = useState(0);
 
     const fetchSession = useCallback(async () => {
         try {
@@ -69,6 +71,14 @@ export default function ExamSession() {
 
                 setExam(secureExam);  // Use secure version
                 setSession(session);  // Store session for camera monitoring
+
+                // Check for Waiting Room
+                const now = new Date();
+                const start = new Date(exam.startTime);
+                if (now < start) {
+                    setIsWaitingRoom(true);
+                    setTimeToStart(Math.floor((start - now) / 1000));
+                }
 
                 console.log('✅ Exam loaded - requireCamera:', secureExam.requireCamera);
                 console.log('✅ Session set:', session._id);
@@ -113,6 +123,23 @@ export default function ExamSession() {
     useEffect(() => {
         fetchSession();
     }, [fetchSession]);
+
+    // Waiting Room Timer
+    useEffect(() => {
+        if (!isWaitingRoom) return;
+
+        const timer = setInterval(() => {
+            setTimeToStart(prev => {
+                if (prev <= 0) {
+                    setIsWaitingRoom(false);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isWaitingRoom]);
 
     // Fullscreen enforcement for proctored exams
     useEffect(() => {
@@ -295,6 +322,53 @@ export default function ExamSession() {
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                     <p className="text-gray-600 dark:text-cream-100 text-lg">Initializing Secure Session...</p>
                 </div>
+            </div>
+        );
+    }
+
+    if (isWaitingRoom) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gradient-dark relative flex items-center justify-center p-4">
+                <GlobalThemeToggle />
+                <AnimatedBackground />
+
+                <div className="max-w-xl w-full bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-dark-300 p-8 shadow-xl relative z-10 text-center">
+                    <div className="w-20 h-20 bg-blue-100 dark:bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Clock className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-pulse" />
+                    </div>
+
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-cream-100 mb-2">
+                        Exam Starts In
+                    </h1>
+
+                    <div className="text-5xl font-mono font-bold text-blue-600 dark:text-blue-400 mb-8 tracking-wider">
+                        {formatTime(timeToStart)}
+                    </div>
+
+                    <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-xl p-4 text-left">
+                        <h3 className="font-bold text-yellow-800 dark:text-yellow-300 mb-2 flex items-center gap-2">
+                            <Shield className="w-5 h-5" />
+                            Proctoring Active
+                        </h3>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-200">
+                            Please remain on this screen. Your camera is being monitored. Do not switch tabs or leave the browser.
+                        </p>
+                    </div>
+
+                    <div className="mt-8 text-sm text-gray-500 dark:text-cream-300">
+                        Exam: {exam?.title}
+                    </div>
+                </div>
+
+                {/* Camera Monitor Active During Waiting */}
+                {session && (
+                    <CameraMonitor
+                        sessionId={session._id}
+                        examId={examId}
+                        isRequired={true}
+                        onCameraStatus={(status) => console.log('📹 Waiting Room Camera:', status)}
+                    />
+                )}
             </div>
         );
     }

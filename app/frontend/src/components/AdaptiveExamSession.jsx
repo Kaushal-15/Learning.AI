@@ -37,6 +37,10 @@ export default function AdaptiveExamSession() {
     const [examExpiryTime, setExamExpiryTime] = useState(null);
     const [showTimeWarning, setShowTimeWarning] = useState(false);
 
+    // Waiting Room State
+    const [isWaitingRoom, setIsWaitingRoom] = useState(false);
+    const [timeToStart, setTimeToStart] = useState(0);
+
     // Initialize session if needed
     const initializeSession = useCallback(async () => {
         try {
@@ -89,6 +93,15 @@ export default function AdaptiveExamSession() {
             setSessionId(session._id);
             setCameraRequired(exam.requireCamera || false);
             setTotalQuestions(exam.totalQuestions);
+
+            // Check for Waiting Room
+            const now = new Date();
+            const start = new Date(exam.startTime);
+            if (now < start) {
+                setIsWaitingRoom(true);
+                setTimeToStart(Math.floor((start - now) / 1000));
+            }
+
             setLoading(false);
         } catch (error) {
             console.error("Error initializing session:", error);
@@ -315,12 +328,29 @@ export default function AdaptiveExamSession() {
         initializeSession();
     }, [initializeSession]);
 
-    // Start fetching questions once exam is loaded
+    // Waiting Room Timer
     useEffect(() => {
-        if (exam && !loading && !isWaiting && !examComplete) {
+        if (!isWaitingRoom) return;
+
+        const timer = setInterval(() => {
+            setTimeToStart(prev => {
+                if (prev <= 0) {
+                    setIsWaitingRoom(false);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isWaitingRoom]);
+
+    // Start fetching questions once exam is loaded and NOT waiting room
+    useEffect(() => {
+        if (exam && !loading && !isWaiting && !examComplete && !isWaitingRoom) {
             fetchNextQuestion();
         }
-    }, [exam, loading, isWaiting, examComplete, fetchNextQuestion]);
+    }, [exam, loading, isWaiting, examComplete, fetchNextQuestion, isWaitingRoom]);
 
     // Format time
     const formatTime = (seconds) => {
@@ -343,6 +373,54 @@ export default function AdaptiveExamSession() {
                     <Clock size={48} className="spinner" />
                     <p>Loading exam...</p>
                 </div>
+            </div>
+        );
+    }
+
+    if (isWaitingRoom) {
+        return (
+            <div className={`exam-session-container ${isDarkMode ? 'dashboard-dark' : ''} flex items-center justify-center min-h-screen`}>
+                <div className="max-w-xl w-full bg-white dark:bg-dark-400 rounded-2xl p-8 shadow-xl text-center border border-gray-200 dark:border-dark-300">
+                    <div className="w-20 h-20 bg-blue-100 dark:bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Clock className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-pulse" />
+                    </div>
+
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-cream-100 mb-2">
+                        Exam Starts In
+                    </h1>
+
+                    <div className="text-5xl font-mono font-bold text-blue-600 dark:text-blue-400 mb-8 tracking-wider">
+                        {formatTime(timeToStart)}
+                    </div>
+
+                    <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-xl p-4 text-left">
+                        <h3 className="font-bold text-yellow-800 dark:text-yellow-300 mb-2 flex items-center gap-2">
+                            <Target size={20} />
+                            Adaptive Exam Mode
+                        </h3>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-200 mb-2">
+                            This exam adapts to your performance. Difficulty will adjust based on your answers.
+                        </p>
+                        <div className="font-bold text-red-800 dark:text-red-300 flex items-center gap-2 mt-4">
+                            <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+                            PROCTORING ACTIVE
+                        </div>
+                    </div>
+
+                    <div className="mt-8 text-sm text-gray-500 dark:text-cream-300">
+                        Exam: {exam?.title}
+                    </div>
+                </div>
+
+                {/* Camera Monitor Active During Waiting */}
+                {sessionId && (
+                    <CameraMonitor
+                        sessionId={sessionId}
+                        examId={examId}
+                        isRequired={true}
+                        onCameraStatus={(status) => console.log('📹 Waiting Room Camera:', status)}
+                    />
+                )}
             </div>
         );
     }
