@@ -17,6 +17,7 @@ logs
 Backend/content-generator/venv/
 content-generator/
 venv/
+uploads
 
 # Runtime data
 pids
