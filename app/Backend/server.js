@@ -195,8 +195,9 @@ initScheduler();
 
 app.listen(PORT, () => {
   console.log(
-    `🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
+    ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
   );
+  console.log(` Connected to MongoDB`);
 });
 
 module.exports = app;
