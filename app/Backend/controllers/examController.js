@@ -1240,11 +1240,66 @@ exports.getNextQuestion = async (req, res) => {
             nextQuestionNumber = answeredCount + 1;
         }
 
-        // Determine difficulty for next question based on INDIVIDUAL performance
-        // Difficulty is updated in submitAdaptiveAnswer based on routing rules
+        // Determine difficulty for next question based on ADMIN ROUTING CONFIG
         let difficulty = session.currentDifficulty || 'easy';
+        let difficultyChangeReason = null;
 
-        // Get question matching current difficulty
+        // If not first question and NOT resuming, check routing config for next difficulty
+        if (nextQuestionNumber > 1 && !isResuming) {
+            // Get last answer to determine if it was correct or wrong
+            const lastAnsweredQuestionId = answeredCount > 0 ? Array.from(session.answers.keys())[answeredCount - 1] : null;
+            let wasLastCorrect = false;
+
+            if (lastAnsweredQuestionId) {
+                // Fetch last question to check correctness
+                let lastQuestion;
+                if (exam.examType === 'dynamic' || exam.isAdaptive) {
+                    lastQuestion = await Question.findById(lastAnsweredQuestionId);
+                } else {
+                    lastQuestion = await ExamQuestion.findById(lastAnsweredQuestionId);
+                }
+
+                if (lastQuestion) {
+                    const lastAnswer = session.answers.get(lastAnsweredQuestionId);
+                    wasLastCorrect = lastAnswer === lastQuestion.correctAnswer;
+                }
+            }
+
+            // Use admin routing config to determine next difficulty
+            if (exam.adaptiveRoutingConfig && exam.adaptiveRoutingConfig[difficulty]) {
+                const routingRule = exam.adaptiveRoutingConfig[difficulty];
+                const allowedNextDifficulties = wasLastCorrect ? routingRule.correct : routingRule.wrong;
+
+                if (allowedNextDifficulties && allowedNextDifficulties.length > 0) {
+                    const previousDifficulty = difficulty;
+
+                    // If multiple options, randomly select one
+                    difficulty = allowedNextDifficulties[Math.floor(Math.random() * allowedNextDifficulties.length)];
+
+                    // Record difficulty change if it changed
+                    if (difficulty !== previousDifficulty) {
+                        difficultyChangeReason = `Admin routing: ${previousDifficulty} + ${wasLastCorrect ? 'correct' : 'wrong'} → ${difficulty}`;
+                        session.difficultyHistory.push({
+                            questionNumber: nextQuestionNumber,
+                            fromDifficulty: previousDifficulty,
+                            toDifficulty: difficulty,
+                            reason: difficultyChangeReason,
+                            accuracy: session.totalAnsweredCount > 0
+                                ? (session.correctAnswersCount / session.totalAnsweredCount) * 100
+                                : 0,
+                            timestamp: new Date()
+                        });
+                        console.log(`📊 [ADAPTIVE ROUTING] ${difficultyChangeReason}`);
+                    }
+                } else {
+                    console.warn(`⚠️ [ADAPTIVE] No routing config for ${difficulty} + ${wasLastCorrect ? 'correct' : 'wrong'}, maintaining current difficulty`);
+                }
+            } else {
+                console.warn(`⚠️ [ADAPTIVE] No routing config found for exam, maintaining current difficulty: ${difficulty}`);
+            }
+        }
+
+        // Get question matching current difficulty using DIFFICULTY TAG (not numeric difficulty)
         let questions = [];
         let question = null;
 
@@ -1254,46 +1309,25 @@ exports.getNextQuestion = async (req, res) => {
             const answeredIds = Array.from(session.answers.keys());
 
             // Filter available questions from the pool
-            // We need to fetch the actual question objects to check difficulty
-            // But first, let's just get the pool of unanswered questions
             const availableQuestionIds = session.questionIds.filter(id => !answeredIds.includes(id.toString()));
 
             console.log(`🎯 [ADAPTIVE] Requesting difficulty: ${difficulty}`);
             console.log(`📊 [ADAPTIVE] Total pool: ${session.questionIds.length}, Answered: ${answeredIds.length}, Available: ${availableQuestionIds.length}`);
 
-            if (availableQuestionIds.length === 0) {
-                return res.status(200).json({
-                    success: true,
-                    isComplete: true,
-                    message: 'All assigned questions completed'
-                });
-            }
-
             // Fetch the actual question objects for the available IDs
-            // We only fetch a subset to optimize, or all if small number
             const poolQuestions = await Question.find({ _id: { $in: availableQuestionIds } });
 
             console.log(`🔍 [ADAPTIVE] Fetched ${poolQuestions.length} available questions from DB`);
 
-            // Filter by difficulty (using difficultyLevel if available, else fallback)
-            let difficultyMatches = poolQuestions.filter(q => {
-                if (q.difficultyLevel) {
-                    return q.difficultyLevel === difficulty;
-                }
-                // Fallback to numerical check
-                if (difficulty === 'easy') return q.difficulty <= 3;
-                if (difficulty === 'medium') return q.difficulty > 3 && q.difficulty <= 6;
-                return q.difficulty > 6;
-            });
-
-            console.log(`📊 [ADAPTIVE] Found ${difficultyMatches.length} questions for difficulty ${difficulty}`);
+            // Filter by difficultyTag (not numeric difficulty)
+            const difficultyMatches = poolQuestions.filter(q => q.difficultyTag === difficulty);
+            console.log(`✅ [ADAPTIVE] Found ${difficultyMatches.length} questions with difficultyTag='${difficulty}'`);
 
             if (difficultyMatches.length > 0) {
                 questions = difficultyMatches;
                 console.log(`✅ [ADAPTIVE] Using ${questions.length} questions matching difficulty: ${difficulty}`);
             } else {
                 // Fallback: if no questions of desired difficulty, use ANY available question from the pool
-                // This ensures we don't get stuck if the pool runs out of 'hard' questions
                 console.warn(`⚠️ [ADAPTIVE] No questions found for difficulty ${difficulty}, falling back to ANY available question`);
                 questions = poolQuestions;
                 console.log(`🔄 [ADAPTIVE] Fallback: Using ${questions.length} questions of any difficulty from pool`);
@@ -1317,26 +1351,16 @@ exports.getNextQuestion = async (req, res) => {
                 query._id = { $nin: answeredIds };
             }
 
-            // Filter by difficulty
-            const difficultyQuery = { ...query };
+            // Filter by difficultyTag (not numeric difficulty)
+            query.difficultyTag = difficulty;
 
-            // Use difficultyLevel if possible, or fallback to range
-            difficultyQuery.$or = [
-                { difficultyLevel: difficulty },
-                {
-                    difficultyLevel: { $exists: false },
-                    difficulty: difficulty === 'easy' ? { $lte: 3 } :
-                               difficulty === 'medium' ? { $gt: 3, $lte: 6 } :
-                               { $gt: 6 }
-                }
-            ];
-
-            questions = await Question.find(difficultyQuery);
-            console.log(`📊 [ADAPTIVE] Found ${questions.length} questions for difficulty ${difficulty} with tags`);
+            questions = await Question.find(query);
+            console.log(`📊 [ADAPTIVE] Found ${questions.length} questions for difficultyTag=${difficulty} with tags`);
 
             // If no questions of this difficulty, try without difficulty filter
             if (questions.length === 0) {
                 console.warn(`⚠️ [ADAPTIVE] No questions for difficulty ${difficulty}, trying without difficulty filter`);
+                delete query.difficultyTag;
                 questions = await Question.find(query);
                 console.log(`🔄 [ADAPTIVE] Fallback found ${questions.length} questions (any difficulty)`);
             }
@@ -1614,7 +1638,7 @@ async function startNextQuestion(exam) {
             return;
         }
 
-        // Get question based on current difficulty
+        // Get question based on current difficulty using DIFFICULTY TAG
         const query = {};
 
         // Filter by tags if specified
@@ -1622,19 +1646,9 @@ async function startNextQuestion(exam) {
             query.tags = { $in: exam.dynamicConfig.tags };
         }
 
-        // Filter by difficulty
+        // Filter by difficultyTag (not numeric difficulty)
         const difficulty = exam.currentDifficulty;
-
-        // Use difficultyLevel if possible, or fallback to range
-        query.$or = [
-            { difficultyLevel: difficulty },
-            {
-                difficultyLevel: { $exists: false },
-                difficulty: difficulty === 'easy' ? { $lte: 3 } :
-                           difficulty === 'medium' ? { $gt: 3, $lte: 6 } :
-                           { $gt: 6 }
-            }
-        ];
+        query.difficultyTag = difficulty;
 
         const questions = await Question.find(query);
 
@@ -1716,45 +1730,52 @@ async function endCurrentQuestion(examId) {
                     (questionResult.correctAttempts / questionResult.totalAttempts) * 100;
             }
 
-            // Determine next difficulty based on collective performance (Sync Mode 60% Rule)
-            const currentDifficulty = exam.currentDifficulty || 'easy';
+            // Determine next difficulty based on 60% THRESHOLD RULE + ADMIN ROUTING CONFIG
+            const currentDifficulty = exam.currentDifficulty;
             let nextDifficulty = currentDifficulty;
             let reason = '';
 
-            // Get routing config
-            const routing = exam.adaptiveRouting || {
-                easy: { correct: ['easy', 'medium'], wrong: ['easy'] },
-                medium: { correct: ['medium', 'hard'], wrong: ['easy', 'medium'] },
-                hard: { correct: ['hard'], wrong: ['medium'] }
-            };
+            const correctPercentage = questionResult.correctPercentage || 0;
+            const wrongPercentage = 100 - correctPercentage;
+            const syncThreshold = exam.syncThreshold || 60;
 
-            // Check for 60% consensus
-            // If >= 60% correct -> Treat as Correct
-            // If >= 60% wrong (<= 40% correct) -> Treat as Wrong
-            // Else -> Maintain
+            // Check if ≥60% of students answered the same way (correct OR wrong)
+            let majorityAnswer = null; // 'correct' or 'wrong' or null
 
-            let consensusState = null;
-            if (questionResult.correctPercentage >= 60) {
-                consensusState = 'correct';
-            } else if (questionResult.correctPercentage <= 40) {
-                consensusState = 'wrong';
+            if (correctPercentage >= syncThreshold) {
+                majorityAnswer = 'correct';
+                reason = `${correctPercentage.toFixed(1)}% correct (≥${syncThreshold}% threshold) - `;
+            } else if (wrongPercentage >= syncThreshold) {
+                majorityAnswer = 'wrong';
+                reason = `${wrongPercentage.toFixed(1)}% wrong (≥${syncThreshold}% threshold) - `;
+            } else {
+                // No clear majority, maintain current difficulty
+                nextDifficulty = currentDifficulty;
+                reason = `No clear majority (${correctPercentage.toFixed(1)}% correct, ${wrongPercentage.toFixed(1)}% wrong, threshold=${syncThreshold}%) - maintaining ${currentDifficulty}`;
+                console.log(`📊 [SYNC MODE] ${reason}`);
             }
 
-            if (consensusState) {
-                const allowedNext = routing[currentDifficulty] ?
-                    routing[currentDifficulty][consensusState] : [currentDifficulty];
+            // If we have a majority answer, apply admin routing config
+            if (majorityAnswer && exam.adaptiveRoutingConfig && exam.adaptiveRoutingConfig[currentDifficulty]) {
+                const routingRule = exam.adaptiveRoutingConfig[currentDifficulty];
+                const allowedNextDifficulties = majorityAnswer === 'correct' ? routingRule.correct : routingRule.wrong;
 
-                // Pick random if multiple
-                if (allowedNext && allowedNext.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * allowedNext.length);
-                    nextDifficulty = allowedNext[randomIndex];
+                if (allowedNextDifficulties && allowedNextDifficulties.length > 0) {
+                    // If multiple options, randomly select one
+                    nextDifficulty = allowedNextDifficulties[Math.floor(Math.random() * allowedNextDifficulties.length)];
+                    reason += `admin routing → ${nextDifficulty}`;
+                    console.log(`📊 [SYNC MODE] ${reason}`);
+                } else {
+                    // No routing config, maintain current difficulty
+                    nextDifficulty = currentDifficulty;
+                    reason += `no routing config - maintaining ${currentDifficulty}`;
+                    console.warn(`⚠️ [SYNC MODE] No routing config for ${currentDifficulty} + ${majorityAnswer}`);
                 }
-
-                reason = `${questionResult.correctPercentage.toFixed(1)}% correct - Consensus: ${consensusState} -> ${nextDifficulty}`;
-            } else {
-                // No consensus, maintain difficulty
+            } else if (majorityAnswer && !exam.adaptiveRoutingConfig) {
+                // Fallback: No routing config at all
                 nextDifficulty = currentDifficulty;
-                reason = `${questionResult.correctPercentage.toFixed(1)}% correct - No consensus (40-60%) -> maintaining ${currentDifficulty}`;
+                reason += `no routing config - maintaining ${currentDifficulty}`;
+                console.warn(`⚠️ [SYNC MODE] No routing config found for exam`);
             }
 
             questionResult.nextDifficulty = nextDifficulty;
@@ -1765,10 +1786,11 @@ async function endCurrentQuestion(examId) {
             exam.currentDifficulty = nextDifficulty;
         }
 
-        // Set wait period
+        // Set wait period (5-10 seconds default)
+        const waitTimeMin = 5;
+        const waitTimeMax = 10;
         const waitTime = Math.floor(
-            Math.random() * (exam.adaptiveSettings.waitTimeMax - exam.adaptiveSettings.waitTimeMin + 1) +
-            exam.adaptiveSettings.waitTimeMin
+            Math.random() * (waitTimeMax - waitTimeMin + 1) + waitTimeMin
         );
         exam.waitPeriodEndTime = new Date(Date.now() + waitTime * 1000);
         await exam.save();

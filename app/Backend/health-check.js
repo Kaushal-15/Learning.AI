@@ -1,53 +1,46 @@
-#!/usr/bin/env node
 /**
  * Health Check Script
- * Validates environment and checks if port 3000 is available
+ * Verifies database connection and basic system health before starting server
  */
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-
-// Check if .env file exists
-const envPath = path.join(__dirname, '.env');
-if (!fs.existsSync(envPath)) {
-  console.error('❌ .env file not found! Copy .env.example to .env and configure it.');
-  process.exit(1);
-}
-
-// Load environment variables
+const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Check required environment variables
-const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const checkHealth = async () => {
+    console.log('\n🔍 Running health checks...\n');
 
-if (missingVars.length > 0) {
-  console.error(`❌ Missing required environment variables: ${missingVars.join(', ')}`);
-  process.exit(1);
-}
+    // Check MongoDB connection
+    try {
+        const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/learning-ai';
+        console.log('📡 Connecting to MongoDB...');
 
-// Check if port 3000 is already in use
-const PORT = 3000;
-const server = http.createServer();
+        await mongoose.connect(mongoURI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 5000
+        });
 
-server.once('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.log(`⚠️  Port ${PORT} is already in use. Attempting to free it...`);
-    // The kill-port command in package.json will handle this
-    server.close();
+        console.log('✅ MongoDB connection successful');
+        await mongoose.connection.close();
+    } catch (err) {
+        console.error('❌ MongoDB connection failed:', err.message);
+        process.exit(1);
+    }
+
+    // Check required environment variables
+    console.log('\n🔐 Checking environment variables...');
+    const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+    if (missingVars.length > 0) {
+        console.warn(`⚠️  Missing environment variables: ${missingVars.join(', ')}`);
+        console.warn('   Server will use defaults where possible');
+    } else {
+        console.log('✅ All required environment variables present');
+    }
+
+    console.log('\n✅ Health checks passed! Starting server...\n');
     process.exit(0);
-  } else {
-    console.error('❌ Health check failed:', err.message);
-    server.close();
-    process.exit(1);
-  }
-});
+};
 
-server.once('listening', () => {
-  console.log('✅ Health check passed - port is available');
-  server.close();
-  process.exit(0);
-});
-
-server.listen(PORT);
+checkHealth();

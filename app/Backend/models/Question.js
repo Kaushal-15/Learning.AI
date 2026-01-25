@@ -20,7 +20,7 @@ const questionSchema = new mongoose.Schema({
     required: [true, 'Correct answer is required'],
     trim: true,
     validate: {
-      validator: function(value) {
+      validator: function (value) {
         return this.options.includes(value);
       },
       message: 'Correct answer must be one of the provided options'
@@ -49,16 +49,6 @@ const questionSchema = new mongoose.Schema({
       validator: Number.isInteger,
       message: 'Difficulty must be an integer'
     }
-  },
-  difficultyLevel: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    required: [true, 'Difficulty level (easy, medium, hard) is required'],
-    default: 'medium'
-  },
-  adminApproved: {
-    type: Boolean,
-    default: false
   },
   tags: [{
     type: String,
@@ -108,17 +98,19 @@ const questionSchema = new mongoose.Schema({
 
 // Indexes for performance optimization
 questionSchema.index({ category: 1, difficulty: 1 });
+questionSchema.index({ difficultyTag: 1 }); // For adaptive exam filtering
+questionSchema.index({ difficultyTag: 1, category: 1 }); // Compound index for category + difficulty tag
 questionSchema.index({ generatedBy: 1, createdAt: -1 });
 questionSchema.index({ tags: 1 });
 questionSchema.index({ 'category.0': 1, difficulty: 1 }); // First category + difficulty
 
 // Virtual for category hierarchy depth
-questionSchema.virtual('categoryDepth').get(function() {
+questionSchema.virtual('categoryDepth').get(function () {
   return this.category.length;
 });
 
 // Virtual for primary category (first in hierarchy)
-questionSchema.virtual('primaryCategory').get(function() {
+questionSchema.virtual('primaryCategory').get(function () {
   return this.category[0];
 });
 
@@ -140,7 +132,7 @@ questionSchema.pre('validate', function(next) {
 });
 
 // Pre-save middleware for validation and tagging
-questionSchema.pre('save', function(next) {
+questionSchema.pre('save', function (next) {
   // Ensure options array has at least 2 options and at most 6
   if (this.options.length < 2) {
     return next(new Error('Question must have at least 2 options'));
@@ -169,23 +161,42 @@ questionSchema.pre('save', function(next) {
   // Auto-generate tags based on category hierarchy and content
   this.generateTags();
 
+  // Auto-set difficultyTag based on numeric difficulty if not already set
+  if (!this.difficultyTag) {
+    if (this.difficulty <= 3) {
+      this.difficultyTag = 'easy';
+    } else if (this.difficulty <= 7) {
+      this.difficultyTag = 'medium';
+    } else {
+      this.difficultyTag = 'hard';
+    }
+  }
+
+  // Validate that difficultyTag aligns with numeric difficulty
+  const expectedTag = this.difficulty <= 3 ? 'easy' :
+    this.difficulty <= 7 ? 'medium' : 'hard';
+  if (this.difficultyTag !== expectedTag) {
+    console.warn(`Question difficulty mismatch: numeric=${this.difficulty}, tag=${this.difficultyTag}. Auto-correcting to ${expectedTag}`);
+    this.difficultyTag = expectedTag;
+  }
+
   next();
 });
 
 // Static method to find questions by category and difficulty range
-questionSchema.statics.findByCategoryAndDifficulty = function(categories, minDifficulty, maxDifficulty, limit = 10) {
+questionSchema.statics.findByCategoryAndDifficulty = function (categories, minDifficulty, maxDifficulty, limit = 10) {
   return this.find({
     category: { $in: categories },
     difficulty: { $gte: minDifficulty, $lte: maxDifficulty }
   })
-  .sort({ createdAt: -1 })
-  .limit(limit);
+    .sort({ createdAt: -1 })
+    .limit(limit);
 };
 
 // Static method to find questions by category hierarchy
-questionSchema.statics.findByCategoryHierarchy = function(categoryPath, exactMatch = false, limit = 10) {
+questionSchema.statics.findByCategoryHierarchy = function (categoryPath, exactMatch = false, limit = 10) {
   let query;
-  
+
   if (exactMatch) {
     // Exact hierarchy match
     query = { category: categoryPath };
@@ -204,7 +215,7 @@ questionSchema.statics.findByCategoryHierarchy = function(categoryPath, exactMat
 };
 
 // Static method to get questions for adaptive learning
-questionSchema.statics.getAdaptiveQuestions = function(learnerProfile, excludeIds = [], limit = 5) {
+questionSchema.statics.getAdaptiveQuestions = function (learnerProfile, excludeIds = [], limit = 5) {
   const query = {
     _id: { $nin: excludeIds }
   };
@@ -229,10 +240,10 @@ questionSchema.statics.getAdaptiveQuestions = function(learnerProfile, excludeId
 };
 
 // Instance method to validate category hierarchy
-questionSchema.methods.validateCategoryHierarchy = function() {
+questionSchema.methods.validateCategoryHierarchy = function () {
   // Categories should be ordered from general to specific
   // e.g., ["Mathematics", "Algebra", "Linear Equations", "Systems of Equations"]
-  
+
   if (this.category.length === 0) {
     return { isValid: false, error: 'Question must have at least one category' };
   }
@@ -258,10 +269,10 @@ questionSchema.methods.validateCategoryHierarchy = function() {
   // Check for proper hierarchy structure (each level should be more specific)
   // This is a basic check - in a real system, you might have a predefined taxonomy
   for (let i = 1; i < this.category.length; i++) {
-    if (this.category[i].length <= this.category[i-1].length) {
+    if (this.category[i].length <= this.category[i - 1].length) {
       // This is a heuristic - more specific categories tend to be longer
       // In practice, you'd validate against a predefined category tree
-      console.warn(`Category hierarchy may not be properly ordered: ${this.category[i-1]} -> ${this.category[i]}`);
+      console.warn(`Category hierarchy may not be properly ordered: ${this.category[i - 1]} -> ${this.category[i]}`);
     }
   }
 
@@ -269,14 +280,14 @@ questionSchema.methods.validateCategoryHierarchy = function() {
 };
 
 // Instance method to generate tags based on category and content
-questionSchema.methods.generateTags = function() {
+questionSchema.methods.generateTags = function () {
   const generatedTags = new Set();
 
   // Add category-based tags
   this.category.forEach(cat => {
     // Add the category itself
     generatedTags.add(cat.toLowerCase());
-    
+
     // Add individual words from multi-word categories
     const words = cat.split(/\s+/).filter(word => word.length > 2);
     words.forEach(word => generatedTags.add(word.toLowerCase()));
@@ -299,28 +310,28 @@ questionSchema.methods.generateTags = function() {
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 3 && !['what', 'which', 'when', 'where', 'why', 'how', 'the', 'and', 'or', 'but', 'for', 'with', 'from', 'this', 'that', 'these', 'those'].includes(word));
-  
+
   contentWords.slice(0, 5).forEach(word => generatedTags.add(word)); // Limit to 5 content-based tags
 
   // Merge with existing tags, avoiding duplicates
   const existingTags = new Set(this.tags.map(tag => tag.toLowerCase()));
   const allTags = new Set([...existingTags, ...generatedTags]);
-  
+
   this.tags = Array.from(allTags).slice(0, 15); // Limit total tags to 15
 };
 
 // Instance method to update usage statistics
-questionSchema.methods.updateUsageStats = function(timeSpent, wasCorrect) {
+questionSchema.methods.updateUsageStats = function (timeSpent, wasCorrect) {
   this.timesUsed += 1;
-  
+
   // Update average time spent
   this.averageTimeSpent = ((this.averageTimeSpent * (this.timesUsed - 1)) + timeSpent) / this.timesUsed;
-  
+
   // Update success rate
   const previousCorrectAnswers = Math.round(this.successRate * (this.timesUsed - 1));
   const newCorrectAnswers = previousCorrectAnswers + (wasCorrect ? 1 : 0);
   this.successRate = newCorrectAnswers / this.timesUsed;
-  
+
   return this.save();
 };
 

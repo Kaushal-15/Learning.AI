@@ -103,11 +103,11 @@ Return ONLY the JSON array, no other text or markdown.`;
                     q.difficulty = 'hard';
                 }
             }
-            
+
             // Ensure difficultyScore exists
             if (!q.difficultyScore) {
                 q.difficultyScore = q.difficulty === 'easy' ? 2 :
-                                   q.difficulty === 'medium' ? 5 : 8;
+                    q.difficulty === 'medium' ? 5 : 8;
             }
 
             // Ensure tags exist
@@ -130,7 +130,16 @@ Return ONLY the JSON array, no other text or markdown.`;
 
         console.log(`✅ Generated ${questions.length} questions using ${aiProvider.toUpperCase()}`);
         console.log(`📊 Distribution: ${questions.filter(q => q.difficulty === 'easy').length} easy, ${questions.filter(q => q.difficulty === 'medium').length} medium, ${questions.filter(q => q.difficulty === 'hard').length} hard`);
-        return questions.slice(0, count);
+
+        // Return segregated by difficulty for admin review
+        const segregated = {
+            easy: questions.filter(q => q.difficulty === 'easy'),
+            medium: questions.filter(q => q.difficulty === 'medium'),
+            hard: questions.filter(q => q.difficulty === 'hard'),
+            all: questions.slice(0, count)
+        };
+
+        return segregated;
     } catch (error) {
         console.error('Error generating questions with AI:', error.message);
         console.warn('Falling back to content-based question generation');
@@ -298,8 +307,11 @@ const generateQuiz = async (documentId, mode, config) => {
     // 2. Generate Questions
     const questionsData = await generateQuestionsFromChunks(chunks, config.questionCount, config.difficulty || 'mixed');
 
-    // 3. Format for Quiz Model - ensure unique IDs and comprehensive tagging
-    return questionsData.map((q, i) => ({
+    // 3. Format for Quiz Model - ensure unique IDs, comprehensive tagging, and difficultyTag
+    // If AI returned segregated format, use 'all' array, otherwise use as-is
+    const questionsArray = questionsData.all || questionsData;
+
+    return questionsArray.map((q, i) => ({
         questionId: `${Date.now()}_${i}_${Math.random().toString(36).substring(7)}`,
         question: q.question,
         options: q.options,
@@ -307,8 +319,10 @@ const generateQuiz = async (documentId, mode, config) => {
         explanation: q.explanation,
         topic: q.topic || 'Custom Learning',
         difficulty: q.difficulty || config.difficulty || 'medium',
+        difficultyTag: q.difficulty || config.difficulty || 'medium', // Add explicit difficultyTag
         tags: q.tags || [q.topic || 'General'],
         difficultyScore: q.difficulty === 'easy' ? 2 : q.difficulty === 'medium' ? 5 : 8,
+        adminApproved: false, // AI questions require admin approval
         status: 'unanswered'
     }));
 };
@@ -340,12 +354,6 @@ const parseCSVQuestions = (filePath) => {
                 normalized[key.toLowerCase()] = record[key];
             });
 
-            // Validate difficulty
-            const difficulty = normalized.difficulty ? normalized.difficulty.toLowerCase() : '';
-            if (!['easy', 'medium', 'hard'].includes(difficulty)) {
-                throw new Error(`Row ${index + 1}: Invalid difficulty '${difficulty}'. Must be easy, medium, or hard.`);
-            }
-
             return {
                 question: normalized.question,
                 options: [
@@ -355,7 +363,7 @@ const parseCSVQuestions = (filePath) => {
                     normalized.optiond
                 ].filter(o => o), // Remove empty options
                 correctAnswer: normalized.correctanswer,
-                difficulty: difficulty,
+                difficulty: normalized.difficulty ? normalized.difficulty.toLowerCase() : 'medium',
                 explanation: normalized.explanation || ''
             };
         });
