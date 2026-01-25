@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ChevronLeft, Users, Clock, BookOpen, Play, Pause,
-    Settings, Eye, Download, RefreshCw, AlertCircle
+    Settings, Eye, Download, RefreshCw, AlertCircle, Target, Save
 } from 'lucide-react';
 import { useTheme } from "../contexts/ThemeContext";
 import "../styles/DevvoraStyles.css";
@@ -16,6 +16,7 @@ export default function AdminExamManage() {
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
+    const [routingConfig, setRoutingConfig] = useState(null);
 
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
@@ -35,6 +36,11 @@ export default function AdminExamManage() {
             const data = await res.json();
             if (data.success) {
                 setExam(data.data);
+                setRoutingConfig(data.data.adaptiveRouting || {
+                    easy: { correct: ['easy', 'medium'], wrong: ['easy'] },
+                    medium: { correct: ['medium', 'hard'], wrong: ['easy', 'medium'] },
+                    hard: { correct: ['hard'], wrong: ['medium'] }
+                });
             }
         } catch (error) {
             console.error('Failed to fetch exam details:', error);
@@ -84,6 +90,35 @@ export default function AdminExamManage() {
             }
         } catch (error) {
             console.error('Failed to update exam status:', error);
+        }
+    };
+
+    const handleRoutingChange = (level, type, targets) => {
+        setRoutingConfig(prev => ({
+            ...prev,
+            [level]: {
+                ...prev[level],
+                [type]: targets
+            }
+        }));
+    };
+
+    const saveRoutingConfig = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/exams/admin/${examId}/config`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adaptiveRouting: routingConfig }),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                alert('Routing rules saved successfully!');
+            } else {
+                alert('Failed to save routing rules.');
+            }
+        } catch (error) {
+            console.error('Failed to save routing:', error);
+            alert('Error saving routing rules.');
         }
     };
 
@@ -154,6 +189,14 @@ export default function AdminExamManage() {
                     >
                         Results ({results.length})
                     </button>
+                    {(exam.isAdaptive || exam.examType === 'dynamic') && (
+                        <button
+                            className={`tab ${activeTab === 'routing' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('routing')}
+                        >
+                            Routing Rules
+                        </button>
+                    )}
                 </div>
 
                 <div className="tab-content">
@@ -309,6 +352,77 @@ export default function AdminExamManage() {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {activeTab === 'routing' && routingConfig && (
+                        <div className="routing-content">
+                            <div className="routing-header">
+                                <h3>Adaptive Routing Configuration</h3>
+                                <p>Define how the exam difficulty changes based on student performance.</p>
+                            </div>
+
+                            <div className="routing-rules-grid">
+                                {['easy', 'medium', 'hard'].map(level => (
+                                    <div key={level} className="routing-rule-card">
+                                        <div className={`rule-header ${level}`}>
+                                            <Target size={20} />
+                                            <span>Current: {level.toUpperCase()}</span>
+                                        </div>
+                                        <div className="rule-body">
+                                            <div className="rule-group">
+                                                <label className="text-green-600 font-bold">If Correct → Next Question can be:</label>
+                                                <div className="checkbox-group">
+                                                    {['easy', 'medium', 'hard'].map(target => (
+                                                        <label key={target} className="checkbox-label">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={routingConfig[level]?.correct?.includes(target)}
+                                                                onChange={(e) => {
+                                                                    const current = routingConfig[level]?.correct || [];
+                                                                    const newTargets = e.target.checked
+                                                                        ? [...current, target]
+                                                                        : current.filter(t => t !== target);
+                                                                    handleRoutingChange(level, 'correct', newTargets);
+                                                                }}
+                                                            />
+                                                            {target}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="rule-group">
+                                                <label className="text-red-600 font-bold">If Wrong → Next Question can be:</label>
+                                                <div className="checkbox-group">
+                                                    {['easy', 'medium', 'hard'].map(target => (
+                                                        <label key={target} className="checkbox-label">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={routingConfig[level]?.wrong?.includes(target)}
+                                                                onChange={(e) => {
+                                                                    const current = routingConfig[level]?.wrong || [];
+                                                                    const newTargets = e.target.checked
+                                                                        ? [...current, target]
+                                                                        : current.filter(t => t !== target);
+                                                                    handleRoutingChange(level, 'wrong', newTargets);
+                                                                }}
+                                                            />
+                                                            {target}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="routing-actions">
+                                <button className="save-btn" onClick={saveRoutingConfig}>
+                                    <Save size={18} />
+                                    Save Rules
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

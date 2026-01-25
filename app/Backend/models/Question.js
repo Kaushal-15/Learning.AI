@@ -50,6 +50,16 @@ const questionSchema = new mongoose.Schema({
       message: 'Difficulty must be an integer'
     }
   },
+  difficultyLevel: {
+    type: String,
+    enum: ['easy', 'medium', 'hard'],
+    required: [true, 'Difficulty level (easy, medium, hard) is required'],
+    default: 'medium'
+  },
+  adminApproved: {
+    type: Boolean,
+    default: false
+  },
   tags: [{
     type: String,
     trim: true,
@@ -110,6 +120,23 @@ questionSchema.virtual('categoryDepth').get(function() {
 // Virtual for primary category (first in hierarchy)
 questionSchema.virtual('primaryCategory').get(function() {
   return this.category[0];
+});
+
+// Pre-validate middleware for syncing difficulty
+questionSchema.pre('validate', function(next) {
+  // Sync numerical difficulty based on difficultyLevel
+  if (this.difficultyLevel) {
+    const diffMap = {
+      'easy': 3,
+      'medium': 5,
+      'hard': 8
+    };
+    // Only update if difficulty is not explicitly set or needs sync
+    if (!this.difficulty || this.isModified('difficultyLevel')) {
+      this.difficulty = diffMap[this.difficultyLevel];
+    }
+  }
+  next();
 });
 
 // Pre-save middleware for validation and tagging

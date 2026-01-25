@@ -364,6 +364,18 @@ export default function AdminExamCreate() {
                 return;
             }
 
+            // Validate difficulty levels
+            if (formData.examType === 'static') {
+                const invalidQuestions = selectedQuestions
+                    .map(idx => extractedQuestions[idx])
+                    .filter(q => !q.difficulty || !['easy', 'medium', 'hard'].includes(q.difficulty.toLowerCase()));
+
+                if (invalidQuestions.length > 0) {
+                    setUploadError(`Error: ${invalidQuestions.length} selected questions have invalid difficulty. Difficulty must be easy, medium, or hard.`);
+                    return;
+                }
+            }
+
             if (formData.examType === 'dynamic') {
                 const totalDynamic = formData.dynamicConfig.totalQuestions || formData.totalQuestions || 0;
                 if (totalDynamic === 0) {

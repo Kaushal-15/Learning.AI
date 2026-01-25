@@ -50,6 +50,20 @@ const examMasterSchema = new mongoose.Schema({
         waitTimeMin: { type: Number, default: 5 }, // minimum wait seconds
         waitTimeMax: { type: Number, default: 10 } // maximum wait seconds
     },
+    adaptiveRouting: {
+        easy: {
+            correct: [{ type: String, enum: ['easy', 'medium', 'hard'] }],
+            wrong: [{ type: String, enum: ['easy', 'medium', 'hard'] }]
+        },
+        medium: {
+            correct: [{ type: String, enum: ['easy', 'medium', 'hard'] }],
+            wrong: [{ type: String, enum: ['easy', 'medium', 'hard'] }]
+        },
+        hard: {
+            correct: [{ type: String, enum: ['easy', 'medium', 'hard'] }],
+            wrong: [{ type: String, enum: ['easy', 'medium', 'hard'] }]
+        }
+    },
     currentDifficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'easy' },
 
     // Synchronized Adaptive Settings (all students see same question at same time)
