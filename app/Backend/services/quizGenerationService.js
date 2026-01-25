@@ -325,7 +325,7 @@ const parseCSVQuestions = (filePath) => {
         // Validate headers
         if (records.length > 0) {
             const headers = Object.keys(records[0]).map(h => h.toLowerCase());
-            const required = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'correctanswer'];
+            const required = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'correctanswer', 'difficulty'];
             const missing = required.filter(r => !headers.includes(r));
 
             if (missing.length > 0) {
@@ -333,12 +333,18 @@ const parseCSVQuestions = (filePath) => {
             }
         }
 
-        return records.map(record => {
+        return records.map((record, index) => {
             // Normalize keys to lowercase for consistent access
             const normalized = {};
             Object.keys(record).forEach(key => {
                 normalized[key.toLowerCase()] = record[key];
             });
+
+            // Validate difficulty
+            const difficulty = normalized.difficulty ? normalized.difficulty.toLowerCase() : '';
+            if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+                throw new Error(`Row ${index + 1}: Invalid difficulty '${difficulty}'. Must be easy, medium, or hard.`);
+            }
 
             return {
                 question: normalized.question,
@@ -349,7 +355,7 @@ const parseCSVQuestions = (filePath) => {
                     normalized.optiond
                 ].filter(o => o), // Remove empty options
                 correctAnswer: normalized.correctanswer,
-                difficulty: normalized.difficulty ? normalized.difficulty.toLowerCase() : 'medium',
+                difficulty: difficulty,
                 explanation: normalized.explanation || ''
             };
         });
