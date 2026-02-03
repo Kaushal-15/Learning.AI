@@ -8,9 +8,16 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
-
-    // FIX: allow ALL hosts including ngrok
     allowedHosts: true,
+
+    // Proxy API requests to the backend during local development
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        // rewrite: (path) => path.replace(/^\/api/, ''), // Don't rewrite if backend expects /api
+      },
+    },
 
     hmr: {
       protocol: 'ws',

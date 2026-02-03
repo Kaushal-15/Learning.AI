@@ -128,7 +128,7 @@ app.use('/api/', limiter);
 // ===============================
 // Health Check Endpoint
 // ===============================
-app.get('/health', (req, res) => {
+app.get(['/health', '/api/health'], (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
