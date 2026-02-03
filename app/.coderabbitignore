@@ -1,0 +1,11 @@
+node_modules
+logs
+data
+.env
+.git
+.vscode
+dist
+build
+coverage
+*.log
+*.zip

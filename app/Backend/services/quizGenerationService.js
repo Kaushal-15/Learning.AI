@@ -119,6 +119,9 @@ Return ONLY the JSON array, no other text or markdown.`;
             if (!q.topic) {
                 q.topic = q.tags[0] || 'General';
             }
+
+            // Add adminApproved flag (AI questions require admin approval)
+            q.adminApproved = false;
         });
 
         // Ensure we have the correct number of unique questions
@@ -319,10 +322,11 @@ const generateQuiz = async (documentId, mode, config) => {
         explanation: q.explanation,
         topic: q.topic || 'Custom Learning',
         difficulty: q.difficulty || config.difficulty || 'medium',
-        difficultyTag: q.difficulty || config.difficulty || 'medium', // Add explicit difficultyTag
+        difficultyLevel: q.difficulty || config.difficulty || 'medium', // Add explicit difficultyLevel
         tags: q.tags || [q.topic || 'General'],
         difficultyScore: q.difficulty === 'easy' ? 2 : q.difficulty === 'medium' ? 5 : 8,
         adminApproved: false, // AI questions require admin approval
+        generatedBy: 'AI',
         status: 'unanswered'
     }));
 };

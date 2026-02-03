@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./app/Backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Add other environment variables here or use env_file
+    restart: unless-stopped
+
+  frontend:
+    build: ./app/frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

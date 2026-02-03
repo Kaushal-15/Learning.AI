@@ -52,6 +52,22 @@ const examMasterSchema = new mongoose.Schema({
     },
     currentDifficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'easy' },
 
+    // ADMIN-CONTROLLED ADAPTIVE ROUTING CONFIGURATION
+    adaptiveRouting: {
+        easy: {
+            correct: [{ type: String, enum: ['easy', 'medium', 'hard'] }],
+            wrong: [{ type: String, enum: ['easy', 'medium', 'hard'] }]
+        },
+        medium: {
+            correct: [{ type: String, enum: ['easy', 'medium', 'hard'] }],
+            wrong: [{ type: String, enum: ['easy', 'medium', 'hard'] }]
+        },
+        hard: {
+            correct: [{ type: String, enum: ['easy', 'medium', 'hard'] }],
+            wrong: [{ type: String, enum: ['easy', 'medium', 'hard'] }]
+        }
+    },
+
     // Synchronized Adaptive Settings (all students see same question at same time)
     isSynchronized: { type: Boolean, default: false },
     currentQuestionNumber: { type: Number, default: 0 }, // Current question shown to all students
@@ -76,8 +92,8 @@ const examMasterSchema = new mongoose.Schema({
 // Set default routing configuration
 examMasterSchema.pre('save', function (next) {
     // If adaptive exam but no routing config, set defaults
-    if (this.isAdaptive && (!this.adaptiveRoutingConfig || !this.adaptiveRoutingConfig.easy)) {
-        this.adaptiveRoutingConfig = {
+    if (this.isAdaptive && (!this.adaptiveRouting || !this.adaptiveRouting.easy)) {
+        this.adaptiveRouting = {
             easy: {
                 correct: ['easy', 'medium'],
                 wrong: ['easy']
@@ -91,6 +107,7 @@ examMasterSchema.pre('save', function (next) {
                 wrong: ['medium']
             }
         };
+        console.log('✅ Set default adaptive routing configuration');
     }
     next();
 });

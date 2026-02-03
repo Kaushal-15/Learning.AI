@@ -50,6 +50,20 @@ const questionSchema = new mongoose.Schema({
       message: 'Difficulty must be an integer'
     }
   },
+  difficultyLevel: {
+    type: String,
+    enum: {
+      values: ['easy', 'medium', 'hard'],
+      message: 'Difficulty level must be easy, medium, or hard'
+    },
+    required: [true, 'Difficulty level is required'],
+    index: true
+  },
+  adminApproved: {
+    type: Boolean,
+    default: false,
+    required: true
+  },
   tags: [{
     type: String,
     trim: true,
@@ -98,8 +112,9 @@ const questionSchema = new mongoose.Schema({
 
 // Indexes for performance optimization
 questionSchema.index({ category: 1, difficulty: 1 });
-questionSchema.index({ difficultyTag: 1 }); // For adaptive exam filtering
-questionSchema.index({ difficultyTag: 1, category: 1 }); // Compound index for category + difficulty tag
+questionSchema.index({ difficultyLevel: 1 }); // For adaptive exam filtering
+questionSchema.index({ difficultyLevel: 1, category: 1 }); // Compound index for category + difficulty level
+questionSchema.index({ adminApproved: 1, difficultyLevel: 1 }); // For approved questions by difficulty
 questionSchema.index({ generatedBy: 1, createdAt: -1 });
 questionSchema.index({ tags: 1 });
 questionSchema.index({ 'category.0': 1, difficulty: 1 }); // First category + difficulty
@@ -128,6 +143,18 @@ questionSchema.pre('validate', function(next) {
       this.difficulty = diffMap[this.difficultyLevel];
     }
   }
+  
+  // Ensure difficultyLevel is set based on numeric difficulty if missing
+  if (!this.difficultyLevel && this.difficulty) {
+    if (this.difficulty <= 3) {
+      this.difficultyLevel = 'easy';
+    } else if (this.difficulty <= 6) {
+      this.difficultyLevel = 'medium';
+    } else {
+      this.difficultyLevel = 'hard';
+    }
+  }
+  
   next();
 });
 
@@ -161,23 +188,23 @@ questionSchema.pre('save', function (next) {
   // Auto-generate tags based on category hierarchy and content
   this.generateTags();
 
-  // Auto-set difficultyTag based on numeric difficulty if not already set
-  if (!this.difficultyTag) {
+  // Auto-set difficultyLevel based on numeric difficulty if not already set
+  if (!this.difficultyLevel) {
     if (this.difficulty <= 3) {
-      this.difficultyTag = 'easy';
-    } else if (this.difficulty <= 7) {
-      this.difficultyTag = 'medium';
+      this.difficultyLevel = 'easy';
+    } else if (this.difficulty <= 6) {
+      this.difficultyLevel = 'medium';
     } else {
-      this.difficultyTag = 'hard';
+      this.difficultyLevel = 'hard';
     }
   }
 
-  // Validate that difficultyTag aligns with numeric difficulty
-  const expectedTag = this.difficulty <= 3 ? 'easy' :
-    this.difficulty <= 7 ? 'medium' : 'hard';
-  if (this.difficultyTag !== expectedTag) {
-    console.warn(`Question difficulty mismatch: numeric=${this.difficulty}, tag=${this.difficultyTag}. Auto-correcting to ${expectedTag}`);
-    this.difficultyTag = expectedTag;
+  // Validate that difficultyLevel aligns with numeric difficulty
+  const expectedLevel = this.difficulty <= 3 ? 'easy' :
+    this.difficulty <= 6 ? 'medium' : 'hard';
+  if (this.difficultyLevel !== expectedLevel) {
+    console.warn(`Question difficulty mismatch: numeric=${this.difficulty}, level=${this.difficultyLevel}. Auto-correcting to ${expectedLevel}`);
+    this.difficultyLevel = expectedLevel;
   }
 
   next();
