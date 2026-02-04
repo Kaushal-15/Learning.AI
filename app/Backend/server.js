@@ -191,13 +191,19 @@ app.use(errorHandler);
 const { initScheduler } = require('./services/schedulerService');
 
 // Initialize Scheduler
-initScheduler();
+// Initialize Scheduler (only in long-running process, not serverless)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  initScheduler();
+}
 
-app.listen(PORT, () => {
-  console.log(
-    ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
-  );
-  console.log(` Connected to MongoDB`);
-});
+// Only listen if not running in Vercel (serverless handles the connection)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(
+      ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
+    );
+    console.log(` Connected to MongoDB`);
+  });
+}
 
 module.exports = app;
