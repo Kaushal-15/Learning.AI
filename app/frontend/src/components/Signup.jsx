@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import "../styles/DevvoraStyles.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const API_BASE = `${BASE_URL}/api`;
 
 function validateEmail(email) {
   return /\S+@\S+\.\S+/.test(email);
@@ -325,7 +326,7 @@ export default function Signup() {
 
           <button
             className="auth-google-btn"
-            onClick={() => window.location.href = 'http://localhost:3000/auth/google'}
+            onClick={() => window.location.href = `${BASE_URL}/auth/google`}
             type="button"
           >
             <svg viewBox="0 0 24 24" width="20" height="20">

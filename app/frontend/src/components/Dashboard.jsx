@@ -10,6 +10,7 @@ import { BookOpen, FolderKanban } from "lucide-react";
 999
 export default function Dashboard() {
     const navigate = useNavigate();
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [testResults, setTestResults] = useState([])
@@ -22,7 +23,7 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchUser = async () => {
             try {
-                const res = await fetch("http://localhost:3000/api/profile/me", {
+                const res = await fetch(`${API_BASE}/api/profile/me`, {
                     method: "GET",
                     credentials: "include",
                 });
@@ -32,7 +33,7 @@ export default function Dashboard() {
 
                     // Fetch learning progress
                     try {
-                        const progressRes = await fetch(`http://localhost:3000/api/progress/${data.user.selectedRoadmap}`, {
+                        const progressRes = await fetch(`${API_BASE}/api/progress/${data.user.selectedRoadmap}`, {
                             method: "GET",
                             credentials: "include",
                         });
@@ -46,14 +47,14 @@ export default function Dashboard() {
 
                     // Fetch test results filtered by current roadmap AND custom quizzes
                     try {
-                        const testRes = await fetch(`http://localhost:3000/api/test-results?limit=5&roadmapType=${data.user.selectedRoadmap}`, {
+                        const testRes = await fetch(`${API_BASE}/api/test-results?limit=5&roadmapType=${data.user.selectedRoadmap}`, {
                             method: "GET",
                             credentials: "include",
                         });
                         const testData = await testRes.json();
 
                         // Also fetch custom quiz results
-                        const customQuizRes = await fetch(`http://localhost:3000/api/quiz?source=custom&limit=5`, {
+                        const customQuizRes = await fetch(`${API_BASE}/api/quiz?source=custom&limit=5`, {
                             method: "GET",
                             credentials: "include",
                         });
@@ -81,7 +82,7 @@ export default function Dashboard() {
 
                     // Fetch roadmap history for paused roadmaps
                     try {
-                        const historyRes = await fetch("http://localhost:3000/api/roadmap-selection/history", {
+                        const historyRes = await fetch(`${API_BASE}/api/roadmap-selection/history`, {
                             method: "GET",
                             credentials: "include",
                         });
@@ -95,7 +96,7 @@ export default function Dashboard() {
 
                     // Fetch custom learning documents
                     try {
-                        const docsRes = await fetch("http://localhost:3000/api/custom-learning/documents", {
+                        const docsRes = await fetch(`${API_BASE}/api/custom-learning/documents`, {
                             method: "GET",
                             credentials: "include",
                         });
@@ -149,7 +150,7 @@ export default function Dashboard() {
 
     const handleResumeRoadmap = async (roadmapId) => {
         try {
-            const res = await fetch("http://localhost:3000/api/roadmap-selection/change", {
+            const res = await fetch(`${API_BASE}/api/roadmap-selection/change`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",

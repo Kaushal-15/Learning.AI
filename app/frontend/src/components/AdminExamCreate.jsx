@@ -236,7 +236,8 @@ export default function AdminExamCreate() {
     const [newStudent, setNewStudent] = useState({ registerNumber: '', name: '' });
     const [studentError, setStudentError] = useState('');
 
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const API_BASE = `${BASE_URL}/api`;
 
     useEffect(() => {
         if (formData.source === 'static') {

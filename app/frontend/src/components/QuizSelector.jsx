@@ -5,7 +5,8 @@ import { Brain, Target, BookOpen, ArrowRight, Zap, Trophy, Moon, Sun } from 'luc
 import { useTheme } from '../contexts/ThemeContext';
 import AnimatedBackground from './AnimatedBackground';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const API_BASE = `${BASE_URL}/api`;
 
 export default function QuizSelector() {
   const navigate = useNavigate();

@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 export default function Settings() {
     <Sidebar />
     const { isDarkMode, toggleTheme } = useTheme();
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
@@ -23,7 +24,7 @@ export default function Settings() {
 
     const fetchProfile = async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/users/me', {
+            const res = await fetch(`${API_BASE}/api/users/me`, {
                 credentials: 'include'
             });
             const data = await res.json();
@@ -69,7 +70,7 @@ export default function Settings() {
         setMessage({ type: '', text: '' });
 
         try {
-            const res = await fetch('http://localhost:3000/api/users/profile', {
+            const res = await fetch(`${API_BASE}/api/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'

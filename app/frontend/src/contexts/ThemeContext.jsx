@@ -50,9 +50,10 @@ export const ThemeProvider = ({ children }) => {
         // Only sync if we have loaded preferences from backend
         if (!isPreferencesLoaded) return;
 
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
         const syncTheme = async () => {
             try {
-                await fetch('http://localhost:3000/api/users/profile', {
+                await fetch(`${API_BASE}/api/users/profile`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -76,7 +77,7 @@ export const ThemeProvider = ({ children }) => {
     useEffect(() => {
         const fetchUserTheme = async () => {
             try {
-                const res = await fetch('http://localhost:3000/api/users/me', { credentials: 'include' });
+                const res = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && data.user.settings?.theme) {

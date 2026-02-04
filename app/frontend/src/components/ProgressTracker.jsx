@@ -3,6 +3,8 @@ import { Trophy, TrendingUp, Flame, Star } from 'lucide-react';
 import '../styles/ProgressTracker.css';
 
 export default function ProgressTracker() {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const API_BASE = `${BASE_URL}/api`;
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -16,7 +18,7 @@ export default function ProgressTracker() {
 
     const fetchProgressData = async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/xp/league', {
+            const res = await fetch(`${API_BASE}/xp/league`, {
                 method: 'GET',
                 credentials: 'include'
             });
