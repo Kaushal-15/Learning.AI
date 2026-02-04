@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Camera, Video, VideoOff, AlertCircle, Disc } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function CameraMonitor({ sessionId, examId, isRequired = false, onCameraStatus }) {
     const { isDarkMode } = useTheme();

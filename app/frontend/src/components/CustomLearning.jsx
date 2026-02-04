@@ -8,6 +8,8 @@ import '../styles/DevvoraStyles.css';
 
 const CustomLearning = () => {
     const navigate = useNavigate();
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
     const [uploadedDocId, setUploadedDocId] = useState(null);
     const [documents, setDocuments] = useState([]);
     const [quizResults, setQuizResults] = useState({});
@@ -21,7 +23,7 @@ const CustomLearning = () => {
     const fetchDocuments = async () => {
         try {
             const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
-            const response = await fetch('http://localhost:3000/api/custom-learning/documents', {
+            const response = await fetch(`${API_BASE}/custom-learning/documents`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 },
@@ -41,7 +43,7 @@ const CustomLearning = () => {
     const fetchQuizResults = async () => {
         try {
             const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
-            const response = await fetch('http://localhost:3000/api/quiz?source=custom&limit=50', {
+            const response = await fetch(`${API_BASE}/quiz?source=custom&limit=50`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 },
@@ -79,7 +81,7 @@ const CustomLearning = () => {
 
         try {
             const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
-            const response = await fetch(`http://localhost:3000/api/custom-learning/documents/${documentId}`, {
+            const response = await fetch(`${API_BASE}/custom-learning/documents/${documentId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`

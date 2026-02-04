@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Plus, Search, Filter, MoreVertical, Users, Clock, 
+    Plus, Search, Filter, MoreVertical, Users, Clock,
     BookOpen, Play, Pause, Settings, Eye, Trash2,
     Calendar, CheckCircle, AlertCircle, XCircle
 } from 'lucide-react';
@@ -39,7 +39,7 @@ const ExamCard = ({ exam, onStart, onPause, onView, onDelete }) => {
                     <span>{exam.status}</span>
                 </div>
             </div>
-            
+
             <div className="exam-stats">
                 <div className="stat">
                     <Users size={16} />
@@ -58,7 +58,7 @@ const ExamCard = ({ exam, onStart, onPause, onView, onDelete }) => {
                     <span>{new Date(exam.startTime).toLocaleDateString()}</span>
                 </div>
             </div>
-            
+
             <div className="exam-details">
                 <div className="detail-row">
                     <span>Access Code:</span>
@@ -73,7 +73,7 @@ const ExamCard = ({ exam, onStart, onPause, onView, onDelete }) => {
                     <span className="exam-type">{exam.examType || 'static'}</span>
                 </div>
             </div>
-            
+
             <div className="exam-actions">
                 {exam.status === 'active' ? (
                     <button className="action-btn pause-btn" onClick={() => onPause(exam._id)}>
@@ -111,7 +111,8 @@ export default function AdminExamList() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
 
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
 
     useEffect(() => {
         fetchExams();
@@ -187,7 +188,7 @@ export default function AdminExamList() {
 
     const filteredExams = exams.filter(exam => {
         const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            exam.examCode.toLowerCase().includes(searchTerm.toLowerCase());
+            exam.examCode.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filterStatus === 'all' || exam.status === filterStatus;
         return matchesSearch && matchesFilter;
     });
@@ -210,7 +211,7 @@ export default function AdminExamList() {
                     <h1>Exam Management</h1>
                     <p>Create, manage, and monitor your exams</p>
                 </div>
-                <button 
+                <button
                     className="create-exam-btn"
                     onClick={() => navigate('/admin/exams/create')}
                 >
@@ -243,7 +244,7 @@ export default function AdminExamList() {
                         </select>
                     </div>
                 </div>
-                
+
                 <div className="exam-stats-summary">
                     <div className="summary-stat">
                         <span className="stat-number">{exams.length}</span>
@@ -266,13 +267,13 @@ export default function AdminExamList() {
                         <BookOpen size={48} />
                         <h3>No exams found</h3>
                         <p>
-                            {searchTerm || filterStatus !== 'all' 
+                            {searchTerm || filterStatus !== 'all'
                                 ? 'Try adjusting your search or filter criteria'
                                 : 'Create your first exam to get started'
                             }
                         </p>
                         {!searchTerm && filterStatus === 'all' && (
-                            <button 
+                            <button
                                 className="create-first-exam-btn"
                                 onClick={() => navigate('/admin/exams/create')}
                             >

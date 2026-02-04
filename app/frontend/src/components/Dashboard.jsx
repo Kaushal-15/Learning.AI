@@ -10,7 +10,7 @@ import { BookOpen, FolderKanban } from "lucide-react";
 999
 export default function Dashboard() {
     const navigate = useNavigate();
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [testResults, setTestResults] = useState([])

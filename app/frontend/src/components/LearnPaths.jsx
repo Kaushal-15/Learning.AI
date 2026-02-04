@@ -27,7 +27,8 @@ import AnimatedBackground from "./AnimatedBackground";
 import api from '../services/api';
 import "../styles/DevvoraStyles.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function LearnPaths() {
   const navigate = useNavigate();

@@ -12,7 +12,8 @@ export default function AdminExamDashboard() {
     const [loading, setLoading] = useState(true);
     const [deleteModal, setDeleteModal] = useState({ show: false, examId: null, examTitle: '' });
     const [deleting, setDeleting] = useState(false);
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
 
     useEffect(() => {
         fetchExams();

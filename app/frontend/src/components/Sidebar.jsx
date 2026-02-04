@@ -16,7 +16,7 @@ export default function Sidebar() {
 
     const logout = async () => {
         try {
-            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+            const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
             const res = await fetch(`${API_BASE}/api/auth/logout`, {
                 method: "POST",
                 credentials: "include",

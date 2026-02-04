@@ -3,7 +3,7 @@ import { Trophy, TrendingUp, Flame, Star } from 'lucide-react';
 import '../styles/ProgressTracker.css';
 
 export default function ProgressTracker() {
-    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
     const API_BASE = `${BASE_URL}/api`;
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);

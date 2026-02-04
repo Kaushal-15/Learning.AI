@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 function validateEmail(email) {
   return /\S+@\S+\.\S+/.test(email);
@@ -149,11 +150,10 @@ export default function Signup() {
           </div>
 
           {message && (
-            <div className={`p-3 rounded-md ${
-              message.type === 'error' 
-                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' 
+            <div className={`p-3 rounded-md ${message.type === 'error'
+                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
                 : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
-            }`}>
+              }`}>
               {message.text}
             </div>
           )}

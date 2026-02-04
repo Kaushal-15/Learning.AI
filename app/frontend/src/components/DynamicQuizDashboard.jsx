@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { 
-  Brain, 
-  Target, 
-  TrendingUp, 
-  Clock, 
-  Award, 
+import {
+  Brain,
+  Target,
+  TrendingUp,
+  Clock,
+  Award,
   Zap,
   BookOpen,
   BarChart3,
@@ -13,7 +13,8 @@ import {
 import AnimatedBackground from "./AnimatedBackground";
 import ThemeToggle from "./ThemeToggle";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
   const [insights, setInsights] = useState(null);
@@ -42,7 +43,7 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
       if (insightsData.success) setInsights(insightsData.data);
       if (previewData.success) setPreview(previewData.data);
       if (recommendationsData.success) setRecommendations(recommendationsData.data);
-      
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -75,7 +76,7 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
         <ThemeToggle />
       </div>
       <div className="max-w-6xl mx-auto space-y-8 relative z-10">
-        
+
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-cream-100 mb-2">
@@ -88,7 +89,7 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
 
         {/* Learning Insights Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          
+
           {/* Streak Card */}
           <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 border-l-4 border-orange-500 dark:border-orange-400">
             <div className="flex items-center justify-between">
@@ -156,14 +157,14 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
 
         {/* Question Bank Analysis */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
+
           {/* Question Distribution */}
           <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-dark-300 p-6">
             <h3 className="text-xl font-semibold text-gray-800 dark:text-cream-100 mb-4 flex items-center">
               <BookOpen className="h-5 w-5 mr-2 text-blue-500" />
               Question Bank Status
             </h3>
-            
+
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <span className="text-sm font-medium text-green-800">Fresh Questions</span>
@@ -171,14 +172,14 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
                   {preview?.freshQuestions || 0}
                 </span>
               </div>
-              
+
               <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
                 <span className="text-sm font-medium text-orange-800">Need Review</span>
                 <span className="text-lg font-bold text-orange-600">
                   {preview?.reviewQuestions || 0}
                 </span>
               </div>
-              
+
               <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-dark-300/50 rounded-lg">
                 <span className="text-sm font-medium text-gray-800 dark:text-cream-100">Total Available</span>
                 <span className="text-lg font-bold text-gray-600 dark:text-cream-200">
@@ -194,15 +195,15 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
               <Zap className="h-5 w-5 mr-2 text-yellow-500" />
               Smart Recommendations
             </h3>
-            
+
             <div className="space-y-3">
               {recommendations?.suggestions?.map((suggestion, index) => (
                 <div key={index} className="p-3 bg-blue-50 rounded-lg border-l-3 border-blue-400">
                   <p className="text-sm text-blue-800">{suggestion}</p>
                 </div>
               )) || (
-                <p className="text-gray-500 text-sm">Complete a few quizzes to get personalized recommendations!</p>
-              )}
+                  <p className="text-gray-500 text-sm">Complete a few quizzes to get personalized recommendations!</p>
+                )}
             </div>
 
             {insights?.nextMilestone && (
@@ -221,7 +222,7 @@ export default function DynamicQuizDashboard({ roadmapType = 'frontend' }) {
               <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
               Topic Distribution
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(preview.topicDistribution).map(([topic, stats]) => (
                 <div key={topic} className="p-4 border border-gray-200 dark:border-dark-300 rounded-lg hover:shadow-md transition-shadow">

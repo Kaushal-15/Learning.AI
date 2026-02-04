@@ -10,6 +10,9 @@ export const useTheme = () => {
     return context;
 };
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
+
 export const ThemeProvider = ({ children }) => {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         // Check if we're in the browser environment
@@ -50,10 +53,9 @@ export const ThemeProvider = ({ children }) => {
         // Only sync if we have loaded preferences from backend
         if (!isPreferencesLoaded) return;
 
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
         const syncTheme = async () => {
             try {
-                await fetch(`${API_BASE}/api/users/profile`, {
+                await fetch(`${API_BASE}/users/profile`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -77,7 +79,7 @@ export const ThemeProvider = ({ children }) => {
     useEffect(() => {
         const fetchUserTheme = async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' });
+                const res = await fetch(`${API_BASE}/users/me`, { credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && data.user.settings?.theme) {

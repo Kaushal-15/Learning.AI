@@ -18,7 +18,8 @@ import GlobalThemeToggle from "./GlobalThemeToggle";
 import "../styles/DevvoraStyles.css";
 
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 
 
@@ -38,7 +39,7 @@ export default function Quiz() {
   const [adaptiveNotification, setAdaptiveNotification] = useState(null);
   const [isLoadingNextQuestion, setIsLoadingNextQuestion] = useState(false);
 
-  
+
   // Enhanced quiz loading with better error handling
   useEffect(() => {
     const fetchQuiz = async () => {
@@ -47,18 +48,18 @@ export default function Quiz() {
         const response = await fetch(`${API_BASE}/quiz/${id}`, {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
         console.log('Quiz data received:', data);
 
         if (data.success && data.data) {
           const quizData = data.data;
           console.log('Quiz questions count:', quizData.questions?.length || 0);
-          
+
           // Ensure quiz has questions
           if (!quizData.questions || quizData.questions.length === 0) {
             console.error('Quiz has no questions!');
@@ -66,7 +67,7 @@ export default function Quiz() {
             navigate('/dashboard');
             return;
           }
-          
+
           setQuiz(quizData);
           setCurrentQuestionIndex(quizData.currentQuestionIndex || 0);
 
@@ -348,12 +349,12 @@ export default function Quiz() {
         setShowResults(true);
         setTimeLeft(0); // Stop the timer
 
-        
+
         // Check if we need to update lesson progress (60% threshold)
         if (lessonId && roadmapId) {
           const passedQuiz = completedQuiz.accuracy >= 60;
           console.log(`Quiz completed with ${completedQuiz.accuracy}% accuracy. Passed: ${passedQuiz}`);
-          
+
           if (passedQuiz) {
             try {
               console.log('Marking lesson as complete...');
@@ -368,10 +369,10 @@ export default function Quiz() {
                   quizScore: completedQuiz.accuracy
                 })
               });
-              
+
               const progressData = await progressResponse.json();
               console.log('Lesson completion response:', progressData);
-              
+
               if (progressData.success) {
                 console.log('✅ Lesson marked as complete!');
                 // Show success message
@@ -487,40 +488,40 @@ export default function Quiz() {
                 </div>
               </div>
 
-          {/* Lesson Completion Status */}
-          {lessonId && roadmapId && (
-            <div className="mb-6">
-              {quiz.accuracy >= 60 ? (
-                <div className="bg-green-50 dark:bg-green-400/20 border border-green-200 dark:border-green-400/30 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-white" />
+              {/* Lesson Completion Status */}
+              {lessonId && roadmapId && (
+                <div className="mb-6">
+                  {quiz.accuracy >= 60 ? (
+                    <div className="bg-green-50 dark:bg-green-400/20 border border-green-200 dark:border-green-400/30 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-green-800 dark:text-green-400">Lesson Completed! 🎉</h3>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            You scored {quiz.accuracy}% and passed the 60% threshold. This day is now marked as complete!
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-green-800 dark:text-green-400">Lesson Completed! 🎉</h3>
-                      <p className="text-sm text-green-700 dark:text-green-300">
-                        You scored {quiz.accuracy}% and passed the 60% threshold. This day is now marked as complete!
-                      </p>
+                  ) : (
+                    <div className="bg-orange-50 dark:bg-orange-400/20 border border-orange-200 dark:border-orange-400/30 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                          <Target className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-orange-800 dark:text-orange-400">Keep Trying! 💪</h3>
+                          <p className="text-sm text-orange-700 dark:text-orange-300">
+                            You scored {quiz.accuracy}%. You need at least 60% to complete this lesson. Take the quiz again to improve your score!
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-orange-50 dark:bg-orange-400/20 border border-orange-200 dark:border-orange-400/30 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                      <Target className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-orange-800 dark:text-orange-400">Keep Trying! 💪</h3>
-                      <p className="text-sm text-orange-700 dark:text-orange-300">
-                        You scored {quiz.accuracy}%. You need at least 60% to complete this lesson. Take the quiz again to improve your score!
-                      </p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
               <div className="flex items-center gap-6">
                 <div className="text-center bg-amber-50 dark:bg-amber-400/20 border border-amber-200 dark:border-amber-400/30 rounded-lg p-4">

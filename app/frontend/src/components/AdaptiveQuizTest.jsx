@@ -4,7 +4,8 @@ import { ArrowLeft, Play, CheckCircle, AlertCircle, Brain, Target } from "lucide
 import AnimatedBackground from "./AnimatedBackground";
 import ThemeToggle from "./ThemeToggle";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function AdaptiveQuizTest() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function AdaptiveQuizTest() {
   const runAdaptiveTest = async () => {
     setLoading(true);
     setTestResults([]);
-    
+
     const tests = [
       {
         name: "Create Adaptive Quiz",
@@ -43,7 +44,7 @@ export default function AdaptiveQuizTest() {
         name: "Test Difficulty Increase (Fast Correct Answers)",
         test: async () => {
           if (!adaptiveQuiz) return { success: false, error: "No quiz created" };
-          
+
           // Simulate 2 fast correct answers
           const results = [];
           for (let i = 0; i < 2; i++) {
@@ -60,10 +61,10 @@ export default function AdaptiveQuizTest() {
             const data = await response.json();
             results.push(data);
           }
-          
+
           const lastResult = results[results.length - 1];
-          return { 
-            success: true, 
+          return {
+            success: true,
             data: {
               adaptiveChange: lastResult.adaptiveChange,
               currentDifficulty: lastResult.data.adaptiveSettings?.currentDifficulty
@@ -75,12 +76,12 @@ export default function AdaptiveQuizTest() {
         name: "Test Difficulty Decrease (Incorrect Answer)",
         test: async () => {
           if (!adaptiveQuiz) return { success: false, error: "No quiz created" };
-          
+
           // Simulate incorrect answer
           const wrongAnswer = adaptiveQuiz.questions[2].options.find(
             opt => opt !== adaptiveQuiz.questions[2].correctAnswer
           );
-          
+
           const response = await fetch(`${API_BASE}/quiz/${adaptiveQuiz._id}/answer`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -92,9 +93,9 @@ export default function AdaptiveQuizTest() {
             })
           });
           const data = await response.json();
-          
-          return { 
-            success: data.success, 
+
+          return {
+            success: data.success,
             data: {
               adaptiveChange: data.adaptiveChange,
               currentDifficulty: data.data.adaptiveSettings?.currentDifficulty
@@ -106,14 +107,14 @@ export default function AdaptiveQuizTest() {
         name: "Get Next Adaptive Question",
         test: async () => {
           if (!adaptiveQuiz) return { success: false, error: "No quiz created" };
-          
+
           const response = await fetch(`${API_BASE}/quiz/${adaptiveQuiz._id}/next-question`, {
             credentials: 'include'
           });
           const data = await response.json();
-          
-          return { 
-            success: data.success, 
+
+          return {
+            success: data.success,
             data: {
               hasNextQuestion: !!data.nextQuestion,
               targetDifficulty: data.adaptiveInfo?.targetDifficulty,
@@ -143,7 +144,7 @@ export default function AdaptiveQuizTest() {
         });
       }
     }
-    
+
     setTestResults(results);
     setLoading(false);
   };
@@ -163,7 +164,7 @@ export default function AdaptiveQuizTest() {
         })
       });
       const data = await response.json();
-      
+
       if (data.success) {
         navigate(`/quiz/${data.data._id}`);
       } else {
@@ -181,7 +182,7 @@ export default function AdaptiveQuizTest() {
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
       </div>
-      
+
       <div className="max-w-4xl mx-auto relative z-10">
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -239,9 +240,8 @@ export default function AdaptiveQuizTest() {
             {testResults.map((result, index) => (
               <div
                 key={index}
-                className={`bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg shadow-sm border-2 p-6 ${
-                  result.success ? 'border-green-200 dark:border-green-400/30' : 'border-red-200 dark:border-red-400/30'
-                }`}
+                className={`bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-lg shadow-sm border-2 p-6 ${result.success ? 'border-green-200 dark:border-green-400/30' : 'border-red-200 dark:border-red-400/30'
+                  }`}
               >
                 <div className="flex items-center gap-3 mb-4">
                   {result.success ? (
@@ -253,32 +253,31 @@ export default function AdaptiveQuizTest() {
                     {result.name}
                   </h3>
                   <span
-                    className={`px-2 py-1 text-xs font-medium rounded ${
-                      result.success
+                    className={`px-2 py-1 text-xs font-medium rounded ${result.success
                         ? 'bg-green-100 dark:bg-green-400/20 text-green-700 dark:text-green-300'
                         : 'bg-red-100 dark:bg-red-400/20 text-red-700 dark:text-red-300'
-                    }`}
+                      }`}
                   >
                     {result.success ? 'PASS' : 'FAIL'}
                   </span>
                 </div>
-                
+
                 {result.error && (
                   <div className="mb-4 p-3 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/30 rounded">
                     <p className="text-red-700 dark:text-red-300 text-sm font-medium">Error:</p>
                     <p className="text-red-600 dark:text-red-400 text-sm">{result.error}</p>
                   </div>
                 )}
-                
+
                 {result.data && (
                   <div className="bg-gray-50 dark:bg-dark-300/50 rounded p-4">
                     <p className="text-gray-700 dark:text-cream-200 text-sm font-medium mb-2">Test Data:</p>
-                    
+
                     {result.data.adaptiveChange && (
                       <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-400/20 border border-blue-200 dark:border-blue-400/30 rounded">
                         <p className="text-blue-800 dark:text-blue-300 font-medium">Adaptive Change Detected:</p>
                         <p className="text-blue-700 dark:text-blue-400 text-sm">
-                          {result.data.adaptiveChange.changed ? 
+                          {result.data.adaptiveChange.changed ?
                             `${result.data.adaptiveChange.from} → ${result.data.adaptiveChange.to}` :
                             'No difficulty change'
                           }
@@ -290,7 +289,7 @@ export default function AdaptiveQuizTest() {
                         )}
                       </div>
                     )}
-                    
+
                     <pre className="text-xs text-gray-600 dark:text-cream-300 overflow-x-auto">
                       {JSON.stringify(result.data, null, 2)}
                     </pre>

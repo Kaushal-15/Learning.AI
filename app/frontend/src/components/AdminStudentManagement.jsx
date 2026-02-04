@@ -16,7 +16,8 @@ export default function AdminStudentManagement() {
     const [newStudent, setNewStudent] = useState({ registerNumber: '', name: '' });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
 
     useEffect(() => {
         fetchExamAndStudents();

@@ -7,6 +7,8 @@ const FileUpload = ({ onUploadSuccess }) => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
     const fileInputRef = useRef(null);
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -58,7 +60,7 @@ const FileUpload = ({ onUploadSuccess }) => {
 
         try {
             const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
-            const response = await fetch('http://localhost:3000/api/custom-learning/upload', {
+            const response = await fetch(`${API_BASE}/custom-learning/upload`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -146,8 +148,8 @@ const FileUpload = ({ onUploadSuccess }) => {
                 onClick={handleUpload}
                 disabled={!file || uploading}
                 className={`w-full mt-4 py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-all ${!file || uploading
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-500/20'
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-500/20'
                     }`}
             >
                 {uploading ? (

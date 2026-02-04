@@ -13,7 +13,8 @@ const AIQuestionTester = () => {
     questionType: 'multiple-choice'
   });
 
-  const API_BASE = 'http://localhost:3000/api';
+  const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+  const API_BASE = `${BASE_URL}/api`;
 
   // Fetch service status and categories on component mount
   useEffect(() => {

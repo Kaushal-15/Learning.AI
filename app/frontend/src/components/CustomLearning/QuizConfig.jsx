@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 
 const QuizConfig = ({ documentId }) => {
     const navigate = useNavigate();
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
     const [mode, setMode] = useState('static'); // 'static' or 'dynamic'
     const [difficulty, setDifficulty] = useState('medium');
     const [questionCount, setQuestionCount] = useState(5);
@@ -16,7 +18,7 @@ const QuizConfig = ({ documentId }) => {
 
         try {
             const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
-            const response = await fetch('http://localhost:3000/api/custom-learning/generate-quiz', {
+            const response = await fetch(`${API_BASE}/custom-learning/generate-quiz`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -62,8 +64,8 @@ const QuizConfig = ({ documentId }) => {
                         <button
                             onClick={() => setMode('static')}
                             className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${mode === 'static'
-                                    ? 'bg-blue-500/20 border-blue-500 text-white'
-                                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                                ? 'bg-blue-500/20 border-blue-500 text-white'
+                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                                 }`}
                         >
                             <BookOpen className="w-6 h-6" />
@@ -72,8 +74,8 @@ const QuizConfig = ({ documentId }) => {
                         <button
                             onClick={() => setMode('dynamic')}
                             className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${mode === 'dynamic'
-                                    ? 'bg-purple-500/20 border-purple-500 text-white'
-                                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                                ? 'bg-purple-500/20 border-purple-500 text-white'
+                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                                 }`}
                         >
                             <Zap className="w-6 h-6" />

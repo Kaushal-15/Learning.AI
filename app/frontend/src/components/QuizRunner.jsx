@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function QuizRunner() {
     const navigate = useNavigate();
@@ -219,14 +220,14 @@ export default function QuizRunner() {
                                 key={index}
                                 onClick={() => handleAnswerSelect(index)}
                                 className={`w-full text-left p-4 rounded-lg border-2 transition-all ${answers[currentIndex] === index
-                                        ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                                        : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                                    ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                                    : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
                                     }`}
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${answers[currentIndex] === index
-                                            ? 'border-indigo-600 bg-indigo-600'
-                                            : 'border-gray-300'
+                                        ? 'border-indigo-600 bg-indigo-600'
+                                        : 'border-gray-300'
                                         }`}>
                                         {answers[currentIndex] === index && (
                                             <div className="w-3 h-3 bg-white rounded-full"></div>
@@ -281,10 +282,10 @@ export default function QuizRunner() {
                                 key={index}
                                 onClick={() => setCurrentIndex(index)}
                                 className={`w-10 h-10 rounded-lg font-semibold text-sm transition ${index === currentIndex
-                                        ? 'bg-indigo-600 text-white'
-                                        : answers[index] !== undefined
-                                            ? 'bg-green-100 text-green-700 border-2 border-green-300'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-indigo-600 text-white'
+                                    : answers[index] !== undefined
+                                        ? 'bg-green-100 text-green-700 border-2 border-green-300'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 {index + 1}

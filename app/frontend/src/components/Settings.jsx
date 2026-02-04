@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 export default function Settings() {
     <Sidebar />
     const { isDarkMode, toggleTheme } = useTheme();
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });

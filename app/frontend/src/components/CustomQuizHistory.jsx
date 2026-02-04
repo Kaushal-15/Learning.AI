@@ -9,6 +9,8 @@ const CustomQuizHistory = () => {
     const [quizzes, setQuizzes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedQuiz, setSelectedQuiz] = useState(null);
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+    const API_BASE = `${BASE_URL}/api`;
 
     useEffect(() => {
         fetchQuizHistory();
@@ -17,7 +19,7 @@ const CustomQuizHistory = () => {
     const fetchQuizHistory = async () => {
         try {
             const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
-            const response = await fetch('http://localhost:3000/api/quiz?source=custom&limit=100', {
+            const response = await fetch(`${API_BASE}/quiz?source=custom&limit=100`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 },

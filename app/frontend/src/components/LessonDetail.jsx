@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { 
-  ArrowLeft, 
-  CheckCircle, 
-  BookOpen, 
+import {
+  ArrowLeft,
+  CheckCircle,
+  BookOpen,
   Award,
   ChevronRight
 } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
 import ThemeToggle from "./ThemeToggle";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function LessonDetail() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function LessonDetail() {
           credentials: "include"
         });
         const data = await res.json();
-        
+
         if (res.ok && data.success) {
           setLesson(data.data);
         } else {
@@ -57,18 +58,18 @@ export default function LessonDetail() {
 
   const submitQuiz = () => {
     if (!lesson?.lesson?.quiz) return;
-    
+
     let correct = 0;
     lesson.lesson.quiz.forEach((question, index) => {
       if (answers[index] === question.options.indexOf(question.answer)) {
         correct++;
       }
     });
-    
+
     const percentage = Math.round((correct / lesson.lesson.quiz.length) * 100);
     setScore(percentage);
     setQuizCompleted(true);
-    
+
     // Mark lesson as completed
     markLessonComplete(percentage);
   };
@@ -108,7 +109,7 @@ export default function LessonDetail() {
         <AnimatedBackground />
         <div className="text-center">
           <p className="text-gray-700 dark:text-cream-100">Lesson not found</p>
-          <button 
+          <button
             onClick={() => navigate("/learn")}
             className="mt-4 px-6 py-2 bg-blue-600 dark:bg-cream-500 text-white dark:text-dark-500 rounded-lg hover:bg-blue-700 dark:hover:bg-cream-400 transition-colors"
           >
@@ -125,7 +126,7 @@ export default function LessonDetail() {
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
       </div>
-      
+
       {/* Header */}
       <header className="bg-white dark:bg-dark-400/80 backdrop-blur-sm shadow-sm border-b border-gray-200 dark:border-dark-300">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -204,7 +205,7 @@ export default function LessonDetail() {
                     Question {currentQuestion + 1} of {lesson.lesson.quiz.length}
                   </p>
                   <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-2 mt-4">
-                    <div 
+                    <div
                       className="bg-blue-600 dark:bg-cream-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${((currentQuestion + 1) / lesson.lesson.quiz.length) * 100}%` }}
                     ></div>
@@ -216,17 +217,16 @@ export default function LessonDetail() {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-cream-100 mb-6">
                     {lesson.lesson.quiz[currentQuestion].question}
                   </h3>
-                  
+
                   <div className="space-y-3">
                     {lesson.lesson.quiz[currentQuestion].options.map((option, index) => (
                       <button
                         key={index}
                         onClick={() => handleQuizAnswer(currentQuestion, index)}
-                        className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
-                          answers[currentQuestion] === index
+                        className={`w-full p-4 text-left rounded-lg border-2 transition-all ${answers[currentQuestion] === index
                             ? 'border-[#344F1F] bg-[#FFECC0] text-[#344F1F]'
                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         {option}
                       </button>
@@ -243,7 +243,7 @@ export default function LessonDetail() {
                   >
                     Previous
                   </button>
-                  
+
                   {currentQuestion === lesson.lesson.quiz.length - 1 ? (
                     <button
                       onClick={submitQuiz}
@@ -266,17 +266,15 @@ export default function LessonDetail() {
             ) : (
               /* Quiz Results */
               <div className="text-center">
-                <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${
-                  score >= 80 ? 'bg-green-100' : score >= 60 ? 'bg-yellow-100' : 'bg-red-100'
-                }`}>
-                  <Award className={`w-10 h-10 ${
-                    score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : 'text-red-600'
-                  }`} />
+                <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${score >= 80 ? 'bg-green-100' : score >= 60 ? 'bg-yellow-100' : 'bg-red-100'
+                  }`}>
+                  <Award className={`w-10 h-10 ${score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                    }`} />
                 </div>
-                
+
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Quiz Complete!</h2>
                 <p className="text-gray-600 mb-6">You scored {score}% on this quiz</p>
-                
+
                 <div className="flex gap-4 justify-center">
                   <button
                     onClick={() => navigate("/learn")}

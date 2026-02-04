@@ -21,7 +21,8 @@ import {
 import { useTheme } from "../contexts/ThemeContext";
 import "../styles/DevvoraStyles.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
 
 export default function Projects({ roadmapId }) {
     const { isDarkMode } = useTheme();
@@ -162,8 +163,8 @@ export default function Projects({ roadmapId }) {
                     <div
                         key={project.id}
                         className={`bg-white dashboard-dark:bg-[#0a0a0a] rounded-3xl p-6 border-2 transition-all duration-300 ${project.isCompleted
-                                ? 'border-green-500/50 shadow-green-500/10'
-                                : 'border-gray-200 dashboard-dark:border-[#1a1a1a] hover:shadow-lg'
+                            ? 'border-green-500/50 shadow-green-500/10'
+                            : 'border-gray-200 dashboard-dark:border-[#1a1a1a] hover:shadow-lg'
                             }`}
                     >
                         {/* Header */}

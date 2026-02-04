@@ -17,6 +17,10 @@ export default defineConfig({
         changeOrigin: true,
         // rewrite: (path) => path.replace(/^\/api/, ''), // Don't rewrite if backend expects /api
       },
+      '/auth': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
 
     hmr: {
