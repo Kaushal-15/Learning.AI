@@ -19,6 +19,10 @@
             "dest": "/app/Backend/server.js"
         },
         {
+            "src": "/auth/(.*)",
+            "dest": "/app/Backend/server.js"
+        },
+        {
             "src": "/(.*)",
             "dest": "/app/frontend/$1"
         }

@@ -14,14 +14,15 @@ const getCleanEnvVar = (varName) => {
 // Get and validate Google OAuth credentials
 const clientID = getCleanEnvVar('GOOGLE_CLIENT_ID');
 const clientSecret = getCleanEnvVar('GOOGLE_CLIENT_SECRET');
-const callbackURL = getCleanEnvVar('GOOGLE_CALLBACK_URL') || 'http://localhost:5000/auth/google/callback';
+const callbackURL = getCleanEnvVar('GOOGLE_CALLBACK_URL') ||
+                    (process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/$/, '')}/auth/google/callback` : 'http://localhost:3000/auth/google/callback');
 
 if (!clientID || !clientSecret) {
     console.error('\n❌ Missing required Google OAuth environment variables!\n');
     console.error('Add these to your .env file (WITHOUT quotes):');
     console.error('  GOOGLE_CLIENT_ID=your_client_id_here');
     console.error('  GOOGLE_CLIENT_SECRET=your_client_secret_here');
-    console.error('  GOOGLE_CALLBACK_URL=http://localhost:5000/auth/google/callback');
+    console.error('  GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback');
     console.error('  SESSION_SECRET=your_random_secret\n');
     throw new Error('Missing Google OAuth credentials');
 }

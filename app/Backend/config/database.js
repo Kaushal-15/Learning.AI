@@ -46,7 +46,12 @@ const connectDB = async () => {
 
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
-    process.exit(1);
+    // In serverless environments (Vercel), we should not exit the process
+    // as it causes 502 Bad Gateway errors. Let the app start, and requests
+    // will fail gracefully if the DB is not connected.
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+        process.exit(1);
+    }
   }
 };
 

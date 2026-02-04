@@ -80,9 +80,11 @@ router.get('/check-name/:name', async (req, res) => {
 const checkUsernameHandler = async (req, res) => {
   try {
     // accepting from query (GET) or body (POST)
-    const username = req.query.username || req.body.username || req.params.username;
+    const username = (req.query && req.query.username) ||
+                     (req.body && req.body.username) ||
+                     (req.params && req.params.username);
 
-    if (!username || username.trim().length < 2) {
+    if (!username || typeof username !== 'string' || username.trim().length < 2) {
       return res.status(400).json({
         available: false,
         message: 'Username must be at least 2 characters'
@@ -92,7 +94,7 @@ const checkUsernameHandler = async (req, res) => {
     // Check DB
     const existingUser = await User.findOne({
       name: { $regex: new RegExp(`^${username.trim()}$`, 'i') }
-    });
+    }).select('_id').lean();
 
     return res.status(200).json({
       available: !existingUser,
@@ -106,7 +108,7 @@ const checkUsernameHandler = async (req, res) => {
     return res.status(500).json({
       available: false,
       message: 'Server error checking username',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
     });
   }
 };
