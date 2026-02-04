@@ -57,7 +57,7 @@ export default function Signup() {
 
     setCheckingName(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/check-name/${encodeURIComponent(name)}`, {
+      const res = await fetch(`${API_BASE}/auth/check-username?username=${encodeURIComponent(name)}`, {
         method: "GET",
       });
       const data = await res.json();
