@@ -79,8 +79,11 @@ router.get('/check-name/:name', async (req, res) => {
  */
 const checkUsernameHandler = async (req, res) => {
   try {
+    // Force JSON content type
+    res.setHeader('Content-Type', 'application/json');
+
     // accepting from query (GET) or body (POST)
-    const username = req.query.username || req.body.username || req.params.username;
+    const username = req.query.username || req.body.username || req.params.username || req.query.name || req.body.name;
 
     if (!username || username.trim().length < 2) {
       return res.status(400).json({
