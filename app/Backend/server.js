@@ -4,6 +4,7 @@
 // CRITICAL: Load environment variables FIRST before any other imports
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -50,7 +51,7 @@ const cameraRoutes = require('./routes/cameraRoutes');
 // Initialize App
 // ===============================
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // ===============================
 // Connect to MongoDB
@@ -98,7 +99,9 @@ app.use(
 // Security Middleware
 // ===============================
 // ⚠️ Keep Helmet AFTER CORS during local dev, or it can block cookies
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false // Disable CSP for demo simplicity, or configure it to allow scripts/styles
+}));
 
 // ===============================
 // Session + Passport Middleware (for OAuth)
@@ -180,17 +183,23 @@ app.use('/api/biometric', biometricRoutes); // Biometric verification
 app.use('/api/camera', cameraRoutes); // Camera monitoring and recording
 
 // ===============================
-// 404 Handler
+// 404 Handler for API
 // ===============================
-app.use('*', (req, res) => {
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found',
   });
 });
 
+// ===============================
+// Static Files & Frontend Support
+// ===============================
+app.use(express.static(path.join(__dirname, 'public')));
 
-
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // ===============================
 // Global Error Handler
@@ -203,19 +212,15 @@ app.use(errorHandler);
 const { initScheduler } = require('./services/schedulerService');
 
 // Initialize Scheduler
-// Initialize Scheduler (only in long-running process, not serverless)
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   initScheduler();
 }
 
-// Only listen if not running in Vercel (serverless handles the connection)
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(
-      ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
-    );
-    console.log(` Connected to MongoDB`);
-  });
-}
+app.listen(PORT, () => {
+  console.log(
+    ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
+  );
+  console.log(` Connected to MongoDB`);
+});
 
 module.exports = app;
