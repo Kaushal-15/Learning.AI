@@ -4,6 +4,7 @@
 // CRITICAL: Load environment variables FIRST before any other imports
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -50,7 +51,7 @@ const cameraRoutes = require('./routes/cameraRoutes');
 // Initialize App
 // ===============================
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // ===============================
 // Connect to MongoDB
@@ -180,13 +181,22 @@ app.use('/api/biometric', biometricRoutes); // Biometric verification
 app.use('/api/camera', cameraRoutes); // Camera monitoring and recording
 
 // ===============================
-// 404 Handler
+// Frontend & Static Files
 // ===============================
-app.use('*', (req, res) => {
+// Handle API 404 (force JSON response for API routes)
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found',
   });
+});
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Catch-all route to serve index.html for frontend client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 
@@ -208,14 +218,12 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   initScheduler();
 }
 
-// Only listen if not running in Vercel (serverless handles the connection)
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(
-      ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
-    );
-    console.log(` Connected to MongoDB`);
-  });
-}
+// Start server
+app.listen(PORT, () => {
+  console.log(
+    ` Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
+  );
+  console.log(` Connected to MongoDB`);
+});
 
 module.exports = app;
