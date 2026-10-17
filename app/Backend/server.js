@@ -1,14 +1,13 @@
 
 /**
  * Learning.AI Backend
- * Supports Vercel and traditional Node.js hosting.
+ * Supports Vercel serverless and traditional Node.js hosting.
  */
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -18,40 +17,46 @@ const session = require("express-session");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const isVercel = Boolean(process.env.VERCEL);
 
-console.log("Learning.AI backend starting");
+console.log("Learning.AI backend initializing");
 console.log("NODE_ENV:", process.env.NODE_ENV);
-console.log("VERCEL:", process.env.VERCEL || "false");
+console.log("VERCEL:", isVercel);
 
-// Trust Vercel's proxy for secure cookies and client IP handling.
-if (process.env.VERCEL) {
+// Fail clearly if required production configuration is missing.
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error("Missing SESSION_SECRET environment variable");
+}
+
+if (isVercel) {
   app.set("trust proxy", 1);
 }
 
-// CORS must run before routes and error handlers.
-const allowedOrigins = [
+// CORS
+const allowedOrigins = new Set([
   "https://learning-ai-rswf.vercel.app",
   "http://localhost:5173"
-];
+]);
 
 if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
+  allowedOrigins.add(process.env.FRONTEND_URL.replace(/\/$/, ""));
 }
 
 if (process.env.FRONTEND_URLS) {
-  allowedOrigins.push(
-    ...process.env.FRONTEND_URLS.split(",").map((url) => url.trim())
-  );
+  process.env.FRONTEND_URLS.split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean)
+    .forEach((url) => allowedOrigins.add(url));
 }
 
 app.use(
   cors({
     origin(origin, callback) {
-      // Requests without Origin include server-to-server and health checks.
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.has(origin.replace(/\/$/, ""))) {
         return callback(null, true);
       }
 
+      console.warn("CORS blocked origin:", origin);
       return callback(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
@@ -65,26 +70,29 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Session
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret:
+      process.env.SESSION_SECRET ||
+      "local-development-only-change-this-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
+      secure: isVercel || process.env.NODE_ENV === "production",
+      sameSite: isVercel ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000
     }
   })
 );
 
-// Passport must be initialized after the session middleware.
+// Passport
 const passport = require("./config/passport-config");
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Rate limiting.
+// Rate limiting
 app.use(
   "/api/",
   rateLimit({
@@ -95,7 +103,7 @@ app.use(
   })
 );
 
-// Health endpoints.
+// Health checks do not require MongoDB.
 app.get("/", (req, res) => {
   res.status(200).json({
     name: "Learning.AI Backend",
@@ -117,16 +125,18 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Database connection.
+// Database connection
 const connectDB = require("./config/database");
 
 connectDB()
-  .then(() => console.log("MongoDB connected"))
+  .then(() => {
+    console.log("MongoDB connected successfully");
+  })
   .catch((err) => {
-    console.error("MongoDB connection failed:", err.message);
+    console.error("MongoDB connection failed:", err.stack || err.message);
   });
 
-// Existing application routes.
+// Application routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/auth", require("./routes/googleAuth"));
 app.use("/api/content", require("./routes/contentRoutes"));
@@ -142,7 +152,7 @@ app.use("/api/test-results", require("./routes/testResultRoutes"));
 app.use("/api/projects", require("./routes/project.routes"));
 app.use("/api/exams", require("./routes/examRoutes"));
 
-// Unknown API paths must not fall through to frontend HTML.
+// Unknown API routes
 app.use("/api", (req, res) => {
   res.status(404).json({
     success: false,
@@ -151,16 +161,25 @@ app.use("/api", (req, res) => {
   });
 });
 
-// Optional static frontend for traditional hosting only.
-if (!process.env.VERCEL) {
+// Serve frontend files only when running outside Vercel.
+if (!isVercel) {
+  const path = require("path");
   const publicPath = path.join(__dirname, "public");
 
   app.use(express.static(publicPath));
 
-  app.get("*", (req, res, next) => {
-    res.sendFile(path.join(publicPath, "index.html"), (err) => {
-      if (err) next(err);
-    });
+  // Compatible with Express 4 and Express 5.
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      return next();
+    }
+
+    res.sendFile(
+      path.join(publicPath, "index.html"),
+      (err) => {
+        if (err) next(err);
+      }
+    );
   });
 }
 
@@ -168,9 +187,8 @@ if (!process.env.VERCEL) {
 const errorHandler = require("./middleware/errorHandler");
 app.use(errorHandler);
 
-// Traditional hosting starts a listener.
-// Vercel invokes the exported Express app as a function.
-if (!process.env.VERCEL) {
+// Only start a listener for traditional hosting.
+if (!isVercel) {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Learning.AI listening on port ${PORT}`);
   });
