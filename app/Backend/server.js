@@ -1,9 +1,9 @@
-// ===============================
-// Learning.AI Backend Server
-// Cloud Run – READY VERSION
-// ===============================
 
-// ⚠️ Load dotenv ONLY in non-production
+/**
+ * Learning.AI Backend
+ * Supports Vercel and traditional Node.js hosting.
+ */
+
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
@@ -16,92 +16,108 @@ const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
 
-// ===============================
-// Initialize App FIRST
-// ===============================
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ===============================
-// 🔊 BOOT LOGS (CRITICAL FOR CLOUD RUN)
-// ===============================
-console.log("BOOT: server.js loaded");
-console.log("BOOT: NODE_ENV =", process.env.NODE_ENV);
-console.log("BOOT: PORT =", PORT);
+console.log("Learning.AI backend starting");
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("VERCEL:", process.env.VERCEL || "false");
 
-// ===============================
-// Middleware (safe order)
-// ===============================
+// Trust Vercel's proxy for secure cookies and client IP handling.
+if (process.env.VERCEL) {
+  app.set("trust proxy", 1);
+}
+
+// CORS must run before routes and error handlers.
+const allowedOrigins = [
+  "https://learning-ai-rswf.vercel.app",
+  "http://localhost:5173"
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+if (process.env.FRONTEND_URLS) {
+  allowedOrigins.push(
+    ...process.env.FRONTEND_URLS.split(",").map((url) => url.trim())
+  );
+}
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Requests without Origin include server-to-server and health checks.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  })
+);
+
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ===============================
-// CORS (safe for demo)
-// ===============================
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
-
-// ===============================
-// Helmet (CSP disabled for demo)
-// ===============================
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-  })
-);
-
-// ===============================
-// Session (OAuth-safe)
-// ===============================
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "demo-secret",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    },
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    }
   })
 );
 
-// ===============================
-// Passport (AFTER session)
-// ===============================
+// Passport must be initialized after the session middleware.
 const passport = require("./config/passport-config");
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ===============================
-// Rate Limiter
-// ===============================
+// Rate limiting.
 app.use(
   "/api/",
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
+    standardHeaders: true,
+    legacyHeaders: false
   })
 );
 
-// ===============================
-// Health Check (Cloud Run)
-// ===============================
-app.get("/health", (req, res) => {
+// Health endpoints.
+app.get("/", (req, res) => {
   res.status(200).json({
-    status: "OK",
-    uptime: process.uptime(),
+    name: "Learning.AI Backend",
+    status: "OK"
   });
 });
 
-// ===============================
-// Connect DB (SAFE – no crash)
-// ===============================
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    uptime: process.uptime()
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    service: "Learning.AI API"
+  });
+});
+
+// Database connection.
 const connectDB = require("./config/database");
 
 connectDB()
@@ -110,9 +126,7 @@ connectDB()
     console.error("MongoDB connection failed:", err.message);
   });
 
-// ===============================
-// Routes
-// ===============================
+// Existing application routes.
 app.use("/api/auth", require("./routes/auth"));
 app.use("/auth", require("./routes/googleAuth"));
 app.use("/api/content", require("./routes/contentRoutes"));
@@ -128,26 +142,38 @@ app.use("/api/test-results", require("./routes/testResultRoutes"));
 app.use("/api/projects", require("./routes/project.routes"));
 app.use("/api/exams", require("./routes/examRoutes"));
 
-// ===============================
-// Static Frontend
-// ===============================
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// Unknown API paths must not fall through to frontend HTML.
+app.use("/api", (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "API endpoint not found",
+    path: req.originalUrl
+  });
 });
 
-// ===============================
-// Error Handler (LAST)
-// ===============================
+// Optional static frontend for traditional hosting only.
+if (!process.env.VERCEL) {
+  const publicPath = path.join(__dirname, "public");
+
+  app.use(express.static(publicPath));
+
+  app.get("*", (req, res, next) => {
+    res.sendFile(path.join(publicPath, "index.html"), (err) => {
+      if (err) next(err);
+    });
+  });
+}
+
+// Error handler must be last.
 const errorHandler = require("./middleware/errorHandler");
 app.use(errorHandler);
 
-// ===============================
-// Start Server (CRITICAL FIX)
-// ===============================
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+// Traditional hosting starts a listener.
+// Vercel invokes the exported Express app as a function.
+if (!process.env.VERCEL) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Learning.AI listening on port ${PORT}`);
+  });
+}
 
 module.exports = app;
