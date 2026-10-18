@@ -33,10 +33,8 @@ const connectDB = async () => {
     }
   }
 
-  const mongoURI =
-    process.env.NODE_ENV === 'test'
-      ? process.env.MONGODB_TEST_URI
-      : process.env.MONGODB_URI;
+  const rawURI = process.env.MONGODB_URI || process.env.MONGODB_TEST_URI;
+  const mongoURI = rawURI ? rawURI.replace(/^["']|["']$/g, '').trim() : null;
 
   if (!mongoURI) {
     throw new Error('MONGODB_URI is not set in environment variables');

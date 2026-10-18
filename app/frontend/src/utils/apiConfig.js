@@ -1,10 +1,13 @@
 /**
  * Centralized API configuration for Learning.AI frontend.
- * Ensures consistent URLs without double slashes regardless of whether
- * VITE_API_BASE_URL has a trailing slash or is omitted (relative URLs).
+ * Ensures consistent URLs without double slashes or accidental quote characters
+ * regardless of how VITE_API_BASE_URL is configured in Vercel.
  */
 
-const rawBase = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+let rawBase = (import.meta.env.VITE_API_BASE_URL || '').trim();
+
+// Strip any literal surrounding quotes (e.g. if entered as "" in Vercel UI)
+rawBase = rawBase.replace(/^["']+|["']+$/g, '').trim().replace(/\/+$/, '');
 
 export const BASE_URL = rawBase;
 export const API_BASE = rawBase ? `${rawBase}/api` : '/api';

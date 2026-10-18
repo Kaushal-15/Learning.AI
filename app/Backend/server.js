@@ -146,13 +146,15 @@ app.use(cookieParser());
 // ---------------------------------------------------------------------------
 let sessionStore;
 
-if (process.env.MONGODB_URI) {
+const mongoUri = (process.env.MONGODB_URI || process.env.MONGODB_TEST_URI || '').replace(/^["']|["']$/g, '').trim();
+
+if (mongoUri) {
   // Use MongoStore in production/staging to survive serverless cold starts.
   try {
     const cm = require('connect-mongo');
     const MongoStore = cm.default || cm.MongoStore || cm;
     sessionStore = MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
+      mongoUrl: mongoUri,
       ttl: 7 * 24 * 60 * 60, // 7 days in seconds
       collectionName: 'sessions',
       // Lazy connect — avoids blocking startup if DB is slow.
