@@ -47,6 +47,7 @@ const connectDB = async () => {
 
   cached.promise = mongoose
     .connect(normalizedURI, {
+      dbName: 'learning-ai',
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 8000, // fail fast in serverless
       socketTimeoutMS: 45000,

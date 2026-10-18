@@ -158,6 +158,7 @@ if (mongoUri) {
     const MongoStore = cm.default || cm.MongoStore || cm;
     sessionStore = MongoStore.create({
       mongoUrl: mongoUri,
+      dbName: 'learning-ai',
       ttl: 7 * 24 * 60 * 60, // 7 days in seconds
       collectionName: 'sessions',
       // Lazy connect — avoids blocking startup if DB is slow.

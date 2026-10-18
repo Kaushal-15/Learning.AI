@@ -9,10 +9,15 @@ let examConn;
 
 const getExamConnection = () => {
     if (!examConn) {
-        const examMongoURI = process.env.EXAM_MONGODB_URI || 'mongodb://localhost:27017/learning_ai_exam';
+        const primaryURI = (process.env.MONGODB_URI || process.env.MONGODB_TEST_URI || '').replace(/^["']|["']$/g, '').trim();
+        let examMongoURI = (process.env.EXAM_MONGODB_URI || primaryURI || 'mongodb://localhost:27017/learning-ai').replace(/^["']|["']$/g, '').trim();
+        if (examMongoURI.startsWith('mongodb+srv://') && !examMongoURI.includes('authSource=')) {
+            examMongoURI += (examMongoURI.includes('?') ? '&' : '?') + 'authSource=admin';
+        }
         examConn = mongoose.createConnection(examMongoURI, {
+            dbName: 'learning-ai',
             maxPoolSize: 10,
-            serverSelectionTimeoutMS: 5000,
+            serverSelectionTimeoutMS: 8000,
             socketTimeoutMS: 45000,
         });
 
