@@ -6,7 +6,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "test_questions.csv"
+      "includeFiles": "{routes/**,models/**,controllers/**,services/**,utils/**,middleware/**,config/**,test_questions.csv}"
     }
   }
 }

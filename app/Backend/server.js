@@ -275,11 +275,12 @@ app.use(async (req, res, next) => {
 //     If any route module throws at require() time, a 503 stub is mounted
 //     for that prefix instead of crashing the whole server.
 // ---------------------------------------------------------------------------
-const safeMount = (app, prefix, modulePath) => {
+const safeMount = (app, prefix, loader) => {
   try {
-    app.use(prefix, require(modulePath));
+    const router = typeof loader === 'function' ? loader() : require(loader);
+    app.use(prefix, router);
   } catch (err) {
-    console.error(`❌ Failed to load route "${prefix}" from "${modulePath}":`, err.message);
+    console.error(`❌ Failed to load route "${prefix}":`, err.message);
     app.use(prefix, (req, res) => {
       res.status(503).json({
         success: false,
@@ -290,20 +291,20 @@ const safeMount = (app, prefix, modulePath) => {
   }
 };
 
-safeMount(app, '/api/auth', './routes/auth');
-safeMount(app, '/auth', './routes/googleAuth');
-safeMount(app, '/api/content', './routes/contentRoutes');
-safeMount(app, '/api/roadmaps', './routes/roadmapRoutes');
-safeMount(app, '/api/daily-learning', './routes/dailyLearningRoutes');
-safeMount(app, '/api/users', './routes/userRoutes');
-safeMount(app, '/api/profile', './routes/profileRoutes');
-safeMount(app, '/api/progress', './routes/progressRoutes');
-safeMount(app, '/api/xp', './routes/xp.routes');
-safeMount(app, '/api/questions', './routes/questionRoutes');
-safeMount(app, '/api/quiz', './routes/quizRoutes');
-safeMount(app, '/api/test-results', './routes/testResultRoutes');
-safeMount(app, '/api/projects', './routes/project.routes');
-safeMount(app, '/api/exams', './routes/examRoutes');
+safeMount(app, '/api/auth', () => require('./routes/auth'));
+safeMount(app, '/auth', () => require('./routes/googleAuth'));
+safeMount(app, '/api/content', () => require('./routes/contentRoutes'));
+safeMount(app, '/api/roadmaps', () => require('./routes/roadmapRoutes'));
+safeMount(app, '/api/daily-learning', () => require('./routes/dailyLearningRoutes'));
+safeMount(app, '/api/users', () => require('./routes/userRoutes'));
+safeMount(app, '/api/profile', () => require('./routes/profileRoutes'));
+safeMount(app, '/api/progress', () => require('./routes/progressRoutes'));
+safeMount(app, '/api/xp', () => require('./routes/xp.routes'));
+safeMount(app, '/api/questions', () => require('./routes/questionRoutes'));
+safeMount(app, '/api/quiz', () => require('./routes/quizRoutes'));
+safeMount(app, '/api/test-results', () => require('./routes/testResultRoutes'));
+safeMount(app, '/api/projects', () => require('./routes/project.routes'));
+safeMount(app, '/api/exams', () => require('./routes/examRoutes'));
 
 // ---------------------------------------------------------------------------
 // 12. Unknown API routes — 404 JSON (must come after all /api/* route mounts)
