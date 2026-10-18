@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
+import { API_BASE } from "../utils/apiConfig";
 
 /**
  * ProtectedLayout:
@@ -13,9 +14,6 @@ export default function ProtectedLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("Checking authentication...");
-
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-  const API_BASE = `${BASE_URL}/api`;
 
   useEffect(() => {
     const checkAuth = async () => {

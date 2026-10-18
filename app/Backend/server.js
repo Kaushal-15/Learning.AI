@@ -86,6 +86,9 @@ app.use(
   })
 );
 
+// End unhandled OPTIONS requests (e.g. preflights blocked by CORS) without reaching DB or data routes
+app.options('*', (req, res) => res.status(204).end());
+
 // ---------------------------------------------------------------------------
 // 3. Helmet
 // ---------------------------------------------------------------------------
@@ -247,7 +250,7 @@ const connectDB = require('./config/database');
 const HEALTH_PATHS = new Set(['/', '/health', '/api/health', '/api/health/db']);
 
 app.use(async (req, res, next) => {
-  if (HEALTH_PATHS.has(req.path)) return next();
+  if (req.method === 'OPTIONS' || HEALTH_PATHS.has(req.path)) return next();
 
   try {
     await connectDB();

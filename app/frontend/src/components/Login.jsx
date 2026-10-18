@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import "../styles/DevvoraStyles.css";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-const API_BASE = `${BASE_URL}/api`;
+import { API_BASE, BASE_URL } from "../utils/apiConfig";
 
 export default function Login() {
   const navigate = useNavigate();

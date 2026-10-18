@@ -1,5 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const API_BASE_URL = `${BASE_URL}/api`;
+import { API_BASE as API_BASE_URL } from '../utils/apiConfig';
 
 class ApiService {
   async request(endpoint, options = {}) {
