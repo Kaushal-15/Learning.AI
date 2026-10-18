@@ -101,7 +101,7 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
 
                     // Upload chunk every 10 seconds
                     if (chunksRef.current.length >= 10) {
-                        await uploadChunks(recId);
+                        await uploadChunks();
                     }
                 }
             };
@@ -115,7 +115,7 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
                 setIsRecording(false);
                 // Upload remaining chunks
                 if (chunksRef.current.length > 0) {
-                    await uploadChunks(recId);
+                    await uploadChunks();
                 }
             };
 
@@ -128,44 +128,67 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
         }
     };
 
-    // Upload video chunks
-    const uploadChunks = async (recId) => {
+    // Upload video chunks directly to S3/R2 presigned URL
+    const uploadChunks = async () => {
         if (chunksRef.current.length === 0) return;
 
+        const chunksToUpload = [...chunksRef.current];
+        chunksRef.current = [];
+
         try {
-            const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-            const reader = new FileReader();
+            const blob = new Blob(chunksToUpload, { type: 'video/webm' });
 
-            reader.onloadend = async () => {
-                const base64data = reader.result;
+            // 1. Request presigned PUT URL
+            const urlRes = await fetch(`${API_BASE}/camera/upload-url`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    examId,
+                    sessionId,
+                    chunkIndex: Date.now()
+                })
+            });
 
-                await fetch(`${API_BASE}/camera/upload-chunk`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        recordingId: recId,
-                        chunkData: base64data,
-                        chunkNumber: Date.now()
-                    })
-                });
+            if (!urlRes.ok) return;
 
-                // Clear uploaded chunks
-                chunksRef.current = [];
-            };
+            const urlData = await urlRes.json();
 
-            reader.readAsDataURL(blob);
+            // 2. If storage is disabled or unconfigured, skip gracefully without breaking exam
+            if (!urlData.success || !urlData.enabled || !urlData.uploadUrl) {
+                return;
+            }
+
+            // 3. Direct browser-to-bucket upload via presigned PUT
+            await fetch(urlData.uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'video/webm' },
+                body: blob
+            });
         } catch (err) {
-            console.error('Error uploading chunks:', err);
+            console.warn('Direct cloud video chunk upload notice:', err.message);
         }
     };
 
-    // Stop recording
-    const stopRecording = () => {
+    // Stop recording and finalize metadata
+    const stopRecording = async () => {
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
             mediaRecorderRef.current = null;
             setRecordingId(null);
+            try {
+                await fetch(`${API_BASE}/camera/finalize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        examId,
+                        sessionId
+                    })
+                });
+            } catch (finalizeErr) {
+                console.warn('Finalize recording notice:', finalizeErr.message);
+            }
         }
     };
 

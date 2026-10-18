@@ -88,8 +88,14 @@ async function uploadChunk({ recordingId, chunkData, chunkNumber }) {
             buffer = chunkData;
         }
 
-        // Append chunk to file
-        await fs.appendFile(recording.filePath, buffer);
+        // Append chunk to file in local/traditional environments (skipped safely on serverless)
+        if (!process.env.VERCEL) {
+            try {
+                await fs.appendFile(recording.filePath, buffer);
+            } catch (fsErr) {
+                console.warn('Local file append skipped in serverless environment:', fsErr.message);
+            }
+        }
 
         // Update chunk count
         recording.chunksReceived = (recording.chunksReceived || 0) + 1;
