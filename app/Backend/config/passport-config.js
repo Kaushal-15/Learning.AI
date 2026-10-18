@@ -10,19 +10,33 @@ const getCleanEnvVar = (varName) => {
 };
 
 // Get and validate Google OAuth credentials
-const clientID = getCleanEnvVar('GOOGLE_CLIENT_ID');
+const clientIDRaw = getCleanEnvVar('GOOGLE_CLIENT_ID');
+const isClientPlaceholder = !clientIDRaw || clientIDRaw.includes('<') || clientIDRaw.includes('YOUR_GOOGLE');
+const clientID = isClientPlaceholder ? '756099397454-htk0oo84c7uvld0t9hj7ieng980k08vf.apps.googleusercontent.com' : clientIDRaw;
+
 const clientSecret = getCleanEnvVar('GOOGLE_CLIENT_SECRET');
-const callbackURL = getCleanEnvVar('GOOGLE_CALLBACK_URL');
+
+const callbackRaw = getCleanEnvVar('GOOGLE_CALLBACK_URL');
+const isCallbackPlaceholder = !callbackRaw || callbackRaw.includes('<') || callbackRaw.includes('YOUR-DEPLOYED') || callbackRaw.includes('YOUR_');
+let callbackURL = isCallbackPlaceholder ? null : callbackRaw;
+
+if (!callbackURL) {
+    if (process.env.BACKEND_URL && !process.env.BACKEND_URL.includes('YOUR')) {
+        callbackURL = `${process.env.BACKEND_URL.replace(/\/$/, '')}/auth/google/callback`;
+    } else if (process.env.VERCEL) {
+        callbackURL = 'https://learning-ai-mocha.vercel.app/auth/google/callback';
+    } else {
+        callbackURL = 'http://localhost:3000/auth/google/callback';
+    }
+}
 
 /**
- * Register GoogleStrategy only if GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
- * and GOOGLE_CALLBACK_URL are all set. Otherwise log a warning and skip it.
- * The app will boot without Google credentials.
+ * Register GoogleStrategy if clientID, clientSecret, and callbackURL are present.
  */
 if (clientID && clientSecret && callbackURL) {
     const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
-    console.log('✅ Google OAuth enabled');
+    console.log('✅ Google OAuth enabled with callback:', callbackURL);
 
     passport.use(
         new GoogleStrategy(
@@ -35,33 +49,45 @@ if (clientID && clientSecret && callbackURL) {
             async (accessToken, refreshToken, profile, done) => {
                 try {
                     const { id: googleId, emails, displayName, photos } = profile;
-                    const email = emails && emails[0] ? emails[0].value : null;
+                    const email = emails && emails[0] ? emails[0].value.toLowerCase().trim() : null;
                     const profilePicture = photos && photos[0] ? photos[0].value : null;
 
                     if (!email) {
                         return done(new Error('No email found in Google profile'), null);
                     }
 
+                    // 1. Check if user already exists with this googleId
                     let user = await User.findOne({ googleId });
-
                     if (user) {
                         return done(null, user);
                     }
 
+                    // 2. Check if user already exists with this email (e.g. registered locally)
                     user = await User.findOne({ email });
-
                     if (user) {
                         user.googleId = googleId;
-                        user.profilePicture = profilePicture || user.profilePicture;
+                        if (profilePicture && !user.profilePicture) {
+                            user.profilePicture = profilePicture;
+                        }
+                        user.isVerified = true;
                         await user.save();
                         return done(null, user);
                     }
 
+                    // 3. New user: generate collision-free unique username and learnerId
                     const learnerId = User.generateLearnerId();
+                    let baseName = (displayName || email.split('@')[0]).trim().replace(/[^a-zA-Z0-9_\-\s]/g, '').trim();
+                    if (baseName.length < 2) baseName = `user_${Date.now().toString(36)}`;
+                    
+                    let uniqueName = baseName;
+                    let counter = 1;
+                    while (await User.findOne({ name: uniqueName })) {
+                        uniqueName = `${baseName}_${counter++}`;
+                    }
 
                     const newUser = new User({
                         email,
-                        name: displayName || email.split('@')[0],
+                        name: uniqueName,
                         learnerId,
                         googleId,
                         authProvider: 'google',
@@ -71,12 +97,15 @@ if (clientID && clientSecret && callbackURL) {
 
                     await newUser.save();
 
-                    const newLearner = new Learner({
-                        email,
-                        name: displayName || email.split('@')[0],
-                    });
-
-                    await newLearner.save();
+                    // Ensure Learner profile exists
+                    let learner = await Learner.findOne({ email });
+                    if (!learner) {
+                        learner = new Learner({
+                            email,
+                            name: uniqueName,
+                        });
+                        await learner.save();
+                    }
 
                     return done(null, newUser);
                 } catch (error) {
@@ -87,11 +116,7 @@ if (clientID && clientSecret && callbackURL) {
         )
     );
 } else {
-    console.warn('\n⚠️ Google OAuth disabled: Missing environment variables.\n');
-    console.warn('To enable Google OAuth, set:');
-    console.warn('GOOGLE_CLIENT_ID');
-    console.warn('GOOGLE_CLIENT_SECRET');
-    console.warn('GOOGLE_CALLBACK_URL\n');
+    console.warn('\n⚠️ Google OAuth waiting for GOOGLE_CLIENT_SECRET in environment.\n');
 }
 
 /**

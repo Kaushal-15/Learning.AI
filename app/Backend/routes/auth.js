@@ -49,6 +49,33 @@ router.post('/refresh', async (req, res) => {
 // Logout user
 router.post('/logout', logoutUser);
 
+// Get current user session
+const authMiddleware = require('../middleware/authMiddleware');
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-passwordHash -salt -refreshToken');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        learnerId: user.learnerId,
+        role: user.role,
+        settings: user.settings,
+        profilePicture: user.profilePicture
+      }
+    });
+  } catch (err) {
+    console.error('Error in /api/auth/me:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Check name availability (Legacy path param)
 router.get('/check-name/:name', async (req, res) => {
   try {

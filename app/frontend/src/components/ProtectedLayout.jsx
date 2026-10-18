@@ -18,8 +18,26 @@ export default function ProtectedLayout() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Handle token passed from OAuth redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        if (tokenFromUrl) {
+          localStorage.setItem('accessToken', tokenFromUrl);
+          document.cookie = `accessToken=${tokenFromUrl}; path=/; max-age=900; SameSite=Lax`;
+          // Clean the token from the address bar without reload
+          const cleanUrl = window.location.pathname + (window.location.hash || '');
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+
+        const token = localStorage.getItem('accessToken');
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const res = await fetch(`${API_BASE}/profile/me`, {
           method: "GET",
+          headers,
           credentials: "include", // 🔐 Required for cookie-based JWT auth
         });
 
@@ -35,6 +53,7 @@ export default function ProtectedLayout() {
           console.warn("User not authenticated:", res.status);
           setIsAuthenticated(false);
           localStorage.removeItem('user');
+          localStorage.removeItem('accessToken');
         }
       } catch (err) {
         console.error("Auth check failed:", err);

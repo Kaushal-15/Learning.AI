@@ -3,10 +3,17 @@ const router = express.Router();
 const passport = require('../config/passport-config');
 const { googleCallback } = require('../controllers/authController');
 
+const getFrontendUrl = () => {
+    let url = process.env.FRONTEND_URL;
+    if (!url || url.includes('YOUR-')) {
+        url = process.env.VERCEL ? 'https://learning-ai-rswf.vercel.app' : 'http://localhost:5173';
+    }
+    return url.replace(/\/$/, '');
+};
+
 const ensureGoogleStrategy = (req, res, next) => {
     if (!passport._strategy('google')) {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        return res.redirect(`${frontendUrl.replace(/\/$/, '')}/login?error=oauth_not_configured`);
+        return res.redirect(`${getFrontendUrl()}/login?error=oauth_not_configured`);
     }
     next();
 };
@@ -32,10 +39,12 @@ router.get(
 router.get(
     '/google/callback',
     ensureGoogleStrategy,
-    passport.authenticate('google', {
-        failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed`,
-        session: true,
-    }),
+    (req, res, next) => {
+        passport.authenticate('google', {
+            failureRedirect: `${getFrontendUrl()}/login?error=oauth_failed`,
+            session: true,
+        })(req, res, next);
+    },
     googleCallback
 );
 

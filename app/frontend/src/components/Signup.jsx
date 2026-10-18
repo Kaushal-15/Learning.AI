@@ -30,7 +30,17 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Initial page load effect
-  useState(() => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    if (errorParam === 'oauth_not_configured') {
+      setMessage({ type: 'error', text: 'Google OAuth is not configured yet on the backend.' });
+    } else if (errorParam === 'oauth_failed') {
+      setMessage({ type: 'error', text: 'Google sign-up was cancelled or failed. Please try again.' });
+    } else if (errorParam) {
+      setMessage({ type: 'error', text: `Authentication error (${errorParam}). Please try again.` });
+    }
+
     const timer = setTimeout(() => {
       setPageLoading(false);
     }, 800);
@@ -325,7 +335,10 @@ export default function Signup() {
 
           <button
             className="auth-google-btn"
-            onClick={() => window.location.href = `${BASE_URL}/auth/google`}
+            onClick={() => {
+              const backendBase = (BASE_URL || (window.location.hostname.includes('vercel.app') ? 'https://learning-ai-mocha.vercel.app' : '')).replace(/\/$/, '');
+              window.location.href = `${backendBase}/auth/google`;
+            }}
             type="button"
           >
             <svg viewBox="0 0 24 24" width="20" height="20">

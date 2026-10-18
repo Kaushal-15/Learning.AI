@@ -244,11 +244,17 @@ exports.logoutUser = async (req, res) => {
  * Generates JWT tokens and sets cookies
  */
 exports.googleCallback = async (req, res) => {
+    let frontendUrl = process.env.FRONTEND_URL;
+    if (!frontendUrl || frontendUrl.includes('YOUR-')) {
+        frontendUrl = process.env.VERCEL ? 'https://learning-ai-rswf.vercel.app' : 'http://localhost:5173';
+    }
+    frontendUrl = frontendUrl.replace(/\/$/, '');
+
     try {
         const user = req.user;
 
         if (!user) {
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed`);
+            return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
         }
 
         // Generate JWT tokens
@@ -264,13 +270,12 @@ exports.googleCallback = async (req, res) => {
         // Set refresh token cookie
         res.cookie('refreshToken', refreshToken, cookieOpts(7 * 24 * 60 * 60 * 1000));
 
-
-        // Redirect to frontend dashboard
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
+        // Redirect to frontend dashboard with token in URL (for cross-domain storage fallback)
+        res.redirect(`${frontendUrl}/dashboard?token=${encodeURIComponent(accessToken)}`);
 
     } catch (error) {
         console.error("Google OAuth Callback Error:", error);
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=server_error`);
+        res.redirect(`${frontendUrl}/login?error=server_error`);
     }
 };
 
