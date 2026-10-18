@@ -97,25 +97,65 @@ app.use(helmet({ contentSecurityPolicy: false }));
 // ---------------------------------------------------------------------------
 // 4. Rate limiters (before session/passport — blocked requests pay no session cost)
 // ---------------------------------------------------------------------------
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many requests, please try again later.' }
-});
-
+// ---------------------------------------------------------------------------
+// 4. Rate limiting — Segmented (Auth: 10/min, Telemetry: 600/min, General: 120/min)
+// ---------------------------------------------------------------------------
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
+  windowMs: 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many auth requests, please try again later.' }
+  statusCode: 429,
+  message: { success: false, message: 'Too many authentication attempts. Please try again after a minute.' },
+  handler: (req, res, next, options) => {
+    res.status(429).json(options.message);
+  }
 });
 
+const telemetryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  statusCode: 429,
+  message: { success: false, message: 'Too many telemetry requests. Please slow down.' },
+  handler: (req, res, next, options) => {
+    res.status(429).json(options.message);
+  }
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  statusCode: 429,
+  message: { success: false, message: 'Too many requests, please try again later.' },
+  skip: (req) => {
+    const url = req.originalUrl || req.url || '';
+    return (
+      url.includes('/auth') ||
+      url.includes('/camera') ||
+      url.includes('/biometric') ||
+      url.includes('/recordings') ||
+      url.includes('/exam-recordings') ||
+      url.includes('/performance')
+    );
+  },
+  handler: (req, res, next, options) => {
+    res.status(429).json(options.message);
+  }
+});
+
+// Specific limiters mounted first
 app.use('/auth/', authLimiter);
 app.use('/api/auth/', authLimiter);
-app.use('/api/', apiLimiter);
+app.use('/api/camera/', telemetryLimiter);
+app.use('/api/biometric/', telemetryLimiter);
+app.use('/api/performance/', telemetryLimiter);
+
+// General limiter excludes specific paths
+app.use('/api/', generalLimiter);
 
 // ---------------------------------------------------------------------------
 // 5. Body parsers — 4 MB cap; Vercel hard-limits bodies at ~4.5 MB
