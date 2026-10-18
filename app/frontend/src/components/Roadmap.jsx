@@ -196,19 +196,19 @@ export default function Roadmap() {
   };
 
   return (
-    <section className="min-h-screen w-full flex flex-col items-center bg-gray-50 dark:bg-gradient-dark relative px-6 py-8">
+    <section className="min-h-screen w-full flex flex-col items-center bg-gray-50 dark:bg-slate-950 relative px-6 py-8 transition-colors">
       <GlobalThemeToggle />
       <AnimatedBackground />
       {/* Header */}
       <div className="w-full max-w-6xl mb-8 relative z-10">
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-cream-100 mb-2">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
             {step === 0 && "Welcome to Learning.AI"}
             {step === 1 && "Choose Your Learning Path"}
             {step === 2 && "What's Your Current Level?"}
             {step === 3 && "Select Your Timeline"}
           </h1>
-          <p className="text-gray-600 dark:text-cream-200">
+          <p className="text-gray-600 dark:text-slate-300 text-lg">
             {step === 0 && "How would you like to start your journey today?"}
             {step === 1 && "Select the technology path you want to master"}
             {step === 2 && "Help us customize your learning experience"}
@@ -222,12 +222,12 @@ export default function Roadmap() {
             <div className="flex items-center space-x-4">
               {[1, 2, 3].map((stepNum) => (
                 <div key={stepNum} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${step >= stepNum ? "bg-green-600 dark:bg-green-500 text-white" : "bg-gray-300 dark:bg-dark-300 text-gray-600 dark:text-cream-200"
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${step >= stepNum ? "bg-green-600 dark:bg-green-500 text-white shadow-md shadow-green-500/20" : "bg-gray-200 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-300 dark:border-slate-700"
                     }`}>
                     {stepNum}
                   </div>
                   {stepNum < 3 && (
-                    <div className={`w-16 h-1 mx-2 ${step > stepNum ? "bg-green-600 dark:bg-green-500" : "bg-gray-300 dark:bg-dark-300"
+                    <div className={`w-16 h-1 mx-2 rounded transition-colors ${step > stepNum ? "bg-green-600 dark:bg-green-500" : "bg-gray-300 dark:bg-slate-700"
                       }`} />
                   )}
                 </div>
@@ -241,12 +241,12 @@ export default function Roadmap() {
       {step === 0 && (
         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
           {/* Attend Test Option */}
-          <div className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-3xl shadow-xl border border-gray-200 dark:border-dark-300 p-8 flex flex-col items-center text-center group hover:border-green-500/50 transition-all duration-300">
+          <div className="bg-white dark:bg-slate-900/90 backdrop-blur-sm rounded-3xl shadow-xl border border-gray-200 dark:border-slate-700 p-8 flex flex-col items-center text-center group hover:border-green-500/50 transition-all duration-300">
             <div className="w-20 h-20 rounded-2xl bg-green-100 dark:bg-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 mb-6 group-hover:scale-110 transition-transform">
               <ClipboardList className="w-10 h-10" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-4">Attend Test</h2>
-            <p className="text-gray-600 dark:text-cream-200 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Attend Test</h2>
+            <p className="text-gray-600 dark:text-slate-300 mb-8">
               Have an exam code? Join a pre-configured test or assessment immediately.
             </p>
             <div className="w-full space-y-4">
@@ -255,12 +255,12 @@ export default function Roadmap() {
                 placeholder="Enter Exam Code (e.g. EXAM123)"
                 value={examCode}
                 onChange={(e) => setExamCode(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-dark-200 text-gray-800 dark:text-cream-100 focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase"
+                className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase"
               />
               <button
                 onClick={handleJoinExam}
                 disabled={validatingCode}
-                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-md shadow-green-600/20"
               >
                 {validatingCode ? "Validating..." : "Join Test"}
                 <ArrowRight className="w-5 h-5" />
@@ -271,17 +271,17 @@ export default function Roadmap() {
           {/* Course Roadmap Option */}
           <div
             onClick={() => setStep(1)}
-            className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-3xl shadow-xl border border-gray-200 dark:border-dark-300 p-8 flex flex-col items-center text-center group hover:border-blue-500/50 transition-all duration-300 cursor-pointer"
+            className="bg-white dark:bg-slate-900/90 backdrop-blur-sm rounded-3xl shadow-xl border border-gray-200 dark:border-slate-700 p-8 flex flex-col items-center text-center group hover:border-blue-500/50 transition-all duration-300 cursor-pointer"
           >
             <div className="w-20 h-20 rounded-2xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6 group-hover:scale-110 transition-transform">
               <Map className="w-10 h-10" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-4">Course Roadmap</h2>
-            <p className="text-gray-600 dark:text-cream-200 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Course Roadmap</h2>
+            <p className="text-gray-600 dark:text-slate-300 mb-8">
               New to the platform? Choose a learning path and get a customized 30-day roadmap.
             </p>
             <div className="mt-auto w-full">
-              <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all">
+              <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/20">
                 Explore Roadmaps
                 <ArrowRight className="w-5 h-5" />
               </button>
@@ -297,16 +297,16 @@ export default function Roadmap() {
             <div
               key={roadmap.id}
               onClick={() => handleRoadmapSelect(roadmap.id)}
-              className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl"
+              className="bg-white dark:bg-slate-900/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl hover:border-blue-500/50 dark:hover:border-blue-400/50"
             >
-              <div className={`w-16 h-16 rounded-xl bg-gradient-to-r ${roadmap.color} flex items-center justify-center text-white mb-4`}>
+              <div className={`w-16 h-16 rounded-xl bg-gradient-to-r ${roadmap.color} flex items-center justify-center text-white mb-4 shadow-md`}>
                 {roadmap.icon}
               </div>
-              <h3 className="text-xl font-bold text-gray-800 dark:text-cream-100 mb-2">{roadmap.title}</h3>
-              <p className="text-gray-600 dark:text-cream-200 text-sm mb-4">{roadmap.description}</p>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{roadmap.title}</h3>
+              <p className="text-gray-600 dark:text-slate-300 text-sm mb-4 leading-relaxed">{roadmap.description}</p>
               <div className="space-y-1">
                 {roadmap.skills.map((skill, index) => (
-                  <span key={index} className="inline-block bg-gray-100 dark:bg-dark-300/50 text-gray-700 dark:text-cream-200 text-xs px-2 py-1 rounded mr-1 mb-1">
+                  <span key={index} className="inline-block bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 text-xs px-2.5 py-1 rounded-md mr-1 mb-1 border border-gray-200 dark:border-slate-700">
                     {skill}
                   </span>
                 ))}
@@ -324,10 +324,10 @@ export default function Roadmap() {
               <div
                 key={level.id}
                 onClick={() => handleSkillLevelSelect(level.id)}
-                className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-dark-300 p-8 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl text-center"
+                className="bg-white dark:bg-slate-900/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-8 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl hover:border-green-500/50 text-center"
               >
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-3">{level.title}</h3>
-                <p className="text-gray-600 dark:text-cream-200 mb-4">{level.description}</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{level.title}</h3>
+                <p className="text-gray-600 dark:text-slate-300 mb-4 leading-relaxed">{level.description}</p>
                 <p className="text-sm text-green-600 dark:text-green-400 font-semibold">{level.duration}</p>
               </div>
             ))}
@@ -336,7 +336,7 @@ export default function Roadmap() {
           <div className="flex justify-center mt-8">
             <button
               onClick={goBack}
-              className="px-6 py-2 bg-gray-300 dark:bg-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-400 dark:hover:bg-dark-200 transition-colors"
+              className="px-6 py-2.5 bg-gray-200 dark:bg-slate-800 text-gray-800 dark:text-slate-100 border border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-300 dark:hover:bg-slate-700 transition-colors font-semibold"
             >
               Back
             </button>
@@ -352,16 +352,16 @@ export default function Roadmap() {
               <div
                 key={timeline.id}
                 onClick={() => handleTimelineSelect(timeline.id)}
-                className="bg-white dark:bg-dark-400/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-dark-300 p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl text-center"
+                className="bg-white dark:bg-slate-900/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-xl hover:border-green-500/50 dark:hover:border-green-400/50 text-center"
               >
-                <h3 className="text-xl font-bold text-gray-800 dark:text-cream-100 mb-3">{timeline.title}</h3>
-                <p className="text-gray-600 dark:text-cream-200 text-sm">{timeline.description}</p>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{timeline.title}</h3>
+                <p className="text-gray-600 dark:text-slate-300 text-sm leading-relaxed">{timeline.description}</p>
               </div>
             ))}
           </div>
 
           {error && (
-            <div className="mt-6 p-4 bg-red-100 dark:bg-red-400/20 border border-red-400 dark:border-red-400/30 text-red-700 dark:text-red-300 rounded-lg text-center">
+            <div className="mt-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800/80 text-red-700 dark:text-red-300 rounded-xl text-center font-medium">
               {error}
             </div>
           )}
@@ -370,7 +370,7 @@ export default function Roadmap() {
             <button
               onClick={goBack}
               disabled={loading}
-              className="px-6 py-2 bg-gray-300 dark:bg-dark-300 text-gray-700 dark:text-cream-200 rounded-lg hover:bg-gray-400 dark:hover:bg-dark-200 transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 bg-gray-200 dark:bg-slate-800 text-gray-800 dark:text-slate-100 border border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-300 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 font-semibold"
             >
               Back
             </button>
@@ -385,7 +385,7 @@ export default function Roadmap() {
       )}
 
       {error && step < 3 && (
-        <div className="mt-6 p-4 bg-red-100 dark:bg-red-400/20 border border-red-400 dark:border-red-400/30 text-red-700 dark:text-red-300 rounded-lg text-center relative z-10">
+        <div className="mt-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800/80 text-red-700 dark:text-red-300 rounded-xl text-center font-medium relative z-10">
           {error}
         </div>
       )}

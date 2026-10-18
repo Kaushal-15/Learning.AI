@@ -1036,9 +1036,18 @@ router.put('/:id/complete', async (req, res) => {
 // Get user's quiz history
 router.get('/', async (req, res) => {
   try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.json({
+        success: true,
+        quizzes: [],
+        data: []
+      });
+    }
+
     const { limit = 10, status, source } = req.query;
 
-    const query = { userId: req.user.id };
+    const query = { userId };
     if (status) {
       query.status = status;
     }
@@ -1318,7 +1327,23 @@ router.get('/insights/:roadmapType', async (req, res) => {
 // Get overall quiz statistics for dashboard
 router.get('/stats', async (req, res) => {
   try {
-    const quizzes = await Quiz.find({ userId: req.user.id });
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.json({
+        success: true,
+        stats: {
+          totalQuizzes: 0,
+          averageAccuracy: 0,
+          totalPoints: 0,
+          currentStreak: 0,
+          totalQuestions: 0,
+          correctAnswers: 0,
+          recentQuizzes: []
+        }
+      });
+    }
+
+    const quizzes = await Quiz.find({ userId });
 
     if (quizzes.length === 0) {
       return res.json({

@@ -2679,49 +2679,58 @@ body {
     color: #b8a67d;
 }
 
-/* Learn Page Dark Mode */
+/* Learn & Roadmap Page Dark Mode */
 .app-dark .bg-gray-50 {
-    background: #000000 !important;
+    background: #0f172a !important;
 }
 
 .app-dark .bg-white {
-    background: #0a0a0a !important;
+    background: #1e293b !important;
 }
 
 .app-dark .border-gray-200 {
-    border-color: #1a1a1a !important;
+    border-color: #334155 !important;
 }
 
-.app-dark .text-gray-900 {
-    color: #ecd69f !important;
+.app-dark .text-gray-900,
+.app-dark .text-gray-800 {
+    color: #f8fafc !important;
 }
 
 .app-dark .text-gray-700 {
-    color: #ecd69f !important;
+    color: #e2e8f0 !important;
 }
 
 .app-dark .text-gray-600 {
-    color: #b8a67d !important;
+    color: #94a3b8 !important;
 }
 
 .app-dark .text-gray-500 {
-    color: #b8a67d !important;
+    color: #64748b !important;
 }
 
 .app-dark .shadow-sm {
-    box-shadow: 0 1px 2px 0 rgba(236, 214, 159, 0.05) !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important;
 }
 
-.app-dark .hover\\:bg-gray-100:hover {
-    background: #1a1a1a !important;
+.app-dark .hover\:bg-gray-100:hover {
+    background: #334155 !important;
 }
 
-.app-dark .bg-gray-50 {
-    background: #0a0a0a !important;
+.app-dark .bg-gray-300,
+.app-dark .bg-gray-200 {
+    background: #334155 !important;
+    color: #f8fafc !important;
+    border: 1px solid #475569 !important;
+}
+
+.app-dark .bg-gray-300:hover,
+.app-dark .bg-gray-200:hover {
+    background: #475569 !important;
 }
 
 .app-dark .bg-green-50 {
-    background: #0a1a0a !important;
+    background: rgba(16, 185, 129, 0.1) !important;
 }
 
 /* Quiz/Test Pages Dark Mode */

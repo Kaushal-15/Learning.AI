@@ -295,6 +295,8 @@ safeMount(app, '/api/auth', () => require('./routes/auth'));
 safeMount(app, '/auth', () => require('./routes/googleAuth'));
 safeMount(app, '/api/content', () => require('./routes/contentRoutes'));
 safeMount(app, '/api/roadmaps', () => require('./routes/roadmapRoutes'));
+safeMount(app, '/api/roadmap-selection', () => require('./routes/roadmapSelectionRoutes'));
+safeMount(app, '/api/custom-learning', () => require('./routes/customLearningRoutes'));
 safeMount(app, '/api/daily-learning', () => require('./routes/dailyLearningRoutes'));
 safeMount(app, '/api/users', () => require('./routes/userRoutes'));
 safeMount(app, '/api/profile', () => require('./routes/profileRoutes'));
@@ -305,6 +307,11 @@ safeMount(app, '/api/quiz', () => require('./routes/quizRoutes'));
 safeMount(app, '/api/test-results', () => require('./routes/testResultRoutes'));
 safeMount(app, '/api/projects', () => require('./routes/project.routes'));
 safeMount(app, '/api/exams', () => require('./routes/examRoutes'));
+safeMount(app, '/api/adaptive-exams', () => require('./routes/adaptiveExamRoutes'));
+safeMount(app, '/api/analytics', () => require('./routes/analyticsRoutes'));
+safeMount(app, '/api/assessments', () => require('./routes/assessmentRoutes'));
+safeMount(app, '/api/learners', () => require('./routes/learnerRoutes'));
+safeMount(app, '/api/performance', () => require('./routes/performanceRoutes'));
 
 // ---------------------------------------------------------------------------
 // 12. Unknown API routes — 404 JSON (must come after all /api/* route mounts)

@@ -3,9 +3,16 @@ const router = express.Router();
 const TestResult = require('../models/TestResult');
 const TestCompletion = require('../models/TestCompletion');
 
+const getUserId = (req) => req.user?.id || req.user?._id;
+
 // Save test result
 router.post('/', async (req, res) => {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
     const {
       roadmapType,
       testCategory,
@@ -19,7 +26,7 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     console.log('Saving test result:', {
-      userId: req.user.id,
+      userId,
       roadmapType,
       testCategory,
       difficulty,
@@ -29,7 +36,7 @@ router.post('/', async (req, res) => {
     });
 
     const testResult = new TestResult({
-      userId: req.user.id,
+      userId,
       roadmapType,
       testCategory,
       difficulty,
@@ -47,7 +54,7 @@ router.post('/', async (req, res) => {
     // Update or create test completion record
     try {
       const existingCompletion = await TestCompletion.findOne({
-        userId: req.user.id,
+        userId,
         roadmapType,
         testCategory,
         difficulty
@@ -65,7 +72,7 @@ router.post('/', async (req, res) => {
         // Create new completion record
         console.log('Creating new completion record');
         const newCompletion = new TestCompletion({
-          userId: req.user.id,
+          userId,
           roadmapType,
           testCategory,
           difficulty,
@@ -98,10 +105,19 @@ router.post('/', async (req, res) => {
 // Get user's test results
 router.get('/', async (req, res) => {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.json({
+        success: true,
+        data: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const { roadmapType, limit = 10 } = req.query;
 
-    const query = { userId: req.user.id };
-    if (roadmapType) {
+    const query = { userId };
+    if (roadmapType && roadmapType !== 'null' && roadmapType !== 'undefined') {
       query.roadmapType = roadmapType;
     }
 
@@ -133,10 +149,25 @@ router.get('/', async (req, res) => {
 // Get test statistics
 router.get('/stats', async (req, res) => {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.json({
+        success: true,
+        data: {
+          totalTests: 0,
+          averageScore: 0,
+          bestScore: 0,
+          totalTimeSpent: 0,
+          recentTests: []
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const { roadmapType } = req.query;
 
-    const matchQuery = { userId: req.user.id };
-    if (roadmapType) {
+    const matchQuery = { userId };
+    if (roadmapType && roadmapType !== 'null' && roadmapType !== 'undefined') {
       matchQuery.roadmapType = roadmapType;
     }
 
@@ -197,10 +228,19 @@ router.get('/stats', async (req, res) => {
 // Get test completions (must be before /:id route)
 router.get('/completions', async (req, res) => {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.json({
+        success: true,
+        data: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const { roadmapType } = req.query;
 
-    const query = { userId: req.user.id };
-    if (roadmapType) {
+    const query = { userId };
+    if (roadmapType && roadmapType !== 'null' && roadmapType !== 'undefined') {
       query.roadmapType = roadmapType;
     }
 
@@ -233,10 +273,20 @@ router.get('/completions', async (req, res) => {
 // Get weak areas analysis (must be before /:id route)
 router.get('/analysis/weak-areas', async (req, res) => {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.json({
+        success: true,
+        weakTopics: [],
+        strongTopics: [],
+        recentResults: []
+      });
+    }
+
     const { roadmapType } = req.query;
 
-    const matchQuery = { userId: req.user.id };
-    if (roadmapType) {
+    const matchQuery = { userId };
+    if (roadmapType && roadmapType !== 'null' && roadmapType !== 'undefined') {
       matchQuery.roadmapType = roadmapType;
     }
 
