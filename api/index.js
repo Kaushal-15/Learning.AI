@@ -6,6 +6,6 @@
  * Delegates requests to the main Express application.
  */
 
-const app = require("../server");
+const app = require("../app/Backend/server");
 
 module.exports = app;

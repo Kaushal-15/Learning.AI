@@ -4,6 +4,7 @@ const { generateSalt, sha256Hash } = require('../utils/crypto');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { sendOTP } = require('../utils/mailer');
 const crypto = require('crypto');
+const connectDB = require('../config/database');
 
 const PEPPER = process.env.PEPPER || '';
 
@@ -25,6 +26,7 @@ const generateOTP = () => {
 
 exports.register = async (req, res) => {
     try {
+        await connectDB();
         const { email, password, name } = req.body;
 
         // Validate required fields
@@ -128,6 +130,7 @@ exports.register = async (req, res) => {
 
 exports.verifyOTP = async (req, res) => {
     try {
+        await connectDB();
         const { email, otp } = req.body;
 
         if (!email || !otp) {
@@ -167,6 +170,7 @@ exports.verifyOTP = async (req, res) => {
 
 exports.loginUser = async (req, res) => {
     try {
+        await connectDB();
         const { email, password } = req.body;
         const user = await User.findOne({ email });
         if (!user) {

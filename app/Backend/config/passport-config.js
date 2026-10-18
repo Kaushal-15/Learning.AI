@@ -135,6 +135,8 @@ passport.serializeUser((user, done) => {
  */
 passport.deserializeUser(async (id, done) => {
     try {
+        const connectDB = require('./database');
+        await connectDB();
         const user = await User.findById(id);
         done(null, user);
     } catch (error) {

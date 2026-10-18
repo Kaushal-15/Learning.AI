@@ -10,6 +10,9 @@
 
 const mongoose = require('mongoose');
 
+// Never buffer queries in serverless; execute against connected DB or fail fast
+mongoose.set('bufferCommands', false);
+
 let cached = global.mongoose;
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null, _listenersRegistered: false };
@@ -17,7 +20,8 @@ if (!cached) {
 
 const connectDB = async () => {
   // Return the already-open connection immediately.
-  if (cached.conn && mongoose.connection.readyState === 1) {
+  if (mongoose.connection.readyState === 1) {
+    cached.conn = mongoose.connection;
     return cached.conn;
   }
 
@@ -28,6 +32,18 @@ const connectDB = async () => {
       return cached.conn;
     } catch (e) {
       cached.promise = null;
+      cached.conn = null;
+      throw e;
+    }
+  }
+
+  // If mongoose is already in the process of connecting through another path
+  if (mongoose.connection.readyState === 2) {
+    try {
+      await mongoose.connection.asPromise();
+      cached.conn = mongoose.connection;
+      return cached.conn;
+    } catch (e) {
       cached.conn = null;
       throw e;
     }

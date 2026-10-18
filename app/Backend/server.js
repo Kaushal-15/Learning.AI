@@ -142,7 +142,77 @@ app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 app.use(cookieParser());
 
 // ---------------------------------------------------------------------------
-// 6-7. Session — MongoStore once connect-mongo is available; MemoryStore in CI
+// 6. Health routes — no DB dependency; always 200 even if DB is down
+// ---------------------------------------------------------------------------
+app.get('/', (req, res) => {
+  res.status(200).json({
+    name: 'Learning.AI Backend',
+    status: 'OK'
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    uptime: process.uptime()
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    service: 'Learning.AI API'
+  });
+});
+
+// DB health check — pings the live connection
+app.get('/api/health/db', async (req, res) => {
+  try {
+    const state = mongoose.connection.readyState;
+    if (state !== 1) {
+      const connectDB = require('./config/database');
+      await connectDB();
+    }
+    await mongoose.connection.db.admin().ping();
+    res.status(200).json({
+      status: 'OK',
+      db: 'connected',
+      host: mongoose.connection.host
+    });
+  } catch (err) {
+    console.error('DB health check failed:', err.message);
+    res.status(503).json({
+      status: 'error',
+      db: 'disconnected',
+      message: err.message
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 7. DB middleware — ensures a connection is open before any data route or session runs.
+//     Health routes above are exempt (they return before reaching this).
+// ---------------------------------------------------------------------------
+const connectDB = require('./config/database');
+const HEALTH_PATHS = new Set(['/', '/health', '/api/health', '/api/health/db']);
+
+app.use(async (req, res, next) => {
+  if (req.method === 'OPTIONS' || HEALTH_PATHS.has(req.path)) return next();
+
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('DB connection failed for request:', req.originalUrl, err.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Database unavailable'
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 8. Session — MongoStore once connect-mongo is available; MemoryStore in CI
 // ---------------------------------------------------------------------------
 let sessionStore;
 
@@ -152,7 +222,6 @@ if (mongoUri && mongoUri.startsWith('mongodb+srv://') && !mongoUri.includes('aut
 }
 
 if (mongoUri) {
-  // Use MongoStore in production/staging to survive serverless cold starts.
   try {
     const cm = require('connect-mongo');
     const MongoStore = cm.default || cm.MongoStore || cm;
@@ -161,7 +230,6 @@ if (mongoUri) {
       dbName: 'learning-ai',
       ttl: 7 * 24 * 60 * 60, // 7 days in seconds
       collectionName: 'sessions',
-      // Lazy connect — avoids blocking startup if DB is slow.
       autoRemove: 'native'
     });
     console.log('✅ Using MongoStore for sessions');
@@ -193,82 +261,11 @@ app.use(
 );
 
 // ---------------------------------------------------------------------------
-// 8. Passport
+// 9. Passport
 // ---------------------------------------------------------------------------
 const passport = require('./config/passport-config');
 app.use(passport.initialize());
 app.use(passport.session());
-
-// ---------------------------------------------------------------------------
-// 9. Health routes — no DB dependency; always 200 even if DB is down
-// ---------------------------------------------------------------------------
-app.get('/', (req, res) => {
-  res.status(200).json({
-    name: 'Learning.AI Backend',
-    status: 'OK'
-  });
-});
-
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    uptime: process.uptime()
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    service: 'Learning.AI API'
-  });
-});
-
-// DB health check — pings the live connection
-app.get('/api/health/db', async (req, res) => {
-  try {
-    const state = mongoose.connection.readyState;
-    if (state !== 1) {
-      // Attempt a connection so a cold-start gets a real result.
-      const connectDB = require('./config/database');
-      await connectDB();
-    }
-    await mongoose.connection.db.admin().ping();
-    res.status(200).json({
-      status: 'OK',
-      db: 'connected',
-      host: mongoose.connection.host
-    });
-  } catch (err) {
-    console.error('DB health check failed:', err.message);
-    res.status(503).json({
-      status: 'error',
-      db: 'disconnected',
-      message: err.message
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// 10. DB middleware — ensures a connection is open before any data route runs.
-//     Health routes above are exempt (they return before reaching this).
-// ---------------------------------------------------------------------------
-const connectDB = require('./config/database');
-const HEALTH_PATHS = new Set(['/', '/health', '/api/health', '/api/health/db']);
-
-app.use(async (req, res, next) => {
-  if (req.method === 'OPTIONS' || HEALTH_PATHS.has(req.path)) return next();
-
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    console.error('DB connection failed for request:', req.originalUrl, err.message);
-    return res.status(503).json({
-      success: false,
-      message: 'Database unavailable'
-    });
-  }
-});
 
 // ---------------------------------------------------------------------------
 // 11. Application routes — wrapped in a crash-safe loader.
