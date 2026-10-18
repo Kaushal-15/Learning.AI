@@ -37,7 +37,7 @@ router.get(
  * @access  Public
  */
 router.get(
-    '/google/callback',
+    ['/google/callback', '/google/callback/'],
     ensureGoogleStrategy,
     (req, res, next) => {
         passport.authenticate('google', {

@@ -30,6 +30,10 @@ if (!callbackURL) {
     }
 }
 
+if (callbackURL) {
+    callbackURL = callbackURL.replace(/\/+$/, '');
+}
+
 /**
  * Register GoogleStrategy if clientID, clientSecret, and callbackURL are present.
  */
