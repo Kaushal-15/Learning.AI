@@ -146,7 +146,10 @@ app.use(cookieParser());
 // ---------------------------------------------------------------------------
 let sessionStore;
 
-const mongoUri = (process.env.MONGODB_URI || process.env.MONGODB_TEST_URI || '').replace(/^["']|["']$/g, '').trim();
+let mongoUri = (process.env.MONGODB_URI || process.env.MONGODB_TEST_URI || '').replace(/^["']|["']$/g, '').trim();
+if (mongoUri && mongoUri.startsWith('mongodb+srv://') && !mongoUri.includes('authSource=')) {
+  mongoUri += (mongoUri.includes('?') ? '&' : '?') + 'authSource=admin';
+}
 
 if (mongoUri) {
   // Use MongoStore in production/staging to survive serverless cold starts.

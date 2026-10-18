@@ -40,8 +40,13 @@ const connectDB = async () => {
     throw new Error('MONGODB_URI is not set in environment variables');
   }
 
+  let normalizedURI = mongoURI;
+  if (normalizedURI.startsWith('mongodb+srv://') && !normalizedURI.includes('authSource=')) {
+    normalizedURI += (normalizedURI.includes('?') ? '&' : '?') + 'authSource=admin';
+  }
+
   cached.promise = mongoose
-    .connect(mongoURI, {
+    .connect(normalizedURI, {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 8000, // fail fast in serverless
       socketTimeoutMS: 45000,
