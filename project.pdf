@@ -1,0 +1,177 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [ 5 0 R 7 0 R 9 0 R ] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 595.28 841.89 ] /Contents 6 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 4311 >>
+stream
+0.12 0.11 0.29 rg 40 710 515 95 re f
+BT /F2 24 Tf 1 1 1 rg 60 770 Td (Learning.AI) Tj ET
+BT /F1 12 Tf 0.8 0.85 1 rg 60 745 Td (System Architecture, Feature Directory & Senior Technical Roadmap) Tj ET
+BT /F1 9 Tf 0.7 0.75 0.95 rg 60 725 Td (Version 1.0  |  Senior Cloud Solutions Architect Review  |  Production Readiness Blueprint) Tj ET
+BT /F2 15 Tf 0.12 0.11 0.29 rg 40 680 Td (1. Executive Summary & Production Topology) Tj ET
+1.5 w 0.8 0.85 0.9 RG 40 672 m 555 672 l S
+BT /F1 10 Tf 0.2 0.2 0.25 rg 40 650 Td (Learning.AI is an AI-powered education and adaptive assessment platform designed for dynamic skill) Tj ET
+BT /F1 10 Tf 0.2 0.2 0.25 rg 40 635 Td (evaluation, real-time proctoring, and personalized learning paths. The system combines an adaptive test engine,) Tj ET
+BT /F1 10 Tf 0.2 0.2 0.25 rg 40 620 Td (biometric verification, WebRTC webcam proctoring, and comprehensive progress tracking.) Tj ET
+0.94 0.98 0.95 rg 40 530 515 75 re f
+3 w 0.08 0.64 0.29 RG 40 530 m 40 605 l S
+BT /F2 10 Tf 0.08 0.45 0.2 rg 55 585 Td (Key Milestone Achieved \(October 2026\):) Tj ET
+BT /F1 9.5 Tf 0.1 0.35 0.15 rg 55 570 Td (- Mongoose serverless cold-start buffering timeout \(10000ms\) permanently resolved.) Tj ET
+BT /F1 9.5 Tf 0.1 0.35 0.15 rg 55 555 Td (- Middleware reordered: connectDB guarantees MongoDB readyState === 1 before session/passport.) Tj ET
+BT /F1 9.5 Tf 0.1 0.35 0.15 rg 55 540 Td (- Live production verified: /api/health/db \(200 OK\) and /api/auth/login responding cleanly.) Tj ET
+BT /F2 12 Tf 0.12 0.11 0.29 rg 40 505 Td (Active Deployment Topology:) Tj ET
+0.97 0.98 1 rg 40 400 515 90 re f
+1 w 0.8 0.85 0.9 RG 40 465 m 555 465 l S
+1 w 0.8 0.85 0.9 RG 40 440 m 555 440 l S
+1 w 0.8 0.85 0.9 RG 40 415 m 555 415 l S
+BT /F2 10 Tf 0.12 0.11 0.29 rg 50 475 Td (Tier / Layer) Tj ET
+BT /F2 10 Tf 0.12 0.11 0.29 rg 160 475 Td (Technology Stack) Tj ET
+BT /F2 10 Tf 0.12 0.11 0.29 rg 350 475 Td (Live Production URL / Identifier) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 50 450 Td (Frontend Client) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 160 450 Td (React 18, Vite, Tailwind CSS) Tj ET
+BT /F1 9.5 Tf 0.1 0.2 0.8 rg 350 450 Td (https://learning-ai-rswf.vercel.app) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 50 425 Td (Backend API) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 160 425 Td (Node.js 22, Express 4, Mongoose 7) Tj ET
+BT /F1 9.5 Tf 0.1 0.2 0.8 rg 350 425 Td (https://learning-ai-mocha.vercel.app) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 50 403 Td (Database Cluster) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 160 403 Td (MongoDB Atlas \(Replica Set\)) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 350 403 Td (learning-ai \(Cluster: ac-thajia8\)) Tj ET
+BT /F2 15 Tf 0.12 0.11 0.29 rg 40 370 Td (2. Platform Capabilities & Functional Subsystems) Tj ET
+1.5 w 0.8 0.85 0.9 RG 40 362 m 555 362 l S
+BT /F2 11 Tf 0.22 0.19 0.54 rg 40 340 Td (Adaptive Exam Engine:) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 325 Td (Dynamically adjusts test difficulty based on real-time student performance vectors. Implemented in) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 310 Td (AdaptiveDifficultyEngine.js and AdaptiveExamSession.jsx with real-time score calibration.) Tj ET
+BT /F2 11 Tf 0.22 0.19 0.54 rg 40 285 Td (Biometric Verification & Camera Proctoring:) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 270 Td (Enforces candidate integrity via facial snapshots and continuous webcam recording. Includes) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 255 Td (AdminBiometricApproval.jsx and real-time candidate feed monitoring in CameraMonitor.jsx.) Tj ET
+BT /F2 11 Tf 0.22 0.19 0.54 rg 40 230 Td (Curriculum Roadmaps & Gamification:) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 215 Td (Structured learning tracks \(Frontend, Backend, AI/ML, Mobile, DevOps\) mapped to granular lesson modules.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 200 Td (Integrated with XP points, streak counters, and category mastery levels \(xp.service.js\).) Tj ET
+BT /F2 11 Tf 0.22 0.19 0.54 rg 40 175 Td (Personalized Content Generation:) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 160 Td (Generates custom question sets \(PersonalizedQuestionSetService.js\) targeting individual weak spots) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 145 Td (identified from prior assessment results and quiz history.) Tj ET
+BT /F1 9 Tf 0.5 0.5 0.5 rg 220 50 Td (Page 1 of 3  -  Learning.AI Architectural Assessment) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 595.28 841.89 ] /Contents 8 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 4396 >>
+stream
+BT /F2 15 Tf 0.12 0.11 0.29 rg 40 780 Td (3. Senior Architectural Evaluation & Gap Analysis) Tj ET
+1.5 w 0.8 0.85 0.9 RG 40 772 m 555 772 l S
+BT /F1 10 Tf 0.2 0.2 0.25 rg 40 750 Td (A rigorous review of the codebase identifies five specific areas required to achieve full production excellence:) Tj ET
+0.98 0.98 0.99 rg 40 480 515 250 re f
+1 w 0.8 0.85 0.9 RG 40 705 m 555 705 l S
+1 w 0.8 0.85 0.9 RG 40 645 m 555 645 l S
+1 w 0.8 0.85 0.9 RG 40 590 m 555 590 l S
+1 w 0.8 0.85 0.9 RG 40 535 m 555 535 l S
+BT /F2 10 Tf 0.12 0.11 0.29 rg 50 715 Td (Architecture Finding) Tj ET
+BT /F2 10 Tf 0.12 0.11 0.29 rg 210 715 Td (Severity) Tj ET
+BT /F2 10 Tf 0.12 0.11 0.29 rg 280 715 Td (Current State & Senior Architect Remedy) Tj ET
+BT /F2 9 Tf 0.7 0.1 0.1 rg 50 685 Td (1. Video Storage on Ephemeral Disk) Tj ET
+BT /F2 8.5 Tf 0.8 0.1 0.1 rg 210 685 Td (CRITICAL) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 690 Td (recordingService.js writes to local /uploads on disk. On Vercel,) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 675 Td (serverless disks are read-only and ephemeral. Migrate to S3/R2 direct uploads.) Tj ET
+BT /F2 9 Tf 0.8 0.4 0 rg 50 625 Td (2. Missing Database Seed Data) Tj ET
+BT /F2 8.5 Tf 0.8 0.4 0 rg 210 625 Td (HIGH) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 630 Td (Collections like "roadmaps" are empty in Atlas, causing /api/roadmaps/frontend) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 615 Td (to 404. Deploy an automated seed script for all core roadmap tracks.) Tj ET
+BT /F2 9 Tf 0.8 0.4 0 rg 50 570 Td (3. Tailwind CDN in Production) Tj ET
+BT /F2 8.5 Tf 0.8 0.4 0 rg 210 570 Td (HIGH) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 575 Td (index.html loads cdn.tailwindcss.com. Browser warns not for production.) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 560 Td (Configure Tailwind via PostCSS inside Vite for optimal performance.) Tj ET
+BT /F2 9 Tf 0.2 0.3 0.7 rg 50 515 Td (4. Pure Stateless JWT Auth) Tj ET
+BT /F2 8.5 Tf 0.2 0.3 0.7 rg 210 515 Td (MEDIUM) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 520 Td (Passport and session store add cold-start overhead. Transition Google OAuth) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 505 Td (and protected routes to pure JWTs \(eliminate MongoStore dependency\).) Tj ET
+BT /F2 9 Tf 0.2 0.3 0.7 rg 50 460 Td (5. Rate Limiter Tuning) Tj ET
+BT /F2 8.5 Tf 0.2 0.3 0.7 rg 210 460 Td (MEDIUM) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 465 Td (Global 100 req / 15 min rate limiter risks dropping high-frequency proctoring) Tj ET
+BT /F1 8.5 Tf 0.2 0.2 0.25 rg 280 450 Td (telemetry chunks. Segment limits by endpoint purpose.) Tj ET
+BT /F2 12 Tf 0.12 0.11 0.29 rg 40 410 Td (Detailed Technical Analysis:) Tj ET
+BT /F2 10.5 Tf 0.22 0.19 0.54 rg 40 385 Td (1. Video Storage & Proctoring Architecture) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 370 Td (In cameraRoutes.js and recordingService.js, video chunks sent from candidate webcams are currently) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 355 Td (appended to local files using fs.appendFile. On Vercel, each request may execute on a separate lambda instance) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 340 Td (with a clean ephemeral file container. The required architectural pattern is presigned cloud object URLs) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 325 Td (\(Amazon S3 or Cloudflare R2\), allowing candidate browsers to stream WebM video chunks straight to cloud buckets.) Tj ET
+BT /F2 10.5 Tf 0.22 0.19 0.54 rg 40 295 Td (2. Seeding & Database Integrity) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 280 Td (When the frontend requests /api/roadmaps/frontend, the route queries Roadmap.findOne\({ roadmapId: ... }\).) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 265 Td (Because the database does not contain seed documents, the endpoint returns 404. Incorporating an automated) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 250 Td (idempotent seeder ensures default tracks \(frontend, backend, full-stack, ai-ml\) are populated upon boot.) Tj ET
+BT /F2 10.5 Tf 0.22 0.19 0.54 rg 40 220 Td (3. Frontend Bundle & PostCSS Optimization) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 205 Td (Tailwind CSS loaded through cdn.tailwindcss.com evaluates all style rules on client-side JS runtime.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 190 Td (Transitioning to Vite PostCSS build plugin bundles purged CSS, eliminating runtime evaluation and latency.) Tj ET
+BT /F1 9 Tf 0.5 0.5 0.5 rg 220 50 Td (Page 2 of 3  -  Learning.AI Architectural Assessment) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 595.28 841.89 ] /Contents 10 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 3161 >>
+stream
+BT /F2 15 Tf 0.12 0.11 0.29 rg 40 780 Td (4. Phased Production Blueprint & Technical Roadmap) Tj ET
+1.5 w 0.8 0.85 0.9 RG 40 772 m 555 772 l S
+0.96 0.98 1 rg 40 640 515 115 re f
+BT /F2 11 Tf 0.12 0.11 0.45 rg 55 735 Td (Phase 1: Immediate Production Hardening \(Priority 1\)) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 715 Td (- Implement S3/R2 presigned URL generation for proctoring video chunk streaming.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 698 Td (- Run database seed script for roadmaps and question banks in MongoDB Atlas.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 681 Td (- Migrate Tailwind CSS from CDN to PostCSS/Vite inside app/frontend.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 664 Td (- Remove dead/duplicate backup files in frontend src/components to reduce bundle footprint.) Tj ET
+0.96 0.98 1 rg 40 495 515 125 re f
+BT /F2 11 Tf 0.12 0.11 0.45 rg 55 595 Td (Phase 2: Architectural Decoupling & Scalability \(Priority 2\)) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 575 Td (- Refactor Google OAuth to stateless JWT exchange \(session: false\), deprecating MongoStore.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 558 Td (- Segment express-rate-limit: auth \(10/min\), general API \(120/min\), proctoring telemetry \(600/min\).) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 541 Td (- Create compound indexes in Atlas for examId, sessionId, learnerId, and status.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 524 Td (- Add React Error Boundaries around AdaptiveExamSession and Roadmap modules.) Tj ET
+0.96 0.98 1 rg 40 360 515 115 re f
+BT /F2 11 Tf 0.12 0.11 0.45 rg 55 450 Td (Phase 3: Enterprise Observability & Operations \(Priority 3\)) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 430 Td (- Setup Sentry error monitoring across frontend SPA and Vercel serverless functions.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 413 Td (- Implement automated end-to-end testing with Playwright for login, exam, and proctoring flows.) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 55 396 Td (- Consolidate custom domains under unified root \(e.g., app.learningai.com & api.learningai.com\).) Tj ET
+BT /F2 14 Tf 0.12 0.11 0.29 rg 40 330 Td (5. Architectural Sign-off & Recommendation) Tj ET
+1.5 w 0.8 0.85 0.9 RG 40 322 m 555 322 l S
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 300 Td (With the resolution of the Mongoose connection lifecycle and query buffering bottleneck, the core) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 285 Td (infrastructure now operates reliably on Vercel Serverless. By systematically addressing the cloud storage) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 270 Td (and database seeding milestones outlined above, Learning.AI will represent a benchmark educational) Tj ET
+BT /F1 9.5 Tf 0.2 0.2 0.25 rg 40 255 Td (platform capable of supporting thousands of concurrent examination sessions with complete integrity.) Tj ET
+0.98 0.98 0.98 rg 40 180 515 55 re f
+BT /F2 9.5 Tf 0.12 0.11 0.29 rg 55 215 Td (Approved by: Senior Full-Stack Cloud Solutions Architect) Tj ET
+BT /F1 9 Tf 0.4 0.4 0.45 rg 55 195 Td (Date: October 18, 2026  |  Document Status: ACTIVE & APPROVED  |  Learning.AI v1.0) Tj ET
+BT /F1 9 Tf 0.5 0.5 0.5 rg 220 50 Td (Page 3 of 3  -  Learning.AI Architectural Assessment) Tj ET
+endstream
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000019 00000 n 
+0000000068 00000 n 
+0000000139 00000 n 
+0000000236 00000 n 
+0000000338 00000 n 
+0000000482 00000 n 
+0000004845 00000 n 
+0000004989 00000 n 
+0000009437 00000 n 
+0000009582 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+12796
+%%EOF

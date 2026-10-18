@@ -1,0 +1,467 @@
+const fs = require('fs');
+const path = require('path');
+
+const docContent = `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+  <meta charset="utf-8">
+  <title>Learning.AI - Senior Architectural Review & Full-Stack Blueprint</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 1.0in 0.8in 1.0in 0.8in;
+      mso-header-margin: 0.5in;
+      mso-footer-margin: 0.5in;
+    }
+    body {
+      font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #1e293b;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .header-banner {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+      color: #ffffff;
+      padding: 35px 30px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .header-banner h1 {
+      margin: 0 0 10px 0;
+      font-size: 26pt;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+    .header-banner .subtitle {
+      font-size: 13pt;
+      color: #c7d2fe;
+      margin-bottom: 15px;
+    }
+    .meta-grid {
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      padding-top: 15px;
+      margin-top: 15px;
+      font-size: 9.5pt;
+      color: #e0e7ff;
+    }
+    h2 {
+      font-size: 16pt;
+      color: #1e1b4b;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-top: 28px;
+      margin-bottom: 14px;
+      font-weight: 700;
+    }
+    h3 {
+      font-size: 13pt;
+      color: #3730a3;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    h4 {
+      font-size: 11pt;
+      color: #475569;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    p {
+      margin: 0 0 10px 0;
+      text-align: justify;
+    }
+    ul, ol {
+      margin: 0 0 12px 0;
+      padding-left: 24px;
+    }
+    li {
+      margin-bottom: 5px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 8.5pt;
+      font-weight: 700;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-critical { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-high { background-color: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    .badge-medium { background-color: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+    .badge-success { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-info { background-color: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0 20px 0;
+      font-size: 10pt;
+    }
+    th {
+      background-color: #1e1b4b;
+      color: #ffffff;
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+    }
+    td {
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      vertical-align: top;
+    }
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .callout {
+      padding: 14px 18px;
+      border-radius: 6px;
+      margin: 16px 0;
+      border-left: 4px solid;
+    }
+    .callout-info {
+      background-color: #f0fdf4;
+      border-color: #16a34a;
+      color: #14532d;
+    }
+    .callout-warning {
+      background-color: #fffbeb;
+      border-color: #d97706;
+      color: #78350f;
+    }
+    .callout-danger {
+      background-color: #fef2f2;
+      border-color: #dc2626;
+      color: #7f1d1d;
+    }
+    .code-block {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 9pt;
+      line-height: 1.4;
+      margin: 12px 0;
+      overflow-x: auto;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- EXECUTIVE HEADER BANNER -->
+  <div class="header-banner">
+    <h1>Learning.AI</h1>
+    <div class="subtitle">Comprehensive System Architecture, Feature Audit & Senior Technical Roadmap</div>
+    <div class="meta-grid">
+      <strong>Document Version:</strong> 1.0.0 &nbsp;|&nbsp;
+      <strong>Author:</strong> Senior Full-Stack Cloud Architect &nbsp;|&nbsp;
+      <strong>Scope:</strong> Production Readiness, Scalability, Proctoring & AI Exam Platform &nbsp;|&nbsp;
+      <strong>Environment:</strong> Vercel Serverless + React/Vite + MongoDB Atlas
+    </div>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#section-1">Executive Summary & Current Architecture Baseline</a></li>
+    <li><a href="#section-2">Platform Domain & Feature Directory</a>
+      <ul>
+        <li>2.1 Adaptive Testing & Dynamic MCQ Engine</li>
+        <li>2.2 AI Biometric Proctoring & Camera Surveillance</li>
+        <li>2.3 Interactive Curriculum, Skill Roadmaps & Gamification</li>
+        <li>2.4 Custom Learning & Personalized Question Engine</li>
+        <li>2.5 Admin Operations, Exam Creation & Live Monitoring</li>
+        <li>2.6 Authentication, Multi-Provider Identity & Security</li>
+      </ul>
+    </li>
+    <li><a href="#section-3">Senior Architectural Evaluation & Gap Analysis</a>
+      <ul>
+        <li>3.1 Serverless Filesystem vs. Stateful Media Uploads</li>
+        <li>3.2 Dual Database Pooling & Session Engine Optimization</li>
+        <li>3.3 Database Seeding & Schema Gaps</li>
+        <li>3.4 Frontend Hygiene & CDN Tailwind Elimination</li>
+        <li>3.5 Cross-Domain Topology & API Gateway Consolidation</li>
+        <li>3.6 Security Hardening & Rate Limit Segmentation</li>
+      </ul>
+    </li>
+    <li><a href="#section-4">Actionable Production Blueprint (Phased Roadmap)</a></li>
+    <li><a href="#section-5">Target Enterprise Architecture Specification</a></li>
+  </ol>
+
+  <!-- SECTION 1: EXECUTIVE SUMMARY -->
+  <h2 id="section-1">1. Executive Summary & Current Architecture Baseline</h2>
+  <p>
+    <strong>Learning.AI</strong> is an advanced, full-featured online education and AI-proctored examination platform designed for personalized learning, adaptive testing, and integrity-verified student assessments. The platform incorporates machine learning principles to dynamically calibrate test difficulty, monitor student biometrics and webcam feeds in real time, and map learning journeys across software engineering disciplines.
+  </p>
+
+  <div class="callout callout-info">
+    <strong>Architectural Assessment Summary:</strong> The core logic, schemas, and user journeys are exceptionally feature-rich. However, transitioning from a monolithic development model to a distributed Vercel serverless deployment has exposed several architectural friction points—namely, stateful media uploads, unseeded collections, and database connection lifecycle orchestration. With the architectural refinements outlined below, Learning.AI will operate as an enterprise-grade, highly resilient platform.
+  </div>
+
+  <h3>Current Deployment Topology</h3>
+  <table>
+    <tr>
+      <th>Layer</th>
+      <th>Technology</th>
+      <th>Host / Provider</th>
+      <th>Endpoint / Role</th>
+    </tr>
+    <tr>
+      <td><strong>Frontend Client</strong></td>
+      <td>React 18, Vite, Tailwind CSS, Lucide Icons</td>
+      <td>Vercel (Edge)</td>
+      <td><code>https://learning-ai-rswf.vercel.app</code></td>
+    </tr>
+    <tr>
+      <td><strong>Backend API</strong></td>
+      <td>Node.js 22, Express 4, Mongoose 7, Passport</td>
+      <td>Vercel (Serverless Functions)</td>
+      <td><code>https://learning-ai-mocha.vercel.app</code></td>
+    </tr>
+    <tr>
+      <td><strong>Database Store</strong></td>
+      <td>MongoDB Atlas (Replica Set / M0 Cluster)</td>
+      <td>MongoDB Cloud (AWS IAD)</td>
+      <td>Database: <code>learning-ai</code></td>
+    </tr>
+    <tr>
+      <td><strong>Proxy Routing</strong></td>
+      <td>Vercel Edge Rewrites (<code>/api/*</code> &rarr; Backend)</td>
+      <td>Vercel Edge Network</td>
+      <td>Cross-domain CORS / Cookie handling</td>
+    </tr>
+  </table>
+
+  <!-- SECTION 2: PLATFORM DOMAIN & FEATURE DIRECTORY -->
+  <div class="page-break"></div>
+  <h2 id="section-2">2. Platform Domain & Feature Directory</h2>
+
+  <h3>2.1 Adaptive Testing & Dynamic MCQ Engine</h3>
+  <p>
+    The adaptive exam system is the intellectual core of the assessment tier. Rather than presenting fixed linear questionnaires, the engine assesses student responses in real time and dynamically adjusts subsequent question difficulty:
+  </p>
+  <ul>
+    <li><strong>Difficulty Calibration Engine (<code>AdaptiveDifficultyEngine.js</code>):</strong> Continuously updates the student's estimated ability level based on question difficulty parameters and consecutive hit/miss patterns.</li>
+    <li><strong>Adaptive Exam Session Controller (<code>AdaptiveExamSession.jsx</code>, <code>adaptiveExamController.js</code>):</strong> Manages test state, time limits, question pagination, answer submission, and score calculation.</li>
+    <li><strong>Dynamic MCQ Routing (<code>AdaptiveRoutingConfig.jsx</code>, <code>AdaptiveWaitScreen.jsx</code>):</strong> Provides smooth transitions between question pools without full-page reloads, retaining test integrity in intermittent connectivity.</li>
+  </ul>
+
+  <h3>2.2 AI Biometric Proctoring & Camera Surveillance</h3>
+  <p>
+    To ensure credential and exam integrity, Learning.AI implements a comprehensive proctoring subsystem:
+  </p>
+  <ul>
+    <li><strong>Biometric Identity Capture (<code>BiometricCapture.jsx</code>):</strong> Captures facial snapshots during onboarding and exam entry, matching them against baseline student records.</li>
+    <li><strong>Real-Time Camera Proctoring (<code>CameraMonitor.jsx</code>, <code>cameraRoutes.js</code>):</strong> Monitors candidate webcam video feeds throughout active testing sessions, periodically dispatching video chunks.</li>
+    <li><strong>Admin Biometric Verification Console (<code>AdminBiometricApproval.jsx</code>, <code>BiometricApproval.jsx</code>):</strong> Allows proctors and exam administrators to approve, reject, or flag candidate biometric captures before exams commence.</li>
+  </ul>
+
+  <h3>2.3 Interactive Curriculum, Skill Roadmaps & Gamification</h3>
+  <p>
+    Learning.AI guides learners through standardized curriculum trees:
+  </p>
+  <ul>
+    <li><strong>Domain Roadmaps (<code>Roadmap.jsx</code>, <code>LearnPaths.jsx</code>):</strong> Predefined tracks for Full-Stack Development, Frontend, Backend, AI/ML, Mobile, DevOps, and Data Science.</li>
+    <li><strong>Lesson Explorer (<code>LessonDetail.jsx</code>, <code>ContentViewer.jsx</code>):</strong> Deep-dive theoretical and practical content for individual syllabus topics.</li>
+    <li><strong>XP & Gamification Engine (<code>xp.service.js</code>, <code>xp.routes.js</code>):</strong> Calculates experience points, study streaks, and mastery tier badges to sustain student engagement.</li>
+  </ul>
+
+  <h3>2.4 Custom Learning & Personalized Question Engine</h3>
+  <ul>
+    <li><strong>Personalized Question Sets (<code>PersonalizedQuestionSetService.js</code>):</strong> Generates targeted practice exams focused specifically on a learner's identified weak points across previous assessments.</li>
+    <li><strong>Custom Quiz Builder (<code>CustomLearning.jsx</code>, <code>CustomQuizHistory.jsx</code>):</strong> Gives students the flexibility to practice specific domains at chosen difficulty levels.</li>
+  </ul>
+
+  <h3>2.5 Admin Operations, Exam Creation & Live Monitoring</h3>
+  <ul>
+    <li><strong>Visual Exam Authoring Studio (<code>AdminExamCreate.jsx</code>, <code>AdminExamManage.jsx</code>):</strong> Comprehensive tool for creating exams, setting pass thresholds, specifying duration, importing questions via CSV, and defining proctoring policies.</li>
+    <li><strong>Live Monitoring Room (<code>ExamMonitor.jsx</code>, <code>ExamDashboard.jsx</code>):</strong> Real-time overview of active candidates, connection statuses, warnings, and biometric discrepancies.</li>
+    <li><strong>Performance Analytics Dashboard (<code>AnalyticsDashboard.jsx</code>, <code>ExamAnalytics.jsx</code>):</strong> Visual analytics highlighting cohort pass rates, question discrimination indices, and time-per-question distributions.</li>
+  </ul>
+
+  <h3>2.6 Authentication, Multi-Provider Identity & Security</h3>
+  <ul>
+    <li><strong>Local Authentication:</strong> Salted SHA-256 password hashing with a server-side cryptographic pepper and 6-digit email OTP verification.</li>
+    <li><strong>Google OAuth 2.0:</strong> Streamlined one-click sign-in leveraging Google accounts, auto-provisioning linked Learner and User records.</li>
+    <li><strong>Token Management:</strong> Short-lived JWT access tokens accompanied by cryptographically signed refresh tokens with automated rotation.</li>
+  </ul>
+
+  <!-- SECTION 3: SENIOR ARCHITECTURAL EVALUATION -->
+  <div class="page-break"></div>
+  <h2 id="section-3">3. Senior Architectural Evaluation & Gap Analysis</h2>
+
+  <table>
+    <tr>
+      <th style="width: 25%;">Area</th>
+      <th style="width: 15%;">Severity</th>
+      <th style="width: 30%;">Current Implementation Detail</th>
+      <th style="width: 30%;">Architectural Remedy</th>
+    </tr>
+    <tr>
+      <td><strong>Video Proctoring Storage</strong></td>
+      <td><span class="badge badge-critical">Critical</span></td>
+      <td><code>recordingService.js</code> writes video chunks to local disk via <code>fs.appendFile</code> into <code>app/Backend/uploads/recordings</code>. Fails on Vercel's read-only ephemeral filesystem.</td>
+      <td>Migrate to direct-to-cloud upload using Presigned S3/Cloudflare R2 URLs. Frontend streams chunks directly to cloud object storage.</td>
+    </tr>
+    <tr>
+      <td><strong>Database Seeding</strong></td>
+      <td><span class="badge badge-high">High</span></td>
+      <td>Empty collections in MongoDB Atlas (e.g., <code>roadmaps</code>, <code>questions</code>) cause public endpoints like <code>/api/roadmaps/frontend</code> to return 404.</td>
+      <td>Deploy an automated idempotent migration script (<code>scripts/seed-roadmaps.js</code>) executed automatically during initial deployment.</td>
+    </tr>
+    <tr>
+      <td><strong>Frontend Styling Assets</strong></td>
+      <td><span class="badge badge-high">High</span></td>
+      <td><code>index.html</code> imports Tailwind CSS via CDN script (<code>https://cdn.tailwindcss.com</code>). Triggers production console warnings and slows First Contentful Paint (FCP).</td>
+      <td>Install Tailwind CSS as a PostCSS plugin in Vite. Build static, purged utility CSS into the bundle.</td>
+    </tr>
+    <tr>
+      <td><strong>Session Layer vs. Stateless JWT</strong></td>
+      <td><span class="badge badge-medium">Medium</span></td>
+      <td><code>express-session</code> with <code>MongoStore</code> was required for Passport Google OAuth, incurring database handshake overhead on serverless cold starts.</td>
+      <td>Transition Google OAuth flow to exchange OAuth codes directly for JWTs, completely decoupling serverless APIs from stateful session stores.</td>
+    </tr>
+    <tr>
+      <td><strong>Rate Limiting Configuration</strong></td>
+      <td><span class="badge badge-medium">Medium</span></td>
+      <td>Global rate limiter in <code>server.js</code> restricts <code>/api/</code> to 100 requests / 15 minutes. High-frequency proctoring telemetry risks triggering false 429 errors.</td>
+      <td>Segment rate limits: strict limits on <code>/api/auth/*</code>, relaxed high-throughput allowances for <code>/api/camera/*</code> and proctoring telemetry.</td>
+    </tr>
+    <tr>
+      <td><strong>Repository Clutter</strong></td>
+      <td><span class="badge badge-info">Low</span></td>
+      <td>Backup files exist in the repository (e.g. <code>Dashboard.backup.jsx</code>, <code>Learn.jsx.backup</code>, <code>check_exam.js</code>).</td>
+      <td>Purge legacy backup files; leverage Git version control history for tracking earlier iterations.</td>
+    </tr>
+  </table>
+
+  <!-- SECTION 4: ACTIONABLE PRODUCTION BLUEPRINT -->
+  <div class="page-break"></div>
+  <h2 id="section-4">4. Actionable Production Blueprint (Phased Roadmap)</h2>
+
+  <h3>Phase 1: Immediate Stabilization & Reliability (Week 1)</h3>
+  <ol>
+    <li>
+      <strong>S3 / Cloudflare R2 Object Storage Adapter:</strong>
+      <p>Replace local disk chunking in <code>recordingService.js</code> and <code>cameraRoutes.js</code> with S3 presigned URL generation:</p>
+      <div class="code-block">
+POST /api/camera/get-upload-url
+Payload: { sessionId: "...", chunkIndex: 1, mimeType: "video/webm" }
+Response: { uploadUrl: "https://bucket.r2.cloudflarestorage.com/...", key: "..." }
+      </div>
+    </li>
+    <li>
+      <strong>Database Seeder Execution:</strong>
+      <p>Execute seeder scripts for the <code>roadmaps</code> and <code>questions</code> collections to populate foundational engineering tracks and prevent 404 responses on public routes.</p>
+    </li>
+    <li>
+      <strong>Vite PostCSS Tailwind Integration:</strong>
+      <p>Remove <code>&lt;script src="https://cdn.tailwindcss.com"&gt;</code> from <code>app/frontend/index.html</code>. Configure <code>tailwind.config.js</code> and <code>postcss.config.js</code> inside <code>app/frontend</code> for zero-runtime CSS overhead.</p>
+    </li>
+  </ol>
+
+  <h3>Phase 2: Architectural Optimization & Hardening (Week 2-3)</h3>
+  <ol>
+    <li>
+      <strong>Stateless Authentication Refactor:</strong>
+      <p>Refactor <code>passport-google-oauth20</code> to execute in <code>session: false</code> mode. Upon Google callback, issue access and refresh JWTs directly, eliminating <code>connect-mongo</code> and cold-start session lookups.</p>
+    </li>
+    <li>
+      <strong>Database Index Optimization:</strong>
+      <p>Add compound indexes to MongoDB schemas to guarantee sub-10ms query execution:</p>
+      <ul>
+        <li><code>users</code>: <code>{ email: 1 }</code>, <code>{ learnerId: 1 }</code>, <code>{ googleId: 1 }</code></li>
+        <li><code>exam_sessions</code>: <code>{ examId: 1, studentId: 1, status: 1 }</code></li>
+        <li><code>camera_recordings</code>: <code>{ sessionId: 1, status: 1 }</code></li>
+        <li><code>roadmaps</code>: <code>{ roadmapId: 1 }</code></li>
+      </ul>
+    </li>
+    <li>
+      <strong>Differentiated Rate Limiting:</strong>
+      <p>Apply dedicated rate-limiters: Auth endpoints (10 req/min), general API (120 req/min), and proctoring telemetry (600 req/min).</p>
+    </li>
+  </ol>
+
+  <h3>Phase 3: Enterprise Readiness & Observability (Week 4+)</h3>
+  <ol>
+    <li><strong>Observability & Monitoring:</strong> Integrate Sentry for full-stack error tracking and Datadog/Axiom for serverless log aggregation.</li>
+    <li><strong>Client Error Boundaries:</strong> Wrap critical views (<code>AdaptiveExamSession</code>, <code>Roadmap</code>, <code>CameraMonitor</code>) in React Error Boundaries to prevent full-screen crashes during unexpected network hiccups.</li>
+    <li><strong>Automated CI/CD Pipeline:</strong> Establish GitHub Actions workflows to run unit tests, schema validation, and Cypress/Playwright integration tests on pull requests.</li>
+  </ol>
+
+  <!-- SECTION 5: TARGET ARCHITECTURE SPECIFICATION -->
+  <div class="page-break"></div>
+  <h2 id="section-5">5. Target Enterprise Architecture Specification</h2>
+
+  <div class="code-block">
++-----------------------------------------------------------------------------------+
+|                                  CLIENT LAYER                                     |
+|               React 18 SPA (Vite, Tailwind PostCSS, Dark Theme Tokens)            |
+|       [Student Test Runner]    [Live Camera Proctor]    [Admin Exam Studio]       |
++-----------------------------------------------------------------------------------+
+                                       |
+                                       | HTTPS / WSS
+                                       v
++-----------------------------------------------------------------------------------+
+|                               VERCEL EDGE ROUTING                                 |
+|         Domain Routing / TLS Termination / Reverse Proxy Rewrites (/api/*)        |
++-----------------------------------------------------------------------------------+
+                  |                                                 |
+                  | API Calls                                       | Direct Video S3
+                  v                                                 v
++----------------------------------+              +---------------------------------+
+|       SERVERLESS API TIER        |              |      OBJECT STORAGE (S3/R2)     |
+|   Express 4 on Node.js 22        |              |  Presigned Multi-part Uploads   |
+|  - Stateless JWT Authentication  |              |  - Proctoring Video Streams     |
+|  - Adaptive Difficulty Engine    |              |  - Candidate Biometric Selfies  |
+|  - Rate-Limited Route Gateways   |              +---------------------------------+
++----------------------------------+
+                  |
+                  | Reused Connection Pool (Zero Buffering)
+                  v
++-----------------------------------------------------------------------------------+
+|                              DATABASE STORE (ATLAS)                               |
+|            MongoDB Replica Set (M0/M10 Multi-Tenant with Compound Indexes)        |
+|    Collections: [users] [learners] [exams] [sessions] [roadmaps] [questions]      |
++-----------------------------------------------------------------------------------+
+  </div>
+
+  <h3>Conclusion & Next Steps</h3>
+  <p>
+    With the critical Mongoose buffering timeout already solved and verified in production, Learning.AI has an exceptionally solid foundation. Implementing the object storage migration for proctoring videos and running the automated database seeders will bring the platform to 100% production perfection.
+  </p>
+
+</body>
+</html>
+`;
+
+// 1. Write the rich Word document (project.doc)
+const docPath = path.join(__dirname, 'project.doc');
+fs.writeFileSync(docPath, docContent, 'utf-8');
+console.log('✅ Generated project.doc successfully at:', docPath);
+
+// 2. Also write project.html for browser preview / printing
+const htmlPath = path.join(__dirname, 'project.html');
+fs.writeFileSync(htmlPath, docContent, 'utf-8');
+console.log('✅ Generated project.html successfully at:', htmlPath);
