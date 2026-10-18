@@ -12,18 +12,14 @@ const getCleanEnvVar = (varName) => {
 // Get and validate Google OAuth credentials
 const clientID = getCleanEnvVar('GOOGLE_CLIENT_ID');
 const clientSecret = getCleanEnvVar('GOOGLE_CLIENT_SECRET');
-const callbackURL =
-    getCleanEnvVar('GOOGLE_CALLBACK_URL') ||
-    (process.env.BACKEND_URL
-        ? `${process.env.BACKEND_URL.replace(/\/$/, '')}/auth/google/callback`
-        : 'http://localhost:3000/auth/google/callback');
+const callbackURL = getCleanEnvVar('GOOGLE_CALLBACK_URL');
 
 /**
- * IMPORTANT CHANGE:
- * Do NOT crash the app if OAuth variables are missing.
- * Only enable Google OAuth if credentials exist.
+ * Register GoogleStrategy only if GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+ * and GOOGLE_CALLBACK_URL are all set. Otherwise log a warning and skip it.
+ * The app will boot without Google credentials.
  */
-if (clientID && clientSecret) {
+if (clientID && clientSecret && callbackURL) {
     const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
     console.log('✅ Google OAuth enabled');

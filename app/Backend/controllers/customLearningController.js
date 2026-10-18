@@ -11,17 +11,19 @@ exports.uploadDocument = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
-        const { originalname, mimetype, size, path } = req.file;
+        const { originalname, mimetype, size, buffer } = req.file;
         const userId = req.user.id || req.user._id;
 
-        // Create Document record
+        // Store file content in DB as a Buffer so it can be processed
+        // without reading from disk (Vercel has a read-only filesystem).
         const document = new Document({
             userId,
-            filename: req.file.filename,
+            filename: `${Date.now()}-${originalname}`,
             originalName: originalname,
             mimeType: mimetype,
             size,
-            path
+            path: null,   // not used with memoryStorage
+            buffer        // stored for fileProcessingService
         });
 
         await document.save();
@@ -36,15 +38,10 @@ exports.uploadDocument = async (req, res) => {
         });
     } catch (error) {
         console.error('Upload error:', error);
-        // Clean up file if processing failed
-        if (req.file && req.file.path) {
-            fs.unlink(req.file.path, (err) => {
-                if (err) console.error('Error deleting file:', err);
-            });
-        }
         res.status(500).json({ success: false, message: 'File upload failed', error: error.message });
     }
 };
+
 
 exports.generateQuiz = async (req, res) => {
     try {

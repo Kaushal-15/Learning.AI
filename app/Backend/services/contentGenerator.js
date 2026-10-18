@@ -2,6 +2,16 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
 const youtubeService = require('./youtube.service');
 
+const AI_TIMEOUT_MS = 30000;
+
+const withTimeout = (promise, ms, name = 'AI request') =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${name} timed out after ${ms}ms`)), ms)
+    )
+  ]);
+
 /**
  * Multi-Tier Content Generator Service
  * Tier 1: Groq API (fast, free alternative)
@@ -24,7 +34,7 @@ class ContentGenerator {
 
     // Initialize Groq (primary)
     const groqKey = process.env.GROQ_API_KEY;
-    this._groqClient = groqKey ? new Groq({ apiKey: groqKey }) : null;
+    this._groqClient = groqKey ? new Groq({ apiKey: groqKey, timeout: AI_TIMEOUT_MS }) : null;
 
     // Initialize Gemini (secondary)
     const geminiKey = process.env.GEMINI_API_KEY;
@@ -68,22 +78,26 @@ class ContentGenerator {
     }
 
     try {
-      const completion = await this.groqClient.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert educator. Always respond with valid, properly escaped JSON only. No markdown code blocks. Ensure all strings are properly escaped with backslashes for special characters like quotes and newlines.'
-          },
-          {
-            role: 'user',
-            content: prompt + '\n\nIMPORTANT: Return ONLY valid JSON. Escape all special characters in strings (quotes, newlines, backslashes).'
-          }
-        ],
-        model: 'llama-3.3-70b-versatile', // Fast and capable model
-        temperature: 0.7,
-        max_tokens: 2048,
-        response_format: { type: 'json_object' } // Force JSON output
-      });
+      const completion = await withTimeout(
+        this.groqClient.chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert educator. Always respond with valid, properly escaped JSON only. No markdown code blocks. Ensure all strings are properly escaped with backslashes for special characters like quotes and newlines.'
+            },
+            {
+              role: 'user',
+              content: prompt + '\n\nIMPORTANT: Return ONLY valid JSON. Escape all special characters in strings (quotes, newlines, backslashes).'
+            }
+          ],
+          model: 'llama-3.3-70b-versatile', // Fast and capable model
+          temperature: 0.7,
+          max_tokens: 2048,
+          response_format: { type: 'json_object' } // Force JSON output
+        }),
+        AI_TIMEOUT_MS,
+        'Groq API'
+      );
 
       const text = completion.choices[0]?.message?.content || '';
       return this.parseJSON(text);
@@ -104,7 +118,11 @@ class ContentGenerator {
     for (const modelName of this.geminiModels) {
       try {
         const model = this.geminiClient.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
+        const result = await withTimeout(
+          model.generateContent(prompt),
+          AI_TIMEOUT_MS,
+          `Gemini (${modelName})`
+        );
         const response = await result.response;
         const text = response.text();
 

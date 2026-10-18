@@ -240,7 +240,7 @@ exports.uploadQuestions = async (req, res) => {
             });
         }
 
-        const { originalname, mimetype, size, path } = req.file;
+        const { originalname, mimetype, size, buffer } = req.file;
         // JWT decode gives us { id: ... } not { _id: ... }
         const userId = req.user.id || req.user._id;
 
@@ -262,29 +262,29 @@ exports.uploadQuestions = async (req, res) => {
             });
         }
 
-        // Validate file size (max 10MB)
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        // Validate file size (4 MB matches multer limit)
+        const maxSize = 4 * 1024 * 1024;
         if (size > maxSize) {
             console.log('ERROR: File too large:', size);
             return res.status(400).json({
                 success: false,
-                message: 'File too large. Please upload a file smaller than 10MB.'
+                message: 'File too large. Maximum is 4 MB.'
             });
         }
 
-        console.log('File details:', { originalname, mimetype, size, path });
+        console.log('File details:', { originalname, mimetype, size });
 
-        // Handle CSV files directly
+        // Handle CSV files directly — parse from in-memory buffer
         if (mimetype === 'text/csv' || mimetype === 'application/csv' || originalname.endsWith('.csv')) {
-            console.log('Processing CSV file...');
+            console.log('Processing CSV file from buffer...');
             try {
-                const questions = quizGenerationService.parseCSVQuestions(path);
+                const questions = quizGenerationService.parseCSVFromBuffer(buffer);
                 console.log('CSV Questions parsed:', questions.length);
 
                 return res.status(200).json({
                     success: true,
                     data: questions,
-                    documentId: null, // No document record for CSVs currently
+                    documentId: null,
                     message: `Successfully extracted ${questions.length} questions from the CSV.`
                 });
             } catch (csvError) {
@@ -296,15 +296,16 @@ exports.uploadQuestions = async (req, res) => {
             }
         }
 
-        // Create Document record
+        // Create Document record — store buffer (memoryStorage, no disk file)
         console.log('Creating document record...');
         const document = new Document({
             userId,
-            filename: req.file.filename,
+            filename: `${Date.now()}-${originalname}`,
             originalName: originalname,
             mimeType: mimetype,
             size,
-            path
+            path: null,
+            buffer
         });
 
         await document.save();

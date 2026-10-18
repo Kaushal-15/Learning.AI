@@ -1,47 +1,35 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
 const examController = require('../controllers/examController');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 
-// Configure Multer
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = 'uploads/';
-        const fs = require('fs');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir);
+// Lazy-require multer middleware to avoid top-level load
+const uploadSingleFile = (req, res, next) => {
+    const multer = require('multer');
+    const fileFilter = (r, file, cb) => {
+        const allowedTypes = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'text/csv',
+            'application/csv'
+        ];
+        if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only PDF, DOCX, TXT, and CSV are allowed.'), false);
         }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+    };
 
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = [
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain',
-        'text/csv',
-        'application/csv'
-    ];
-    if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
-        cb(null, true);
-    } else {
-        cb(new Error('Invalid file type. Only PDF, DOCX, TXT, and CSV are allowed.'), false);
-    }
+    const upload = multer({
+        storage: multer.memoryStorage(),
+        fileFilter: fileFilter,
+        limits: { fileSize: 4 * 1024 * 1024 } // 4 MB — Vercel body cap is ~4.5 MB
+    });
+
+    return upload.single('file')(req, res, next);
 };
-
-const upload = multer({
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
-});
 
 router.use(authMiddleware);
 
@@ -64,7 +52,7 @@ router.put('/admin/:examId/config', adminMiddleware, examController.updateExamCo
 router.get('/admin/:examId/results', adminMiddleware, examController.getExamResults);
 router.get('/admin/:examId/analytics', adminMiddleware, examController.getExamAnalytics);
 router.get('/admin/questions', adminMiddleware, examController.getQuestions);
-router.post('/admin/upload-questions', adminMiddleware, upload.single('file'), examController.uploadQuestions);
+router.post('/admin/upload-questions', adminMiddleware, uploadSingleFile, examController.uploadQuestions);
 
 // Student Management Routes
 router.get('/admin/:examId/students', adminMiddleware, examController.getExamStudents);

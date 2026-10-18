@@ -1,11 +1,38 @@
-const cron = require('node-cron');
+/**
+ * schedulerService.js
+ *
+ * Cron jobs must NOT run on Vercel — the process is frozen between requests
+ * and there is no persistent Node process to keep cron alive.
+ *
+ * To recreate the weekly content generation job on Vercel:
+ *   1. Add a Vercel Cron route: POST /api/cron/generate-content
+ *   2. Protect it with a CRON_SECRET header check.
+ *   3. In vercel.json add:
+ *        "crons": [{ "path": "/api/cron/generate-content", "schedule": "0 0 * * 0" }]
+ *
+ * Registered cron jobs (for reference when creating Vercel Cron routes):
+ *   • "0 0 * * 0"  — Every Sunday at midnight UTC
+ *                    Runs: content-generator/generator.py --roadmap all
+ */
+
 const { spawn } = require('child_process');
 const path = require('path');
 
 /**
- * Initialize the weekly content generation scheduler
+ * Initialize the weekly content generation scheduler.
+ * Guard: only runs when NOT on Vercel (i.e. traditional long-running host).
  */
 const initScheduler = () => {
+    if (process.env.VERCEL) {
+        console.log(
+            '⏭️  Skipping cron scheduler — running on Vercel. ' +
+            'Use Vercel Cron routes instead (see schedulerService.js comments).'
+        );
+        return;
+    }
+
+    const cron = require('node-cron'); // lazy-require — not needed on Vercel
+
     console.log('Initializing Weekly Content Generation Scheduler...');
 
     // Schedule task to run every Sunday at midnight (0 0 * * 0)
@@ -18,7 +45,8 @@ const initScheduler = () => {
 };
 
 /**
- * Run the Python content generator script
+ * Run the Python content generator script.
+ * Used by both the cron job (traditional hosts) and the Vercel Cron route handler.
  */
 const runContentGeneration = () => {
     const scriptPath = path.join(__dirname, '../content-generator/generator.py');
@@ -30,7 +58,6 @@ const runContentGeneration = () => {
     const pythonProcess = spawn(pythonPath, [scriptPath, '--roadmap', 'all']);
 
     pythonProcess.stdout.on('data', (data) => {
-        // Clean up output to avoid excessive newlines
         const output = data.toString().trim();
         if (output) {
             console.log(`[Content Generator]: ${output}`);

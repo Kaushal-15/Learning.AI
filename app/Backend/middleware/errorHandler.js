@@ -1,44 +1,65 @@
-const errorHandler = (err, req, res, next) => {
-  let error = { ...err };
-  error.message = err.message;
+/**
+ * errorHandler.js — Central Express error handler.
+ *
+ * Always returns JSON.
+ * Uses err.status || err.statusCode || 500.
+ * Includes stack trace only when NODE_ENV !== 'production'.
+ * Logs every error to console.error so it appears in Vercel function logs.
+ */
 
-  // Log error
-  console.error(err);
+const errorHandler = (err, req, res, next) => { // eslint-disable-line no-unused-vars
+    // Always log so errors appear in Vercel function logs.
+    console.error('[ErrorHandler]', {
+        message: err.message,
+        status: err.status || err.statusCode,
+        path: req.originalUrl,
+        method: req.method,
+        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+    });
 
-  // Mongoose bad ObjectId
-  if (err.name === 'CastError') {
-    const message = 'Resource not found';
-    error = { message, statusCode: 404 };
-  }
+    let statusCode = err.status || err.statusCode || 500;
+    let message = err.message || 'Server Error';
 
-  // Mongoose duplicate key
-  if (err.code === 11000) {
-    const message = 'Duplicate field value entered';
-    error = { message, statusCode: 400 };
-  }
+    // Mongoose bad ObjectId
+    if (err.name === 'CastError') {
+        statusCode = 404;
+        message = 'Resource not found';
+    }
 
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map(val => val.message).join(', ');
-    error = { message, statusCode: 400 };
-  }
+    // Mongoose duplicate key
+    if (err.code === 11000) {
+        statusCode = 400;
+        message = 'Duplicate field value entered';
+    }
 
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    const message = 'Invalid token';
-    error = { message, statusCode: 401 };
-  }
+    // Mongoose validation error
+    if (err.name === 'ValidationError') {
+        statusCode = 400;
+        message = Object.values(err.errors).map(val => val.message).join(', ');
+    }
 
-  if (err.name === 'TokenExpiredError') {
-    const message = 'Token expired';
-    error = { message, statusCode: 401 };
-  }
+    // JWT errors
+    if (err.name === 'JsonWebTokenError') {
+        statusCode = 401;
+        message = 'Invalid token';
+    }
 
-  res.status(error.statusCode || 500).json({
-    success: false,
-    message: error.message || 'Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+    if (err.name === 'TokenExpiredError') {
+        statusCode = 401;
+        message = 'Token expired';
+    }
+
+    // Multer / payload-too-large
+    if (err.code === 'LIMIT_FILE_SIZE' || err.type === 'entity.too.large') {
+        statusCode = 413;
+        message = 'Payload too large. Maximum upload size is 4 MB.';
+    }
+
+    res.status(statusCode).json({
+        success: false,
+        message,
+        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+    });
 };
 
 module.exports = errorHandler;

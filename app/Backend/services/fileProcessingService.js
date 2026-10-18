@@ -1,6 +1,11 @@
-const fs = require('fs');
-const pdf = require('pdf-parse');
-const mammoth = require('mammoth');
+/**
+ * fileProcessingService.js
+ *
+ * Heavy modules (pdf-parse, mammoth) are lazy-required inside each handler so
+ * they are not loaded at startup. All file reads come from in-memory buffers
+ * (multer memoryStorage) — no disk reads on Vercel.
+ */
+
 const Document = require('../models/Document');
 const Chunk = require('../models/Chunk');
 
@@ -17,13 +22,52 @@ const calculateDifficulty = (text) => {
     return 'basic';
 };
 
-const extractText = async (filePath, mimeType) => {
+/**
+ * Extract text from a buffer.
+ * @param {Buffer} buffer  File content as a Buffer (from multer memoryStorage).
+ * @param {string} mimeType
+ */
+const extractTextFromBuffer = async (buffer, mimeType) => {
     try {
         if (mimeType === 'application/pdf') {
+            const pdf = require('pdf-parse'); // lazy-require
+            const data = await pdf(buffer);
+            return data.text;
+        } else if (
+            mimeType ===
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ) {
+            const mammoth = require('mammoth'); // lazy-require
+            const result = await mammoth.extractRawText({ buffer });
+            return result.value;
+        } else if (mimeType === 'text/plain') {
+            return buffer.toString('utf8');
+        } else {
+            throw new Error('Unsupported file type');
+        }
+    } catch (error) {
+        console.error('Error extracting text from buffer:', error);
+        throw error;
+    }
+};
+
+/**
+ * Legacy path-based extraction (kept for on-disk backward compat on traditional hosts).
+ * On Vercel this should not be called — use extractTextFromBuffer instead.
+ */
+const extractText = async (filePath, mimeType) => {
+    const fs = require('fs'); // lazy-require fs
+    try {
+        if (mimeType === 'application/pdf') {
+            const pdf = require('pdf-parse'); // lazy-require
             const dataBuffer = fs.readFileSync(filePath);
             const data = await pdf(dataBuffer);
             return data.text;
-        } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        } else if (
+            mimeType ===
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ) {
+            const mammoth = require('mammoth'); // lazy-require
             const result = await mammoth.extractRawText({ path: filePath });
             return result.value;
         } else if (mimeType === 'text/plain') {
@@ -37,12 +81,21 @@ const extractText = async (filePath, mimeType) => {
     }
 };
 
+/**
+ * Process a Document record.
+ * Prefers buffer (stored on document.buffer) over disk path.
+ */
 const processDocument = async (documentId) => {
     const document = await Document.findById(documentId);
     if (!document) throw new Error('Document not found');
 
     try {
-        const text = await extractText(document.path, document.mimeType);
+        let text;
+        if (document.buffer) {
+            text = await extractTextFromBuffer(document.buffer, document.mimeType);
+        } else {
+            text = await extractText(document.path, document.mimeType);
+        }
 
         // Simple chunking by paragraphs, then grouping to ensure min length
         const rawParagraphs = text.split(/\n\s*\n/);
@@ -69,7 +122,7 @@ const processDocument = async (documentId) => {
             content,
             index,
             difficulty: calculateDifficulty(content),
-            tags: [] // Could use AI to generate tags here later
+            tags: []
         }));
 
         await Chunk.insertMany(chunkDocs);
@@ -87,5 +140,6 @@ const processDocument = async (documentId) => {
 
 module.exports = {
     extractText,
+    extractTextFromBuffer,
     processDocument
 };

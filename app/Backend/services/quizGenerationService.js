@@ -8,8 +8,18 @@ const { parse } = require('csv-parse/sync');
 let aiClient = null;
 let aiProvider = 'none';
 
+const AI_TIMEOUT_MS = 30000;
+
+const withTimeout = (promise, ms, name = 'AI request') =>
+    Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`${name} timed out after ${ms}ms`)), ms)
+        )
+    ]);
+
 if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here') {
-    aiClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    aiClient = new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: AI_TIMEOUT_MS });
     aiProvider = 'groq';
     console.log('✅ Using Groq AI for quiz generation');
 } else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
@@ -70,19 +80,32 @@ Return ONLY the JSON array, no other text or markdown.`;
 
         let responseText = '';
 
-        if (aiProvider === 'groq') {
-            const completion = await aiClient.chat.completions.create({
-                messages: [{ role: 'user', content: prompt }],
-                model: 'llama-3.3-70b-versatile',
-                temperature: 0.7,
-                max_tokens: 4000,
-            });
-            responseText = completion.choices[0]?.message?.content || '';
-        } else if (aiProvider === 'gemini') {
-            const model = aiClient.getGenerativeModel({ model: "gemini-pro" });
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            responseText = response.text();
+        try {
+            if (aiProvider === 'groq') {
+                const completion = await withTimeout(
+                    aiClient.chat.completions.create({
+                        messages: [{ role: 'user', content: prompt }],
+                        model: 'llama-3.3-70b-versatile',
+                        temperature: 0.7,
+                        max_tokens: 4000,
+                    }),
+                    AI_TIMEOUT_MS,
+                    'Groq AI'
+                );
+                responseText = completion.choices[0]?.message?.content || '';
+            } else if (aiProvider === 'gemini') {
+                const model = aiClient.getGenerativeModel({ model: "gemini-pro" });
+                const result = await withTimeout(
+                    model.generateContent(prompt),
+                    AI_TIMEOUT_MS,
+                    'Gemini AI'
+                );
+                const response = await result.response;
+                responseText = response.text();
+            }
+        } catch (aiErr) {
+            console.warn(`⚠️ AI call failed (${aiErr.message}), falling back to content-based generation`);
+            return generateContentBasedQuestions(chunks, count, difficulty);
         }
 
         // Clean up markdown code blocks if present
@@ -331,9 +354,9 @@ const generateQuiz = async (documentId, mode, config) => {
     }));
 };
 
-const parseCSVQuestions = (filePath) => {
+const parseCSVFromBuffer = (buffer) => {
     try {
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const fileContent = Buffer.isBuffer(buffer) ? buffer.toString('utf-8') : String(buffer);
         const records = parse(fileContent, {
             columns: true,
             skip_empty_lines: true,
@@ -351,7 +374,7 @@ const parseCSVQuestions = (filePath) => {
             }
         }
 
-        return records.map((record, index) => {
+        return records.map((record) => {
             // Normalize keys to lowercase for consistent access
             const normalized = {};
             Object.keys(record).forEach(key => {
@@ -365,19 +388,25 @@ const parseCSVQuestions = (filePath) => {
                     normalized.optionb,
                     normalized.optionc,
                     normalized.optiond
-                ].filter(o => o), // Remove empty options
+                ].filter(Boolean), // Remove empty options
                 correctAnswer: normalized.correctanswer,
                 difficulty: normalized.difficulty ? normalized.difficulty.toLowerCase() : 'medium',
                 explanation: normalized.explanation || ''
             };
         });
     } catch (error) {
-        console.error('Error parsing CSV:', error);
+        console.error('Error parsing CSV from buffer:', error);
         throw new Error(`Failed to parse CSV: ${error.message}`);
     }
 };
 
+const parseCSVQuestions = (filePath) => {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    return parseCSVFromBuffer(fileContent);
+};
+
 module.exports = {
     generateQuiz,
-    parseCSVQuestions
+    parseCSVQuestions,
+    parseCSVFromBuffer
 };

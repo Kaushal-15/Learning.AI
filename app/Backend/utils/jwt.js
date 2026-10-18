@@ -1,26 +1,25 @@
 const jwt = require('jsonwebtoken');
 
-const {
-  JWT_SECRET,
-  JWT_EXPIRES_IN,
-  JWT_REFRESH_SECRET,
-  JWT_REFRESH_EXPIRES_IN
-} = process.env;
-
 function signAccessToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const secret = process.env.JWT_SECRET || 'dev-jwt-secret-key-change-in-production';
+  const expiresIn = process.env.JWT_EXPIRES_IN || '15m';
+  return jwt.sign(payload, secret, { expiresIn });
 }
 
 function signRefreshToken(payload) {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-key-change-in-production';
+  const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+  return jwt.sign(payload, refreshSecret, { expiresIn });
 }
 
 function verifyAccessToken(token) {
-  return jwt.verify(token, JWT_SECRET);
+  const secret = process.env.JWT_SECRET || 'dev-jwt-secret-key-change-in-production';
+  return jwt.verify(token, secret);
 }
 
 function verifyRefreshToken(token) {
-  return jwt.verify(token, JWT_REFRESH_SECRET);
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-key-change-in-production';
+  return jwt.verify(token, refreshSecret);
 }
 
 module.exports = {

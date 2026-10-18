@@ -4,6 +4,16 @@ const { register, verifyOTP, loginUser, logoutUser } = require('../controllers/a
 const { verifyRefreshToken, signAccessToken } = require('../utils/jwt');
 const User = require('../models/User');
 
+// Cookie options — mirrors authController.js cookieOpts.
+const cookieOpts = (maxAgeMs) => ({
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL),
+    sameSite: (process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL)) ? 'none' : 'lax',
+    path: '/',
+    maxAge: maxAgeMs
+});
+
+
 // Register a new user
 router.post('/register', register);
 
@@ -26,14 +36,10 @@ router.post('/refresh', async (req, res) => {
     }
 
     const newAccessToken = signAccessToken({ id: user._id, email: user.email });
-    res.cookie('accessToken', newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000
-    });
+    res.cookie('accessToken', newAccessToken, cookieOpts(15 * 60 * 1000));
 
     res.json({ message: 'Token refreshed' });
+
   } catch (error) {
     console.error(error);
     res.status(403).json({ message: 'Invalid refresh token' });

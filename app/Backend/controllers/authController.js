@@ -7,6 +7,17 @@ const crypto = require('crypto');
 
 const PEPPER = process.env.PEPPER || '';
 
+// Cookie options helper — ensures consistent settings across all auth endpoints.
+// Cross-site (two different Vercel domains) requires sameSite:'none' + secure:true.
+const cookieOpts = (maxAgeMs) => ({
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL),
+    sameSite: (process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL)) ? 'none' : 'lax',
+    path: '/',
+    maxAge: maxAgeMs
+});
+
+
 // Generate a 6-digit OTP
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -180,22 +191,11 @@ exports.loginUser = async (req, res) => {
         await User.findByIdAndUpdate(user._id, { refreshToken }, { runValidators: false });
 
         // SET "accessToken" COOKIE (matching middleware expectation)
-        res.cookie("accessToken", accessToken, {
-            httpOnly: true,
-            secure: process.env.COOKIE_SECURE === "true",
-            sameSite: process.env.COOKIE_SAMESITE || "lax",
-            path: "/",
-            maxAge: 15 * 60 * 1000, // 15 mins for access token
-        });
+        res.cookie('accessToken', accessToken, cookieOpts(15 * 60 * 1000)); // 15 mins
 
         // SET "refreshToken" COOKIE
-        res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: process.env.COOKIE_SECURE === "true",
-            sameSite: process.env.COOKIE_SAMESITE || "lax",
-            path: "/",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+        res.cookie('refreshToken', refreshToken, cookieOpts(7 * 24 * 60 * 60 * 1000)); // 7 days
+
 
         return res.status(200).json({
             success: true,
@@ -221,19 +221,9 @@ exports.loginUser = async (req, res) => {
 exports.logoutUser = async (req, res) => {
     try {
         // Clear both cookies
-        res.clearCookie("accessToken", {
-            httpOnly: true,
-            secure: process.env.COOKIE_SECURE === "true",
-            sameSite: process.env.COOKIE_SAMESITE || "lax",
-            path: "/",
-        });
+        res.clearCookie('accessToken', cookieOpts(0));
+        res.clearCookie('refreshToken', cookieOpts(0));
 
-        res.clearCookie("refreshToken", {
-            httpOnly: true,
-            secure: process.env.COOKIE_SECURE === "true",
-            sameSite: process.env.COOKIE_SAMESITE || "lax",
-            path: "/",
-        });
 
         return res.status(200).json({
             success: true,
@@ -269,22 +259,11 @@ exports.googleCallback = async (req, res) => {
         await User.findByIdAndUpdate(user._id, { refreshToken }, { runValidators: false });
 
         // Set access token cookie
-        res.cookie("accessToken", accessToken, {
-            httpOnly: true,
-            secure: process.env.COOKIE_SECURE === "true",
-            sameSite: process.env.COOKIE_SAMESITE || "lax",
-            path: "/",
-            maxAge: 15 * 60 * 1000, // 15 minutes
-        });
+        res.cookie('accessToken', accessToken, cookieOpts(15 * 60 * 1000));
 
         // Set refresh token cookie
-        res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: process.env.COOKIE_SECURE === "true",
-            sameSite: process.env.COOKIE_SAMESITE || "lax",
-            path: "/",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+        res.cookie('refreshToken', refreshToken, cookieOpts(7 * 24 * 60 * 60 * 1000));
+
 
         // Redirect to frontend dashboard
         res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
