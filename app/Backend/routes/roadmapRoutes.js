@@ -49,7 +49,9 @@ router.get('/:roadmapId', async (req, res) => {
   try {
     const { roadmapId } = req.params;
     const normalizedId = normalizeRoadmapId(roadmapId);
-    const roadmap = await Roadmap.findOne({ roadmapId: normalizedId });
+    const roadmap = await Roadmap.findOne({
+      $or: [{ roadmapId: normalizedId }, { roadmapId: roadmapId }]
+    });
 
     if (!roadmap) {
       return res.status(404).json({
@@ -77,7 +79,9 @@ router.get('/:roadmapId/lessons/:lessonId', async (req, res) => {
     const { roadmapId, lessonId } = req.params;
     const normalizedId = normalizeRoadmapId(roadmapId);
 
-    const roadmap = await Roadmap.findOne({ roadmapId: normalizedId });
+    const roadmap = await Roadmap.findOne({
+      $or: [{ roadmapId: normalizedId }, { roadmapId: roadmapId }]
+    });
     if (!roadmap) {
       return res.status(404).json({
         success: false,
@@ -148,7 +152,9 @@ router.get('/:roadmapId/progress', authMiddleware, async (req, res) => {
 
     // Calculate progress based on category mastery
     const normalizedId = normalizeRoadmapId(roadmapId);
-    const roadmap = await Roadmap.findOne({ roadmapId: normalizedId });
+    const roadmap = await Roadmap.findOne({
+      $or: [{ roadmapId: normalizedId }, { roadmapId: roadmapId }]
+    });
     if (!roadmap) {
       return res.status(404).json({
         success: false,

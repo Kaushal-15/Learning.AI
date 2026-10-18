@@ -12,6 +12,7 @@
     "build": "node -e \"console.log('Learning.AI backend build check complete')\"",
     "vercel-build": "npm run build",
     "test": "jest",
+    "seed": "node scripts/seed.js",
     "health-check": "node health-check.js",
     "test-backend": "node test-backend.js",
     "monitor-errors": "node error-monitor.js"
