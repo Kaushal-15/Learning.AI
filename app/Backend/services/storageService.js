@@ -46,9 +46,10 @@ function getS3Client() {
 }
 
 /**
- * Generate a presigned PUT URL for direct browser-to-bucket chunk streaming
+ * Generate a presigned PUT URL for direct browser-to-bucket chunk streaming.
+ * Uses key: recordings/<examId>/<userId>/<sessionId>/<chunkIndex>.webm
  */
-async function getPresignedUploadUrl({ examId, sessionId, chunkIndex, contentType = 'video/webm' }) {
+async function getPresignedUploadUrl({ examId, userId, sessionId, chunkIndex, contentType = 'video/webm' }) {
   if (!isRecordingConfigured()) {
     return {
       enabled: false,
@@ -56,29 +57,39 @@ async function getPresignedUploadUrl({ examId, sessionId, chunkIndex, contentTyp
     };
   }
 
-  const s3 = getS3Client();
-  const bucket = process.env.STORAGE_BUCKET;
-  const key = `recordings/${examId}/${sessionId}/${chunkIndex}.webm`;
+  try {
+    const s3 = getS3Client();
+    const bucket = process.env.STORAGE_BUCKET;
+    const resolvedUserId = userId || 'anonymous';
+    const key = `recordings/${examId}/${resolvedUserId}/${sessionId}/${chunkIndex}.webm`;
 
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    ContentType: contentType,
-  });
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType === 'video/webm' ? 'video/webm' : 'video/webm',
+    });
 
-  // URL expires in 5 minutes (sufficient for uploading a 10s chunk)
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+    // URL expires in 5 minutes (300 seconds)
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
 
-  return {
-    enabled: true,
-    uploadUrl,
-    key,
-    expiresIn: 300
-  };
+    return {
+      enabled: true,
+      uploadUrl,
+      key,
+      expiresIn: 300
+    };
+  } catch (err) {
+    console.error('Storage service presigned PUT generation failed:', err.message);
+    return {
+      enabled: false,
+      message: `Failed to generate upload URL: ${err.message}`
+    };
+  }
 }
 
 /**
- * Generate a presigned GET URL for reviewing/downloading recorded chunks
+ * Generate a short-lived presigned GET URL for reviewing/downloading recorded chunks.
+ * Never returns permanent or public URLs.
  */
 async function getPresignedDownloadUrl({ key, expiresIn = 900 }) {
   if (!isRecordingConfigured()) {
@@ -88,28 +99,38 @@ async function getPresignedDownloadUrl({ key, expiresIn = 900 }) {
     };
   }
 
-  const s3 = getS3Client();
-  const bucket = process.env.STORAGE_BUCKET;
+  try {
+    const s3 = getS3Client();
+    const bucket = process.env.STORAGE_BUCKET;
 
-  const command = new GetObjectCommand({
-    Bucket: bucket,
-    Key: key,
-  });
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    });
 
-  const downloadUrl = await getSignedUrl(s3, command, { expiresIn });
+    // Default: 15 minutes (900 seconds) short-lived presigned URL
+    const downloadUrl = await getSignedUrl(s3, command, { expiresIn });
 
-  return {
-    enabled: true,
-    downloadUrl,
-    key,
-    expiresIn
-  };
+    return {
+      enabled: true,
+      downloadUrl,
+      key,
+      expiresIn
+    };
+  } catch (err) {
+    console.error('Storage service presigned GET generation failed:', err.message);
+    return {
+      enabled: false,
+      message: `Failed to generate download URL: ${err.message}`
+    };
+  }
 }
 
 /**
- * List all chunk keys for a given session and generate presigned download URLs
+ * List all chunk keys for a given session and generate short-lived presigned download URLs.
+ * Checks both recordings/<examId>/<userId>/<sessionId>/ and legacy recordings/<examId>/<sessionId>/
  */
-async function listSessionChunks({ examId, sessionId }) {
+async function listSessionChunks({ examId, userId, sessionId }) {
   if (!isRecordingConfigured()) {
     return {
       enabled: false,
@@ -118,36 +139,66 @@ async function listSessionChunks({ examId, sessionId }) {
     };
   }
 
-  const s3 = getS3Client();
-  const bucket = process.env.STORAGE_BUCKET;
-  const prefix = `recordings/${examId}/${sessionId}/`;
+  try {
+    const s3 = getS3Client();
+    const bucket = process.env.STORAGE_BUCKET;
 
-  const command = new ListObjectsV2Command({
-    Bucket: bucket,
-    Prefix: prefix,
-  });
+    // Check with userId prefix first if available
+    let prefix = userId
+      ? `recordings/${examId}/${userId}/${sessionId}/`
+      : `recordings/${examId}/`;
 
-  const response = await s3.send(command);
-  const contents = response.Contents || [];
+    let command = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+    });
 
-  const chunks = await Promise.all(
-    contents.map(async (item) => {
-      const { downloadUrl } = await getPresignedDownloadUrl({ key: item.Key, expiresIn: 1800 });
-      return {
-        key: item.Key,
-        size: item.Size,
-        lastModified: item.LastModified,
-        downloadUrl
-      };
-    })
-  );
+    let response = await s3.send(command);
+    let contents = response.Contents || [];
 
-  return {
-    enabled: true,
-    prefix,
-    totalChunks: chunks.length,
-    chunks
-  };
+    // Fallback: If no objects found with userId prefix, search session prefix directly
+    if (contents.length === 0 && userId) {
+      const fallbackPrefix = `recordings/${examId}/${sessionId}/`;
+      const fallbackCmd = new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: fallbackPrefix,
+      });
+      const fallbackRes = await s3.send(fallbackCmd);
+      if (fallbackRes.Contents && fallbackRes.Contents.length > 0) {
+        contents = fallbackRes.Contents;
+        prefix = fallbackPrefix;
+      }
+    }
+
+    // Filter to only match this sessionId
+    const sessionContents = contents.filter(item => item.Key.includes(`/${sessionId}/`));
+
+    const chunks = await Promise.all(
+      sessionContents.map(async (item) => {
+        const { downloadUrl } = await getPresignedDownloadUrl({ key: item.Key, expiresIn: 1800 });
+        return {
+          key: item.Key,
+          size: item.Size,
+          lastModified: item.LastModified,
+          downloadUrl
+        };
+      })
+    );
+
+    return {
+      enabled: true,
+      prefix,
+      totalChunks: chunks.length,
+      chunks
+    };
+  } catch (err) {
+    console.error('Storage service listSessionChunks error:', err.message);
+    return {
+      enabled: false,
+      chunks: [],
+      message: `Failed to list session recordings: ${err.message}`
+    };
+  }
 }
 
 module.exports = {

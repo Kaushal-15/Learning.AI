@@ -17,6 +17,8 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
     const [recordingId, setRecordingId] = useState(null);
     const [error, setError] = useState('');
     const [permissionDenied, setPermissionDenied] = useState(false);
+    const [storageUnavailable, setStorageUnavailable] = useState(false);
+    const chunkCounterRef = useRef(0);
 
     // Start camera
     const startCamera = async () => {
@@ -137,6 +139,7 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
 
         try {
             const blob = new Blob(chunksToUpload, { type: 'video/webm' });
+            const currentChunkIndex = chunkCounterRef.current++;
 
             // 1. Request presigned PUT URL
             const urlRes = await fetch(`${API_BASE}/camera/upload-url`, {
@@ -146,18 +149,25 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
                 body: JSON.stringify({
                     examId,
                     sessionId,
-                    chunkIndex: Date.now()
+                    chunkIndex: currentChunkIndex,
+                    contentType: 'video/webm'
                 })
             });
 
-            if (!urlRes.ok) return;
+            if (!urlRes.ok) {
+                setStorageUnavailable(true);
+                return;
+            }
 
             const urlData = await urlRes.json();
 
             // 2. If storage is disabled or unconfigured, skip gracefully without breaking exam
             if (!urlData.success || !urlData.enabled || !urlData.uploadUrl) {
+                setStorageUnavailable(true);
                 return;
             }
+
+            setStorageUnavailable(false);
 
             // 3. Direct browser-to-bucket upload via presigned PUT
             await fetch(urlData.uploadUrl, {
@@ -167,6 +177,7 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
             });
         } catch (err) {
             console.warn('Direct cloud video chunk upload notice:', err.message);
+            setStorageUnavailable(true);
         }
     };
 
@@ -235,14 +246,14 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
         };
     }, [isRequired, sessionId]);
 
-    // Auto-start recording when recording ID is detected
+    // Auto-start recording when camera is active and session exists
     useEffect(() => {
-        if (recordingId && cameraActive && !isRecording) {
-            startRecording(recordingId);
-        } else if (!recordingId && isRecording) {
+        if (cameraActive && sessionId && !isRecording) {
+            startRecording(recordingId || sessionId);
+        } else if (!cameraActive && isRecording) {
             stopRecording();
         }
-    }, [recordingId, cameraActive]);
+    }, [cameraActive, sessionId, recordingId]);
 
     if (!isRequired && !cameraActive) {
         return null;
@@ -284,10 +295,14 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
                         />
                         <div className="camera-status">
                             <div className="status-indicator">
-                                <div className={`status-dot ${isRecording ? 'recording' : 'active'}`}></div>
-                                <span>{isRecording ? 'Recording' : 'Camera Active'}</span>
+                                <div className={`status-dot ${storageUnavailable ? 'unavailable' : (isRecording ? 'recording' : 'active')}`}></div>
+                                <span>
+                                    {storageUnavailable
+                                        ? 'Recording Unavailable'
+                                        : (isRecording ? 'Recording' : 'Camera Active')}
+                                </span>
                             </div>
-                            {isRecording && (
+                            {isRecording && !storageUnavailable && (
                                 <Disc size={16} className="recording-icon" />
                             )}
                         </div>
@@ -410,6 +425,11 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
 
                 .status-dot.recording {
                     background: #ef4444;
+                }
+
+                .status-dot.unavailable {
+                    background: #f59e0b;
+                    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
                 }
 
                 .status-indicator span {
