@@ -33,7 +33,7 @@ class AIClient {
       messages: [
         {
           role: 'system',
-          content: 'You are an expert educational content creator. Generate high-quality, accurate educational questions with detailed explanations. Always respond with valid JSON format as requested.'
+          content: 'You generate questions for an adaptive exam, each requested difficulty tag must receive at least 60 percent of the exam\'s question count, produce the exact number requested per difficulty, label each question with its difficulty, never mix difficulty levels within a requested batch, and respond only with valid JSON.'
         },
         {
           role: 'user',

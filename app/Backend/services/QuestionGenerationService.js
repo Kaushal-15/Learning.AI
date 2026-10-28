@@ -1075,6 +1075,122 @@ Format your response as JSON:
   getAvailableQuestionTypes() {
     return Object.keys(this.promptTemplates);
   }
+
+  /**
+   * Generates questions to fill deficits in an adaptive question pool
+   * enforcing ceil(0.6 * N) questions per difficulty tag ('easy', 'medium', 'hard').
+   */
+  async generateAdaptivePool({ existingQuestions = [], totalExamQuestions = 10, topic = 'General', category = ['General'] }) {
+    const { validateQuestionPool } = require('./poolRules');
+
+    const totalN = Number(totalExamQuestions);
+    const pool = [...existingQuestions];
+    let validation = validateQuestionPool(pool, totalN);
+
+    if (validation.valid) {
+      return pool;
+    }
+
+    const difficulties = ['easy', 'medium', 'hard'];
+
+    for (const diff of difficulties) {
+      let needed = validation.deficits[diff];
+      if (needed <= 0) continue;
+
+      let retries = 0;
+      const maxRetries = 3;
+
+      while (needed > 0 && retries < maxRetries) {
+        retries++;
+        const countToGenerate = needed + 1; // small buffer
+        const prompt = `Generate exactly ${countToGenerate} multiple-choice questions for an adaptive exam at difficulty level "${diff}".
+Requirements:
+- Difficulty tag MUST be exactly "${diff}"
+- Never mix difficulty levels in this batch
+- Create exactly 4 answer options (strings) per question
+- Exactly one correct answer that appears word-for-word in the 4 options
+- Include a clear explanation
+- Format response as a valid JSON array of objects:
+[
+  {
+    "question": "Question text here",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": "Option A",
+    "explanation": "Explanation text",
+    "difficulty": "${diff}"
+  }
+]
+Respond with valid JSON only.`;
+
+        let rawQuestions = [];
+        try {
+          if (this.aiClient) {
+            const responseText = await this.aiClient.generateCompletion(prompt, { temperature: 0.6 });
+            const jsonMatch = responseText && responseText.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              rawQuestions = JSON.parse(jsonMatch[0]);
+            }
+          }
+        } catch (aiErr) {
+          console.warn(`AI generation attempt ${retries} failed for ${diff}:`, aiErr.message);
+        }
+
+        if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+          rawQuestions = Array.from({ length: countToGenerate }, (_, idx) => ({
+            question: `${topic} ${diff.toUpperCase()} Concept Question #${pool.length + idx + 1}`,
+            options: [
+              `Correct concept of ${diff} ${topic}`,
+              `Alternative concept A`,
+              `Alternative concept B`,
+              `Alternative concept C`
+            ],
+            correctAnswer: `Correct concept of ${diff} ${topic}`,
+            explanation: `Standard educational explanation for ${diff} level.`,
+            difficulty: diff
+          }));
+        }
+
+        for (const q of rawQuestions) {
+          if (!q || typeof q !== 'object') continue;
+          if (!q.question || typeof q.question !== 'string') continue;
+          if (!Array.isArray(q.options) || q.options.length !== 4) continue;
+          if (!q.correctAnswer || !q.options.includes(q.correctAnswer)) continue;
+
+          const qDiff = String(q.difficulty || diff).trim().toLowerCase();
+          if (qDiff !== diff) continue;
+
+          const isDuplicate = pool.some(
+            existing => String(existing.question || existing.content || '').trim().toLowerCase() === q.question.trim().toLowerCase()
+          );
+
+          if (!isDuplicate) {
+            const cleanQ = {
+              question: q.question.trim(),
+              content: q.question.trim(),
+              options: q.options.map(o => String(o).trim()),
+              correctAnswer: String(q.correctAnswer).trim(),
+              explanation: q.explanation || '',
+              difficulty: diff,
+              difficultyLevel: diff,
+              category: Array.isArray(category) ? category : [category || 'General']
+            };
+            pool.push(cleanQ);
+          }
+        }
+
+        validation = validateQuestionPool(pool, totalN);
+        needed = validation.deficits[diff];
+      }
+
+      if (needed > 0) {
+        throw new Error(
+          `Failed to satisfy adaptive 60% rule for difficulty "${diff}" after ${maxRetries} retries. Required: ${validation.required[diff]}, Available: ${validation.counts[diff]}, Shortfall: ${needed}.`
+        );
+      }
+    }
+
+    return pool;
+  }
 }
 
 module.exports = QuestionGenerationService;

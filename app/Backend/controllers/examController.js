@@ -5,6 +5,7 @@ const fileProcessingService = require('../services/fileProcessingService');
 const quizGenerationService = require('../services/quizGenerationService');
 const mongoose = require('mongoose');
 const { computeExamState } = require('../services/examStateHelper');
+const { validateQuestionPool, getRequiredPerDifficulty } = require('../services/poolRules');
 
 // Helper function to convert difficulty string to number
 const convertDifficulty = (difficulty) => {
@@ -79,6 +80,28 @@ exports.createExam = async (req, res) => {
                     success: false,
                     message: 'Time per question must be between 10 and 300 seconds'
                 });
+            }
+        }
+
+        // Enforce adaptive question pool rule: at least ceil(0.6 * N) per difficulty
+        if (isAdaptive || examType === 'dynamic') {
+            const poolCandidates = (mixedQuestions && mixedQuestions.length)
+                ? mixedQuestions
+                : (rawQuestions && rawQuestions.length)
+                    ? rawQuestions
+                    : (questionIds && questionIds.length)
+                        ? await Question.find({ _id: { $in: questionIds } })
+                        : [];
+
+            if (poolCandidates.length > 0) {
+                const poolValidation = validateQuestionPool(poolCandidates, Number(totalQuestions));
+                if (!poolValidation.valid) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Adaptive exam creation blocked: ${poolValidation.message}`,
+                        data: poolValidation
+                    });
+                }
             }
         }
 
@@ -989,12 +1012,33 @@ exports.regenerateExamCode = async (req, res) => {
     }
 };
 
-// Admin: Update exam status (Pause/Resume/End)
+// Admin: Update exam status (Pause/Resume/End/Publish)
 exports.updateExamStatus = async (req, res) => {
     try {
         const { examId } = req.params;
         const { status } = req.body;
-        const exam = await ExamMaster.findByIdAndUpdate(examId, { status }, { new: true });
+
+        const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        // Enforce 60% pool rule when publishing or activating adaptive exam
+        if (status === 'active' && (exam.isAdaptive || exam.examType === 'dynamic')) {
+            const questions = await ExamQuestion.find({ examId });
+            const pool = (questions && questions.length > 0) ? questions : (exam.rawQuestions || []);
+            const validation = validateQuestionPool(pool, exam.totalQuestions);
+            if (!validation.valid) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot activate adaptive exam: ${validation.message}`,
+                    data: validation
+                });
+            }
+        }
+
+        exam.status = status;
+        await exam.save();
         res.status(200).json({ success: true, data: exam });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1005,13 +1049,40 @@ exports.updateExamStatus = async (req, res) => {
 exports.updateExamConfig = async (req, res) => {
     try {
         const { examId } = req.params;
-        const { controls, proctoringConfig, adaptiveRouting } = req.body;
-        const update = {};
-        if (controls) update.controls = controls;
-        if (proctoringConfig) update.proctoringConfig = proctoringConfig;
-        if (adaptiveRouting) update.adaptiveRouting = adaptiveRouting;
+        const { controls, proctoringConfig, adaptiveRouting, duration, verificationDuration, passingScore, requireStudentVerification, requireBiometric, requireCamera, allowRecording, autoRecord, totalQuestions } = req.body;
 
-        const exam = await ExamMaster.findByIdAndUpdate(examId, update, { new: true });
+        const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        if (totalQuestions !== undefined && (exam.isAdaptive || exam.examType === 'dynamic')) {
+            const questions = await ExamQuestion.find({ examId });
+            const pool = (questions && questions.length > 0) ? questions : (exam.rawQuestions || []);
+            const validation = validateQuestionPool(pool, Number(totalQuestions));
+            if (!validation.valid) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot update configuration: ${validation.message}`,
+                    data: validation
+                });
+            }
+            exam.totalQuestions = Number(totalQuestions);
+        }
+
+        if (controls !== undefined) exam.controls = controls;
+        if (proctoringConfig !== undefined) exam.proctoringConfig = proctoringConfig;
+        if (adaptiveRouting !== undefined) exam.adaptiveRouting = adaptiveRouting;
+        if (duration !== undefined) exam.duration = Number(duration);
+        if (verificationDuration !== undefined) exam.verificationDuration = Number(verificationDuration);
+        if (passingScore !== undefined) exam.passingScore = Number(passingScore);
+        if (requireStudentVerification !== undefined) exam.requireStudentVerification = Boolean(requireStudentVerification);
+        if (requireBiometric !== undefined) exam.requireBiometric = Boolean(requireBiometric);
+        if (requireCamera !== undefined) exam.requireCamera = Boolean(requireCamera);
+        if (allowRecording !== undefined) exam.allowRecording = Boolean(allowRecording);
+        if (autoRecord !== undefined) exam.autoRecord = Boolean(autoRecord);
+
+        await exam.save();
         res.status(200).json({ success: true, data: exam });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
