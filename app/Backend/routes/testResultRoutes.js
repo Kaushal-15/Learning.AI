@@ -368,29 +368,31 @@ router.get('/analysis/weak-areas', async (req, res) => {
   }
 });
 
-// Debug route to check all test results for a user
-router.get('/debug/all', async (req, res) => {
-  try {
-    const testResults = await TestResult.find({ userId: req.user.id });
-    const completions = await TestCompletion.find({ userId: req.user.id });
+// Debug route to check all test results for a user (disabled in production)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  router.get('/debug/all', async (req, res) => {
+    try {
+      const testResults = await TestResult.find({ userId: req.user.id });
+      const completions = await TestCompletion.find({ userId: req.user.id });
 
-    res.json({
-      success: true,
-      data: {
-        testResults: testResults.length,
-        completions: completions.length,
-        results: testResults,
-        completionRecords: completions
-      }
-    });
-  } catch (error) {
-    console.error('Error in debug route:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Debug failed'
-    });
-  }
-});
+      res.json({
+        success: true,
+        data: {
+          testResults: testResults.length,
+          completions: completions.length,
+          results: testResults,
+          completionRecords: completions
+        }
+      });
+    } catch (error) {
+      console.error('Error in debug route:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Debug failed'
+      });
+    }
+  });
+}
 
 // Get detailed test result
 router.get('/:id', async (req, res) => {

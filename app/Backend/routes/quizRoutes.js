@@ -1427,59 +1427,61 @@ router.get('/recent', async (req, res) => {
 });
 
 
-// Debug endpoint to check quiz status
-router.get('/:id/debug', asyncHandler(async (req, res) => {
-  try {
-    const quiz = await Quiz.findOne({
-      _id: req.params.id,
-      userId: req.user.id
-    });
+// Debug endpoint to check quiz status (disabled in production)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  router.get('/:id/debug', asyncHandler(async (req, res) => {
+    try {
+      const quiz = await Quiz.findOne({
+        _id: req.params.id,
+        userId: req.user.id
+      });
 
-    if (!quiz) {
-      return res.status(404).json({
+      if (!quiz) {
+        return res.status(404).json({
+          success: false,
+          message: 'Quiz not found'
+        });
+      }
+
+      const debugInfo = {
+        quizId: quiz._id,
+        title: quiz.title,
+        status: quiz.status,
+        totalQuestions: quiz.totalQuestions,
+        actualQuestionCount: quiz.questions.length,
+        currentQuestionIndex: quiz.currentQuestionIndex,
+        accuracy: quiz.accuracy,
+        correctAnswers: quiz.correctAnswers,
+        timeLimit: quiz.timeLimit,
+        startedAt: quiz.startedAt,
+        completedAt: quiz.completedAt,
+        isAdaptive: quiz.isAdaptive,
+        roadmapType: quiz.roadmapType,
+        difficulty: quiz.difficulty,
+        questionsPreview: quiz.questions.slice(0, 3).map(q => ({
+          questionId: q.questionId,
+          question: q.question.substring(0, 100) + '...',
+          optionsCount: q.options.length,
+          hasCorrectAnswer: !!q.correctAnswer,
+          status: q.status
+        }))
+      };
+
+      res.json({
+        success: true,
+        data: debugInfo
+      });
+
+    } catch (error) {
+      console.error('Error in quiz debug:', error);
+      res.status(500).json({
         success: false,
-        message: 'Quiz not found'
+        message: 'Debug failed',
+        error: error.message
       });
     }
-
-    const debugInfo = {
-      quizId: quiz._id,
-      title: quiz.title,
-      status: quiz.status,
-      totalQuestions: quiz.totalQuestions,
-      actualQuestionCount: quiz.questions.length,
-      currentQuestionIndex: quiz.currentQuestionIndex,
-      accuracy: quiz.accuracy,
-      correctAnswers: quiz.correctAnswers,
-      timeLimit: quiz.timeLimit,
-      startedAt: quiz.startedAt,
-      completedAt: quiz.completedAt,
-      isAdaptive: quiz.isAdaptive,
-      roadmapType: quiz.roadmapType,
-      difficulty: quiz.difficulty,
-      questionsPreview: quiz.questions.slice(0, 3).map(q => ({
-        questionId: q.questionId,
-        question: q.question.substring(0, 100) + '...',
-        optionsCount: q.options.length,
-        hasCorrectAnswer: !!q.correctAnswer,
-        status: q.status
-      }))
-    };
-
-    res.json({
-      success: true,
-      data: debugInfo
-    });
-
-  } catch (error) {
-    console.error('Error in quiz debug:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Debug failed',
-      error: error.message
-    });
-  }
-}));
+  }));
+}
 
 
 module.exports = router;

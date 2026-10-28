@@ -2,12 +2,34 @@ const express = require('express');
 const router = express.Router();
 const Performance = require('../models/Performance');
 const Learner = require('../models/Learner');
+const User = require('../models/User');
+
+// Helper to resolve caller's learner record and admin status
+async function getAuthLearner(req) {
+  const user = await User.findById(req.user.id || req.user._id);
+  if (!user) return { user: null, learner: null, isAdmin: false };
+  const isAdmin = user.role === 'admin';
+  const learner = await Learner.findOne({ email: user.email });
+  return { user, learner, isAdmin };
+}
 
 // Create a new performance record
 router.post('/', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    
+    let targetLearnerId = req.body.learnerId;
+    if (!isAdmin) {
+      if (!learner) {
+        return res.status(403).json({
+          success: false,
+          message: 'No learner profile found for this user'
+        });
+      }
+      targetLearnerId = learner._id;
+    }
+
     const {
-      learnerId,
       questionId,
       selectedAnswer,
       correct,
@@ -21,8 +43,8 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     const performance = new Performance({
-      learnerId,
-      questionId: questionId || '507f1f77bcf86cd799439011', // Mock question ID
+      learnerId: targetLearnerId,
+      questionId: questionId || '507f1f77bcf86cd799439011',
       selectedAnswer,
       correct,
       timeSpent,
@@ -37,11 +59,11 @@ router.post('/', async (req, res) => {
     await performance.save();
 
     // Update learner's category mastery and overall stats
-    if (learnerId) {
-      const learner = await Learner.findById(learnerId);
-      if (learner) {
-        await learner.updateCategoryMastery(category[0], correct, timeSpent);
-        await learner.updateOverallStats(correct, timeSpent);
+    if (targetLearnerId) {
+      const targetLearner = await Learner.findById(targetLearnerId);
+      if (targetLearner) {
+        await targetLearner.updateCategoryMastery(category[0], correct, timeSpent);
+        await targetLearner.updateOverallStats(correct, timeSpent);
       }
     }
 
@@ -58,13 +80,22 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get all performance records
+// Get all performance records (filtered by authenticated learner unless admin)
 router.get('/', async (req, res) => {
   try {
-    const { learnerId, sessionId, category, limit = 50 } = req.query;
-    
+    const { sessionId, category, limit = 50 } = req.query;
+    const { learner, isAdmin } = await getAuthLearner(req);
+
     let query = {};
-    if (learnerId) query.learnerId = learnerId;
+    if (isAdmin) {
+      if (req.query.learnerId) query.learnerId = req.query.learnerId;
+    } else {
+      if (!learner) {
+        return res.json({ success: true, data: [], count: 0 });
+      }
+      query.learnerId = learner._id;
+    }
+
     if (sessionId) query.sessionId = sessionId;
     if (category) query.category = { $in: [category] };
 
@@ -87,9 +118,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get performance by ID
+// Get performance by ID (caller must be admin or owner of the performance record)
 router.get('/:id', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
     const performance = await Performance.findById(req.params.id)
       .populate('learnerId', 'name email')
       .select('-__v');
@@ -99,6 +131,16 @@ router.get('/:id', async (req, res) => {
         success: false,
         message: 'Performance record not found'
       });
+    }
+
+    if (!isAdmin) {
+      const perfLearnerId = performance.learnerId?._id || performance.learnerId;
+      if (!learner || !perfLearnerId || perfLearnerId.toString() !== learner._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: Cannot access other learners\' performance data'
+        });
+      }
     }
 
     res.json({
@@ -116,9 +158,17 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Get learner analytics
+// Get learner analytics (caller must be admin or accessing their own analytics)
 router.get('/analytics/learner/:learnerId', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.learnerId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access other learners\' analytics'
+      });
+    }
+
     const { timeRange = 30 } = req.query;
     const analytics = await Performance.getLearnerAnalytics(req.params.learnerId, parseInt(timeRange));
 
@@ -142,9 +192,17 @@ router.get('/analytics/learner/:learnerId', async (req, res) => {
   }
 });
 
-// Get category trends
+// Get category trends (caller must be admin or owner)
 router.get('/analytics/trends/:learnerId/:category', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.learnerId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access other learners\' trends'
+      });
+    }
+
     const { days = 30 } = req.query;
     const trends = await Performance.getCategoryTrends(
       req.params.learnerId, 
@@ -164,9 +222,17 @@ router.get('/analytics/trends/:learnerId/:category', async (req, res) => {
   }
 });
 
-// Get difficulty progression
+// Get difficulty progression (caller must be admin or owner)
 router.get('/analytics/difficulty/:learnerId/:category', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.learnerId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access other learners\' progression'
+      });
+    }
+
     const progression = await Performance.getDifficultyProgression(
       req.params.learnerId, 
       req.params.category

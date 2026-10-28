@@ -86,12 +86,16 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Check name availability (Legacy path param)
 router.get('/check-name/:name', async (req, res) => {
   try {
     const { name } = req.params;
 
-    if (!name || name.trim().length < 2) {
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return res.status(400).json({
         available: false,
         message: 'Name must be at least 2 characters long'
@@ -99,7 +103,7 @@ router.get('/check-name/:name', async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
+      name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') }
     });
 
     res.json({
@@ -136,7 +140,7 @@ const checkUsernameHandler = async (req, res) => {
 
     // Check DB
     const existingUser = await User.findOne({
-      name: { $regex: new RegExp(`^${username.trim()}$`, 'i') }
+      name: { $regex: new RegExp(`^${escapeRegex(username.trim())}$`, 'i') }
     }).select('_id').lean();
 
     return res.status(200).json({

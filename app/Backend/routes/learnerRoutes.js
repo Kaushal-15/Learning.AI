@@ -2,10 +2,21 @@ const express = require('express');
 const router = express.Router();
 const Learner = require('../models/Learner');
 const Performance = require('../models/Performance');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 
-// Create a new learner
-router.post('/', async (req, res) => {
+// Helper to resolve caller's learner record and admin status
+async function getAuthLearner(req) {
+  const user = await User.findById(req.user.id || req.user._id);
+  if (!user) return { user: null, learner: null, isAdmin: false };
+  const isAdmin = user.role === 'admin';
+  const learner = await Learner.findOne({ email: user.email });
+  return { user, learner, isAdmin };
+}
+
+// Create a new learner (admin only)
+router.post('/', adminMiddleware, async (req, res) => {
   try {
     const { email, name, difficultyPreference } = req.body;
     
@@ -40,10 +51,9 @@ router.post('/', async (req, res) => {
 });
 
 // Get current user's learner data
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/me', async (req, res) => {
   try {
-    const User = require('../models/User');
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id || req.user._id);
     
     if (!user) {
       return res.status(404).json({
@@ -90,8 +100,8 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// Get all learners
-router.get('/', async (req, res) => {
+// Get all learners (admin only)
+router.get('/', adminMiddleware, async (req, res) => {
   try {
     const learners = await Learner.find().select('-__v');
     res.json({
@@ -107,12 +117,19 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get learner by ID
+// Get learner by ID (caller must be admin or accessing their own profile)
 router.get('/:id', async (req, res) => {
   try {
-    const learner = await Learner.findById(req.params.id).select('-__v');
-    
-    if (!learner) {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access other learners\' data'
+      });
+    }
+
+    const target = await Learner.findById(req.params.id).select('-__v');
+    if (!target) {
       return res.status(404).json({
         success: false,
         message: 'Learner not found'
@@ -121,7 +138,7 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       success: true,
-      data: learner
+      data: target
     });
   } catch (error) {
     res.status(500).json({
@@ -131,12 +148,20 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update learner profile
+// Update learner profile (caller must be admin or updating their own profile)
 router.put('/:id', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot update other learners\' profile'
+      });
+    }
+
     const { name, difficultyPreference, preferences } = req.body;
     
-    const learner = await Learner.findByIdAndUpdate(
+    const updated = await Learner.findByIdAndUpdate(
       req.params.id,
       { 
         ...(name && { name }),
@@ -146,7 +171,7 @@ router.put('/:id', async (req, res) => {
       { new: true, runValidators: true }
     ).select('-__v');
 
-    if (!learner) {
+    if (!updated) {
       return res.status(404).json({
         success: false,
         message: 'Learner not found'
@@ -155,7 +180,7 @@ router.put('/:id', async (req, res) => {
 
     res.json({
       success: true,
-      data: learner,
+      data: updated,
       message: 'Learner updated successfully'
     });
   } catch (error) {
@@ -166,9 +191,17 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Update category mastery (simulate answering a question)
+// Update category mastery (caller must be admin or answering as themselves)
 router.post('/:id/answer', async (req, res) => {
   try {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot record answers for other learners'
+      });
+    }
+
     const { category, wasCorrect, timeSpent } = req.body;
     
     if (!category || wasCorrect === undefined || !timeSpent) {
@@ -178,9 +211,8 @@ router.post('/:id/answer', async (req, res) => {
       });
     }
 
-    const learner = await Learner.findById(req.params.id);
-    
-    if (!learner) {
+    const targetLearner = await Learner.findById(req.params.id);
+    if (!targetLearner) {
       return res.status(404).json({
         success: false,
         message: 'Learner not found'
@@ -188,14 +220,14 @@ router.post('/:id/answer', async (req, res) => {
     }
 
     // Update category mastery
-    await learner.updateCategoryMastery(category, wasCorrect, timeSpent);
+    await targetLearner.updateCategoryMastery(category, wasCorrect, timeSpent);
     
     // Update overall stats
-    await learner.updateOverallStats(wasCorrect, timeSpent);
+    await targetLearner.updateOverallStats(wasCorrect, timeSpent);
 
     res.json({
       success: true,
-      data: learner,
+      data: targetLearner,
       message: 'Performance updated successfully'
     });
   } catch (error) {
@@ -206,12 +238,19 @@ router.post('/:id/answer', async (req, res) => {
   }
 });
 
-// Get learner analytics
+// Get learner analytics (caller must be admin or accessing their own analytics)
 router.get('/:id/analytics', async (req, res) => {
   try {
-    const learner = await Learner.findById(req.params.id);
-    
-    if (!learner) {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access other learners\' analytics'
+      });
+    }
+
+    const targetLearner = await Learner.findById(req.params.id);
+    if (!targetLearner) {
       return res.status(404).json({
         success: false,
         message: 'Learner not found'
@@ -224,14 +263,14 @@ router.get('/:id/analytics', async (req, res) => {
       success: true,
       data: {
         learner: {
-          name: learner.name,
-          email: learner.email,
-          weakAreas: learner.weakAreas,
-          strongAreas: learner.strongAreas,
-          overallAccuracy: learner.overallAccuracy,
-          currentStreak: learner.currentStreak,
-          longestStreak: learner.longestStreak,
-          categoryMastery: Object.fromEntries(learner.categoryMastery)
+          name: targetLearner.name,
+          email: targetLearner.email,
+          weakAreas: targetLearner.weakAreas,
+          strongAreas: targetLearner.strongAreas,
+          overallAccuracy: targetLearner.overallAccuracy,
+          currentStreak: targetLearner.currentStreak,
+          longestStreak: targetLearner.longestStreak,
+          categoryMastery: Object.fromEntries(targetLearner.categoryMastery)
         },
         analytics: analytics[0] || {}
       }
@@ -244,26 +283,33 @@ router.get('/:id/analytics', async (req, res) => {
   }
 });
 
-// Get recommended difficulty for a category
+// Get recommended difficulty for a category (caller must be admin or accessing their own)
 router.get('/:id/difficulty/:category', async (req, res) => {
   try {
-    const learner = await Learner.findById(req.params.id);
-    
-    if (!learner) {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access other learners\' difficulty recommendations'
+      });
+    }
+
+    const targetLearner = await Learner.findById(req.params.id);
+    if (!targetLearner) {
       return res.status(404).json({
         success: false,
         message: 'Learner not found'
       });
     }
 
-    const recommendedDifficulty = learner.getRecommendedDifficulty(req.params.category);
+    const recommendedDifficulty = targetLearner.getRecommendedDifficulty(req.params.category);
 
     res.json({
       success: true,
       data: {
         category: req.params.category,
         recommendedDifficulty,
-        currentMastery: learner.categoryMastery.get(req.params.category) || null
+        currentMastery: targetLearner.categoryMastery.get(req.params.category) || null
       }
     });
   } catch (error) {
@@ -274,12 +320,19 @@ router.get('/:id/difficulty/:category', async (req, res) => {
   }
 });
 
-// Delete learner
+// Delete learner (admin or self)
 router.delete('/:id', async (req, res) => {
   try {
-    const learner = await Learner.findByIdAndDelete(req.params.id);
-    
-    if (!learner) {
+    const { learner, isAdmin } = await getAuthLearner(req);
+    if (!isAdmin && (!learner || learner._id.toString() !== req.params.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot delete other learners\' profiles'
+      });
+    }
+
+    const targetLearner = await Learner.findByIdAndDelete(req.params.id);
+    if (!targetLearner) {
       return res.status(404).json({
         success: false,
         message: 'Learner not found'

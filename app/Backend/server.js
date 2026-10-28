@@ -30,11 +30,25 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const mongoose = require('mongoose');
+const mongoSanitize = require('express-mongo-sanitize');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 const isVercel = Boolean(process.env.VERCEL);
 const isProd = isVercel || process.env.NODE_ENV === 'production';
+
+// In production, fail immediately if critical secrets are missing
+if (isProd) {
+  if (!process.env.SESSION_SECRET) {
+    throw new Error('SESSION_SECRET environment variable is required in production');
+  }
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  }
+  if (!process.env.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_REFRESH_SECRET environment variable is required in production');
+  }
+}
 
 console.log('Learning.AI backend initializing');
 console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -180,6 +194,7 @@ app.use((err, req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 app.use(cookieParser());
+app.use(mongoSanitize());
 
 // ---------------------------------------------------------------------------
 // 6. Health routes — no DB dependency; always 200 even if DB is down
@@ -214,18 +229,10 @@ app.get('/api/health/db', async (req, res) => {
       await connectDB();
     }
     await mongoose.connection.db.admin().ping();
-    res.status(200).json({
-      status: 'OK',
-      db: 'connected',
-      host: mongoose.connection.host
-    });
+    res.status(200).json({ status: 'OK' });
   } catch (err) {
     console.error('DB health check failed:', err.message);
-    res.status(503).json({
-      status: 'error',
-      db: 'disconnected',
-      message: err.message
-    });
+    res.status(503).json({ status: 'error' });
   }
 });
 
@@ -286,7 +293,7 @@ app.use(
   session({
     secret:
       process.env.SESSION_SECRET ||
-      'local-development-only-change-this-secret',
+      (isProd ? undefined : 'local-development-only-change-this-secret'),
     resave: false,
     saveUninitialized: false,
     proxy: true,             // Trust the first proxy (required for secure cookies)
@@ -312,10 +319,16 @@ app.use(passport.session());
 //     If any route module throws at require() time, a 503 stub is mounted
 //     for that prefix instead of crashing the whole server.
 // ---------------------------------------------------------------------------
-const safeMount = (app, prefix, loader) => {
+const authMiddleware = require('./middleware/authMiddleware');
+
+const safeMount = (app, prefix, loader, ...middlewares) => {
   try {
     const router = typeof loader === 'function' ? loader() : require(loader);
-    app.use(prefix, router);
+    if (middlewares.length > 0) {
+      app.use(prefix, ...middlewares, router);
+    } else {
+      app.use(prefix, router);
+    }
   } catch (err) {
     console.error(`❌ Failed to load route "${prefix}":`, err.message);
     app.use(prefix, (req, res) => {
@@ -328,27 +341,30 @@ const safeMount = (app, prefix, loader) => {
   }
 };
 
+// Public routes
 safeMount(app, '/api/auth', () => require('./routes/auth'));
 safeMount(app, '/auth', () => require('./routes/googleAuth'));
-safeMount(app, '/api/content', () => require('./routes/contentRoutes'));
 safeMount(app, '/api/roadmaps', () => require('./routes/roadmapRoutes'));
-safeMount(app, '/api/roadmap-selection', () => require('./routes/roadmapSelectionRoutes'));
-safeMount(app, '/api/custom-learning', () => require('./routes/customLearningRoutes'));
-safeMount(app, '/api/daily-learning', () => require('./routes/dailyLearningRoutes'));
-safeMount(app, '/api/users', () => require('./routes/userRoutes'));
-safeMount(app, '/api/profile', () => require('./routes/profileRoutes'));
-safeMount(app, '/api/progress', () => require('./routes/progressRoutes'));
-safeMount(app, '/api/xp', () => require('./routes/xp.routes'));
-safeMount(app, '/api/questions', () => require('./routes/questionRoutes'));
-safeMount(app, '/api/quiz', () => require('./routes/quizRoutes'));
-safeMount(app, '/api/test-results', () => require('./routes/testResultRoutes'));
-safeMount(app, '/api/projects', () => require('./routes/project.routes'));
-safeMount(app, '/api/exams', () => require('./routes/examRoutes'));
-safeMount(app, '/api/adaptive-exams', () => require('./routes/adaptiveExamRoutes'));
-safeMount(app, '/api/analytics', () => require('./routes/analyticsRoutes'));
-safeMount(app, '/api/assessments', () => require('./routes/assessmentRoutes'));
-safeMount(app, '/api/learners', () => require('./routes/learnerRoutes'));
-safeMount(app, '/api/performance', () => require('./routes/performanceRoutes'));
+
+// Protected routes (require authMiddleware)
+safeMount(app, '/api/content', () => require('./routes/contentRoutes'), authMiddleware);
+safeMount(app, '/api/roadmap-selection', () => require('./routes/roadmapSelectionRoutes'), authMiddleware);
+safeMount(app, '/api/custom-learning', () => require('./routes/customLearningRoutes'), authMiddleware);
+safeMount(app, '/api/daily-learning', () => require('./routes/dailyLearningRoutes'), authMiddleware);
+safeMount(app, '/api/users', () => require('./routes/userRoutes'), authMiddleware);
+safeMount(app, '/api/profile', () => require('./routes/profileRoutes'), authMiddleware);
+safeMount(app, '/api/progress', () => require('./routes/progressRoutes'), authMiddleware);
+safeMount(app, '/api/xp', () => require('./routes/xp.routes'), authMiddleware);
+safeMount(app, '/api/questions', () => require('./routes/questionRoutes'), authMiddleware);
+safeMount(app, '/api/quiz', () => require('./routes/quizRoutes'), authMiddleware);
+safeMount(app, '/api/test-results', () => require('./routes/testResultRoutes'), authMiddleware);
+safeMount(app, '/api/projects', () => require('./routes/project.routes'), authMiddleware);
+safeMount(app, '/api/exams', () => require('./routes/examRoutes'), authMiddleware);
+safeMount(app, '/api/adaptive-exams', () => require('./routes/adaptiveExamRoutes'), authMiddleware);
+safeMount(app, '/api/analytics', () => require('./routes/analyticsRoutes'), authMiddleware);
+safeMount(app, '/api/assessments', () => require('./routes/assessmentRoutes'), authMiddleware);
+safeMount(app, '/api/learners', () => require('./routes/learnerRoutes'), authMiddleware);
+safeMount(app, '/api/performance', () => require('./routes/performanceRoutes'), authMiddleware);
 
 // ---------------------------------------------------------------------------
 // 12. Unknown API routes — 404 JSON (must come after all /api/* route mounts)

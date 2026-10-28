@@ -181,11 +181,14 @@ router.get('/cache/stats', async (req, res) => {
     }
 });
 
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
+
 /**
  * DELETE /api/content/cache/clear
  * Clear all cached content (admin only)
  */
-router.delete('/cache/clear', async (req, res) => {
+router.delete('/cache/clear', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const result = await ContentCache.deleteMany({});
 
