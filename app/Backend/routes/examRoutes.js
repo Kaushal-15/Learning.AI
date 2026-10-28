@@ -57,6 +57,7 @@ router.post('/admin/upload-questions', adminMiddleware, uploadSingleFile, examCo
 // Student Management Routes
 router.get('/admin/:examId/students', adminMiddleware, examController.getExamStudents);
 router.post('/admin/:examId/students', adminMiddleware, examController.addStudent);
+router.put('/admin/:examId/students', adminMiddleware, examController.setExamStudents);
 router.delete('/admin/:examId/students/:registerNumber', adminMiddleware, examController.removeStudent);
 router.put('/admin/:examId/student-verification', adminMiddleware, examController.updateStudentVerification);
 

@@ -49,6 +49,34 @@ export default function AdaptiveExamSession() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showFullscreenWarning, setShowFullscreenWarning] = useState(false);
     const [violations, setViolations] = useState(0);
+    const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (['input', 'textarea'].includes(e.target.tagName?.toLowerCase())) return;
+            if (!currentQuestion?.options) return;
+            const key = e.key.toUpperCase();
+            let optionIndex = -1;
+            if (['1', '2', '3', '4'].includes(e.key)) optionIndex = parseInt(e.key, 10) - 1;
+            else if (['A', 'B', 'C', 'D'].includes(key)) optionIndex = key.charCodeAt(0) - 65;
+            if (optionIndex >= 0 && optionIndex < currentQuestion.options.length) {
+                setSelectedAnswer(currentQuestion.options[optionIndex]);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentQuestion]);
 
     // Initialize session if needed
     const initializeSession = useCallback(async () => {
@@ -562,19 +590,51 @@ export default function AdaptiveExamSession() {
 
     return (
         <div className={`exam-session-container ${isDarkMode ? 'dashboard-dark' : ''}`}>
+            {!isOnline && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 9999,
+                    backgroundColor: '#ef4444',
+                    color: '#fff',
+                    textAlign: 'center',
+                    padding: '8px 16px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                }}>
+                    <AlertTriangle size={16} />
+                    <span>You are currently offline. Please do not close this window. Reconnecting...</span>
+                </div>
+            )}
+
             {/* Header */}
-            <div className="exam-session-header">
-                <button
-                    className="back-btn"
-                    onClick={() => {
-                        if (window.confirm('Are you sure you want to leave? Your progress will be lost.')) {
-                            navigate('/dashboard');
-                        }
-                    }}
-                >
-                    <ArrowLeft size={20} />
-                    Exit Exam
-                </button>
+            <div className="exam-session-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.5rem', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button
+                        className="back-btn"
+                        onClick={() => {
+                            if (window.confirm('Are you sure you want to leave? Your progress will be lost.')) {
+                                navigate('/dashboard');
+                            }
+                        }}
+                    >
+                        <ArrowLeft size={20} />
+                        Exit Exam
+                    </button>
+                    <span style={{ fontWeight: 600, fontSize: '1rem' }}>{exam?.title || 'Adaptive Exam'}</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.8rem', padding: '3px 8px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' }}>
+                        Autosave Active
+                    </span>
+                </div>
             </div>
 
             {/* Adaptive Question Container */}

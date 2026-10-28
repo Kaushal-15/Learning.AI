@@ -6,6 +6,7 @@ import {
     Clock, Users, BookOpen, Settings, Play, Eye, Sparkles, FileText, Camera
 } from 'lucide-react';
 import { useTheme } from "../contexts/ThemeContext";
+import StudentListManager from "./StudentListManager";
 import "../styles/DevvoraStyles.css";
 
 // Error Message Component
@@ -967,6 +968,16 @@ export default function AdminExamCreate() {
                                 <span className="toggle-slider"></span>
                             </label>
                         </div>
+
+                        {formData.requireStudentVerification && (
+                            <div style={{ marginTop: '0.75rem', marginBottom: '1.25rem' }}>
+                                <StudentListManager
+                                    students={formData.students || []}
+                                    onStudentsChange={(newStudents) => setFormData(prev => ({ ...prev, students: newStudents }))}
+                                    isDarkMode={isDarkMode}
+                                />
+                            </div>
+                        )}
 
                         {/* Biometric Verification Toggle */}
                         <div className="verification-toggle-card">

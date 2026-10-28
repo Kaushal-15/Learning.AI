@@ -33,11 +33,13 @@ import ExamAnalytics from "./components/ExamAnalytics";
 import AdminExamCreate from "./components/AdminExamCreate";
 import AdminExamManage from "./components/AdminExamManage";
 import AdminBiometricApproval from "./components/AdminBiometricApproval";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
@@ -82,6 +84,7 @@ export default function App() {
           <Route path="/admin/biometrics" element={<AdminBiometricApproval />} />
         </Route>
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

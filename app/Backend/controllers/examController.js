@@ -1160,6 +1160,46 @@ exports.getExamStudents = async (req, res) => {
     }
 };
 
+// Admin: Set/replace entire student list for an exam (with deduplication & uppercase normalization)
+exports.setExamStudents = async (req, res) => {
+    try {
+        const { examId } = req.params;
+        const { students } = req.body;
+
+        if (!Array.isArray(students)) {
+            return res.status(400).json({ success: false, message: 'Students must be an array' });
+        }
+
+        const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        const seen = new Set();
+        const cleaned = [];
+        for (const s of students) {
+            if (!s || !s.registerNumber) continue;
+            const reg = String(s.registerNumber).trim().toUpperCase();
+            const nm = s.name ? String(s.name).trim() : reg;
+            if (!reg || seen.has(reg)) continue;
+            seen.add(reg);
+            cleaned.push({
+                registerNumber: reg,
+                name: nm,
+                hasAttempted: Boolean(s.hasAttempted),
+                hasCompleted: Boolean(s.hasCompleted)
+            });
+        }
+
+        exam.students = cleaned;
+        await exam.save();
+
+        res.status(200).json({ success: true, data: exam.students });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // Admin: Update student verification setting
 exports.updateStudentVerification = async (req, res) => {
     try {

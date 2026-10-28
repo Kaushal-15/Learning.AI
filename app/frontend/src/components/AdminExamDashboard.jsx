@@ -11,7 +11,8 @@ export default function AdminExamDashboard() {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deleteModal, setDeleteModal] = useState({ show: false, examId: null, examTitle: '' });
-    const [deleting, setDeleting] = useState(false);
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
     const API_BASE = `${BASE_URL}/api`;
 
@@ -34,6 +35,52 @@ export default function AdminExamDashboard() {
             setLoading(false);
         }
     };
+
+    const getStatusChip = (exam) => {
+        const s = exam.computedStatus || exam.status || 'scheduled';
+        switch (s) {
+            case 'live':
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        LIVE
+                    </span>
+                );
+            case 'verification-open':
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        VERIFICATION OPEN
+                    </span>
+                );
+            case 'scheduled':
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                        SCHEDULED
+                    </span>
+                );
+            case 'ended':
+            default:
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-500/10 text-gray-500 dark:text-gray-400 border border-gray-500/30">
+                        ENDED
+                    </span>
+                );
+        }
+    };
+
+    const filteredExams = exams.filter(exam => {
+        const s = exam.computedStatus || exam.status || 'scheduled';
+        if (filterStatus !== 'all' && s !== filterStatus) return false;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            return (
+                exam.title?.toLowerCase().includes(q) ||
+                exam.examCode?.toLowerCase().includes(q)
+            );
+        }
+        return true;
+    });
 
     const handleStatusUpdate = async (examId, newStatus) => {
         try {
@@ -108,28 +155,66 @@ export default function AdminExamDashboard() {
                 </div>
             </header>
 
-            {exams.length === 0 ? (
+            {/* Filter and Search Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div className="flex flex-wrap items-center gap-2">
+                    {[
+                        { id: 'all', label: 'All' },
+                        { id: 'live', label: 'Live' },
+                        { id: 'verification-open', label: 'Verification Open' },
+                        { id: 'scheduled', label: 'Scheduled' },
+                        { id: 'ended', label: 'Ended' }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setFilterStatus(tab.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                                filterStatus === tab.id
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-white dark:bg-dark-400 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-500 border border-gray-200 dark:border-dark-300'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="w-full sm:w-64">
+                    <input
+                        type="text"
+                        placeholder="Search by title or code..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-dark-400 border border-gray-200 dark:border-dark-300 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+            </div>
+
+            {filteredExams.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon dark:bg-dark-500 dark:text-gray-400">
                         <BarChart2 size={48} />
                     </div>
-                    <h3 className="dark:text-cream-100">No exams yet</h3>
-                    <p className="dark:text-gray-400">Create your first exam to get started</p>
-                    <button className="create-btn" onClick={() => navigate('/admin/exams/create')}>
-                        <Plus size={20} />
-                        Create Exam
-                    </button>
+                    <h3 className="dark:text-cream-100">No matching exams</h3>
+                    <p className="dark:text-gray-400">
+                        {exams.length === 0 ? "Create your first exam to get started" : "Try adjusting your filter or search query"}
+                    </p>
+                    {exams.length === 0 && (
+                        <button className="create-btn" onClick={() => navigate('/admin/exams/create')}>
+                            <Plus size={20} />
+                            Create Exam
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="exam-grid">
-                    {exams.map(exam => (
+                    {filteredExams.map(exam => (
                         <div key={exam._id} className="exam-card premium-card">
                             <div className="exam-card-header">
                                 <div className="exam-info">
                                     <h3 className="text-gray-900 dark:text-cream-100">{exam.title}</h3>
-                                    <span className={`status-badge ${exam.status}`}>
-                                        {exam.status.toUpperCase()}
-                                    </span>
+                                    {getStatusChip(exam)}
                                 </div>
                                 <button
                                     className="delete-btn-icon"
