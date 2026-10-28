@@ -21,7 +21,11 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+        const error = new Error(data.message || 'API request failed');
+        error.status = response.status;
+        error.retryAfter = data.retryAfter;
+        error.data = data;
+        throw error;
       }
 
       return data;
@@ -29,6 +33,35 @@ class ApiService {
       console.error('API Error:', error);
       throw error;
     }
+  }
+
+  // Auth / OTP API methods
+  async verifyOtp(email, otp) {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: { email, otp },
+    });
+  }
+
+  async resendOtp(email) {
+    return this.request('/auth/resend-otp', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  async forgotPassword(email) {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  async resetPassword(email, otp, newPassword) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: { email, otp, newPassword },
+    });
   }
 
   // Learner API methods

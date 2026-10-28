@@ -127,7 +127,19 @@ export default function Signup() {
       const data = await res.json();
 
       if (res.ok) {
-        // Auto-login after successful signup
+        if (data.requiresVerification) {
+          setMessage({
+            type: "success",
+            text: `Account created successfully! ${data.emailSent ? "We sent a 6-digit code to your email." : "Please verify your email."} Redirecting...`,
+          });
+          setForm({ name: "", email: "", password: "" });
+          setTimeout(() => {
+            navigate("/verify-email", { state: { email: form.email.trim() } });
+          }, 1500);
+          return;
+        }
+
+        // Auto-login fallback if verification is not required
         const loginRes = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

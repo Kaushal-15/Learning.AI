@@ -68,6 +68,14 @@ export default function Login() {
         setTimeout(() => {
           navigate("/dashboard");
         }, 800);
+      } else if (res.status === 403 && data.requiresVerification) {
+        setMessage({
+          type: "error",
+          text: data.message || "Please verify your email before signing in. Redirecting...",
+        });
+        setTimeout(() => {
+          navigate("/verify-email", { state: { email: data.email || form.email.trim() } });
+        }, 1200);
       } else {
         setMessage({ type: "error", text: data.message || "Invalid credentials" });
       }
