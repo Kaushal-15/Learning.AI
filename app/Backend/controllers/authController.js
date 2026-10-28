@@ -2,8 +2,7 @@ const User = require('../models/User');
 const Learner = require('../models/Learner');
 const { generateSalt, sha256Hash } = require('../utils/crypto');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
-const { sendOTP } = require('../utils/mailer');
-const crypto = require('crypto');
+const { issueOtp } = require('../services/otpService');
 const connectDB = require('../config/database');
 
 const PEPPER = process.env.PEPPER || '';
@@ -18,36 +17,47 @@ const cookieOpts = (maxAgeMs) => ({
     maxAge: maxAgeMs
 });
 
-
-// Generate a 6-digit OTP
-const generateOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-};
+/**
+ * Escape special regex characters so user input can be used safely inside RegExp.
+ */
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 exports.register = async (req, res) => {
     try {
         await connectDB();
         const { email, password, name } = req.body;
 
-        // Validate required fields
-        if (!email || !password || !name) {
+        // Validate required fields are strings
+        if (!email || typeof email !== 'string' ||
+            !password || typeof password !== 'string' ||
+            !name || typeof name !== 'string') {
             return res.status(400).json({ message: 'Email, password, and name are required' });
         }
 
+        const trimmedEmail = email.toLowerCase().trim();
+        const trimmedName = name.trim();
+
         // Validate name length
-        if (name.trim().length < 2) {
+        if (trimmedName.length < 2) {
             return res.status(400).json({ message: 'Name must be at least 2 characters long' });
         }
 
+        // Validate password length
+        if (password.length < 8 || password.length > 128) {
+            return res.status(400).json({ message: 'Password must be between 8 and 128 characters' });
+        }
+
         // Check if email already exists
-        const existingEmail = await User.findOne({ email });
+        const existingEmail = await User.findOne({ email: trimmedEmail });
         if (existingEmail) {
             return res.status(409).json({ message: 'Email already registered' });
         }
 
-        // Check if name already exists (case-insensitive)
+        // Check if name already exists (case-insensitive, escaped for regex safety)
         const existingName = await User.findOne({
-            name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
+            name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') }
         });
         if (existingName) {
             return res.status(409).json({ message: 'Username already taken. Please choose a different name.' });
@@ -71,46 +81,42 @@ exports.register = async (req, res) => {
             return res.status(500).json({ message: 'Failed to generate unique learner ID. Please try again.' });
         }
 
-        // Generate OTP
-        const otp = generateOTP();
-        const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
         // Create user
         const salt = generateSalt();
         const passwordHash = sha256Hash(password, salt, PEPPER);
         const newUser = new User({
-            email,
-            name: name.trim(),
+            email: trimmedEmail,
+            name: trimmedName,
             learnerId,
             salt,
             passwordHash,
             isVerified: false,
-            verificationCode: otp,
-            verificationExpires: otpExpires
         });
         await newUser.save();
 
         // Create corresponding learner profile
         const newLearner = new Learner({
-            email,
-            name: name.trim()
+            email: trimmedEmail,
+            name: trimmedName,
         });
         await newLearner.save();
 
-        // Send OTP email
+        // Send signup OTP through the new service
+        let emailSent = true;
         try {
-            await sendOTP(email, otp);
+            await issueOtp(newUser, 'signup');
         } catch (emailError) {
-            console.error('Failed to send OTP email:', emailError);
-            // Optional: Delete user if email fails, or just return warning
-            // For now, we keep the user but they need to resend OTP (logic to be added if needed)
+            console.error('Failed to send signup OTP:', emailError);
+            emailSent = false;
         }
 
         res.status(201).json({
             message: 'Account created successfully. Please verify your email.',
+            email: trimmedEmail,
             learnerId: learnerId,
             needsRoadmapSelection: true,
-            requiresVerification: true
+            requiresVerification: true,
+            emailSent,
         });
     } catch (error) {
         console.error('Registration error:', error);
@@ -128,51 +134,21 @@ exports.register = async (req, res) => {
     }
 };
 
-exports.verifyOTP = async (req, res) => {
-    try {
-        await connectDB();
-        const { email, otp } = req.body;
-
-        if (!email || !otp) {
-            return res.status(400).json({ message: 'Email and OTP are required' });
-        }
-
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        if (user.isVerified) {
-            return res.status(200).json({ message: 'User already verified' });
-        }
-
-        if (user.verificationCode !== otp) {
-            return res.status(400).json({ message: 'Invalid OTP' });
-        }
-
-        if (user.verificationExpires < Date.now()) {
-            return res.status(400).json({ message: 'OTP expired' });
-        }
-
-        // Verify user
-        user.isVerified = true;
-        user.verificationCode = undefined;
-        user.verificationExpires = undefined;
-        await user.save();
-
-        res.status(200).json({ message: 'Email verified successfully' });
-    } catch (error) {
-        console.error('Verification error:', error);
-        res.status(500).json({ message: 'Server error during verification' });
-    }
-};
+// verifyOTP is now handled by otpAuthController.js
 
 exports.loginUser = async (req, res) => {
     try {
         await connectDB();
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+
+        // Validate inputs are strings
+        if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+            return res.status(400).json({ success: false, message: 'Email and password are required.' });
+        }
+
+        const trimmedEmail = email.toLowerCase().trim();
+
+        const user = await User.findOne({ email: trimmedEmail });
         if (!user) {
             return res
                 .status(401)
@@ -185,6 +161,16 @@ exports.loginUser = async (req, res) => {
             return res
                 .status(401)
                 .json({ success: false, message: "Invalid email or password." });
+        }
+
+        // Block unverified users — tell the frontend to redirect to verification
+        if (!user.isVerified) {
+            return res.status(403).json({
+                success: false,
+                requiresVerification: true,
+                email: user.email,
+                message: 'Please verify your email before signing in.',
+            });
         }
 
         // Generate tokens using utility functions

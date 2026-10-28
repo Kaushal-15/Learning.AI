@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { register, verifyOTP, loginUser, logoutUser } = require('../controllers/authController');
+const { register, loginUser, logoutUser } = require('../controllers/authController');
+const { verifyOTP, resendOtp, forgotPassword, resetPassword } = require('../controllers/otpAuthController');
 const { verifyRefreshToken, signAccessToken } = require('../utils/jwt');
 const User = require('../models/User');
 
@@ -19,6 +20,15 @@ router.post('/register', register);
 
 // Verify OTP
 router.post('/verify-otp', verifyOTP);
+
+// Resend OTP
+router.post('/resend-otp', resendOtp);
+
+// Forgot password (request reset code)
+router.post('/forgot-password', forgotPassword);
+
+// Reset password (verify code + set new password)
+router.post('/reset-password', resetPassword);
 
 // Login user
 router.post('/login', loginUser);

@@ -22,8 +22,13 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   refreshToken: { type: String }, // optional store for refresh token validation
   isVerified: { type: Boolean, default: false },
-  verificationCode: { type: String },
-  verificationExpires: { type: Date },
+  otp: {
+    purpose: { type: String, enum: ['signup', 'reset'] },
+    hash: { type: String },
+    expiresAt: { type: Date },
+    attempts: { type: Number, default: 0 },
+    lastSentAt: { type: Date },
+  },
   settings: {
     theme: { type: String, default: 'light' },
     notifications: { type: Boolean, default: true }
