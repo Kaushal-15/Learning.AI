@@ -18,7 +18,8 @@ export default function ExamDashboard() {
 
     const handleValidateCode = async (e) => {
         e.preventDefault();
-        if (!examCode.trim()) return;
+        const trimmedCode = (examCode || '').trim().toUpperCase();
+        if (!trimmedCode) return;
 
         setLoading(true);
         setError('');
@@ -27,7 +28,7 @@ export default function ExamDashboard() {
             const validateResponse = await fetch(`${API_BASE}/exams/validate-entry`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ examCode }),
+                body: JSON.stringify({ examCode: trimmedCode }),
                 credentials: 'include'
             });
 
@@ -39,7 +40,10 @@ export default function ExamDashboard() {
                 return;
             }
 
-            setExamData(validateData.data);
+            setExamData({
+                ...validateData.data,
+                serverNow: validateData.serverNow || validateData.data?.serverNow
+            });
             setStep(2); // Move to student info step
         } catch (err) {
             console.error('Error validating exam code:', err);
@@ -51,7 +55,10 @@ export default function ExamDashboard() {
 
     const handleSubmitStudentInfo = async (e) => {
         e.preventDefault();
-        if (!studentInfo.name.trim() || !studentInfo.registerNumber.trim()) {
+        const trimmedName = (studentInfo.name || '').trim();
+        const trimmedReg = (studentInfo.registerNumber || '').trim().toUpperCase();
+
+        if (!trimmedName || !trimmedReg) {
             setError('Please fill in all fields');
             return;
         }
@@ -60,14 +67,16 @@ export default function ExamDashboard() {
         setError('');
 
         try {
+            const trimmedCode = (examCode || '').trim().toUpperCase();
+
             // Validate student if verification is required
             if (examData.requireStudentVerification) {
                 const validateResponse = await fetch(`${API_BASE}/exams/validate-entry`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        examCode,
-                        registerNumber: studentInfo.registerNumber
+                        examCode: trimmedCode,
+                        registerNumber: trimmedReg
                     }),
                     credentials: 'include'
                 });
@@ -79,13 +88,27 @@ export default function ExamDashboard() {
                     setLoading(false);
                     return;
                 }
+
+                if (validateData.data) {
+                    setExamData(prev => ({
+                        ...prev,
+                        ...validateData.data,
+                        serverNow: validateData.serverNow || prev?.serverNow
+                    }));
+                }
             }
 
             // Navigate to verification page with student info
             navigate(`/exam/${examData._id}/verify`, {
                 state: {
-                    examData,
-                    studentInfo
+                    examData: {
+                        ...examData,
+                        examCode: trimmedCode
+                    },
+                    studentInfo: {
+                        name: trimmedName,
+                        registerNumber: trimmedReg
+                    }
                 }
             });
         } catch (err) {

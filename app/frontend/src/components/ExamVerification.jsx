@@ -30,12 +30,81 @@ export default function ExamVerification() {
         return null;
     }
 
-    // CRITICAL SECURITY ENFORCEMENT - FORCE ENABLE ALL SECURITY FEATURES
-    // Override exam settings to ALWAYS require biometric and camera
+    const [exam, setExam] = useState(examData);
+
+    // Server-authoritative clock synchronization
+    const initialOffset = examData?.serverNow ? (new Date(examData.serverNow).getTime() - Date.now()) : 0;
+    const [serverOffset, setServerOffset] = useState(initialOffset);
+    const [nowMs, setNowMs] = useState(Date.now() + initialOffset);
+
+    // Ticking second timer
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setNowMs(Date.now() + serverOffset);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [serverOffset]);
+
+    // Light polling (every 12 seconds) to keep serverNow and window status synchronized
+    useEffect(() => {
+        let mounted = true;
+        const pollExamDetails = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/exams/${examId}/details`, { credentials: 'include' });
+                if (res.ok) {
+                    const json = await res.json();
+                    if (mounted && json.success && json.data) {
+                        setExam(prev => ({ ...prev, ...json.data }));
+                        if (json.serverNow) {
+                            const newOffset = new Date(json.serverNow).getTime() - Date.now();
+                            setServerOffset(newOffset);
+                        }
+                    }
+                }
+            } catch (pollErr) {
+                console.warn('Exam details light poll notice:', pollErr.message);
+            }
+        };
+
+        const interval = setInterval(pollExamDetails, 12000);
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, [examId]);
+
+    // Timings
+    const startTime = new Date(exam.startTime).getTime();
+    const endTime = new Date(exam.endTime).getTime();
+    const verificationDuration = Number(exam.verificationDuration) || 15;
+    const verificationStart = exam.verificationStart
+        ? new Date(exam.verificationStart).getTime()
+        : startTime - (verificationDuration * 60000);
+
+    const isBeforeVerification = nowMs < verificationStart;
+    const isVerificationOpen = nowMs >= verificationStart && nowMs < startTime;
+    const isLive = nowMs >= startTime && nowMs <= endTime;
+    const isEnded = nowMs > endTime;
+
+    const secondsToVerification = Math.max(0, Math.ceil((verificationStart - nowMs) / 1000));
+    const secondsToStart = Math.max(0, Math.ceil((startTime - nowMs) / 1000));
+
+    const formatCountdown = (totalSecs) => {
+        if (totalSecs <= 0) return '00:00';
+        const hours = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+        if (hours > 0) {
+            return `${hours}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+        }
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Honor configured exam settings (no artificial forced overrides)
     const secureExamData = {
-        ...examData,
-        requireBiometric: true,  // FORCE ENABLE
-        requireCamera: true       // FORCE ENABLE
+        ...exam,
+        requireBiometric: Boolean(exam.requireBiometric),
+        requireCamera: exam.requireCamera !== false
     };
 
     // Check biometric status on mount
@@ -43,13 +112,14 @@ export default function ExamVerification() {
         if (secureExamData.requireBiometric) {
             checkBiometricStatus();
         }
-    }, []);
+    }, [secureExamData.requireBiometric]);
 
     const checkBiometricStatus = async () => {
         setCheckingBiometric(true);
         try {
+            const reg = (studentInfo.registerNumber || '').trim().toUpperCase();
             const response = await fetch(
-                `${API_BASE}/biometric/status/${examId}/${studentInfo.registerNumber}`,
+                `${API_BASE}/biometric/status/${examId}/${reg}`,
                 { credentials: 'include' }
             );
             const data = await response.json();
@@ -75,12 +145,11 @@ export default function ExamVerification() {
     };
 
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleString('en-US', {
+        return new Date(dateString).toLocaleString(undefined, {
             dateStyle: 'medium',
             timeStyle: 'short'
         });
     };
-
 
     const handleStartExam = () => {
         // Show warning modal instead of starting directly
@@ -97,24 +166,26 @@ export default function ExamVerification() {
         setError('');
         setShowWarningModal(false);
 
-        // CHECK EXAM TIMING FIRST
-        const now = new Date();
-        const start = new Date(examData.startTime);
-        const end = new Date(examData.endTime);
-
-        if (now < start) {
-            setError(`Exam starts at ${start.toLocaleString()}. Please wait until the scheduled time.`);
+        // CHECK EXAM TIMING FIRST (using authoritative synchronized serverNow)
+        if (nowMs < verificationStart) {
+            setError(`Exam verification starts in ${formatCountdown(secondsToVerification)}. Please wait until then.`);
             setLoading(false);
             return;
         }
 
-        if (now > end) {
+        if (nowMs < startTime) {
+            setError(`Exam starts in ${formatCountdown(secondsToStart)}. You will be admitted automatically when the exam goes live.`);
+            setLoading(false);
+            return;
+        }
+
+        if (nowMs > endTime) {
             setError('Exam has ended. No new sessions allowed.');
             setLoading(false);
             return;
         }
 
-        // CRITICAL: ALWAYS CHECK BIOMETRIC (FORCED FOR ALL EXAMS)
+        // Biometric check if configured
         if (secureExamData.requireBiometric) {
             if (!biometricStatus || !biometricStatus.exists) {
                 setError('❌ BIOMETRIC REQUIRED: Please complete biometric verification first');
@@ -339,7 +410,7 @@ export default function ExamVerification() {
                     </div>
                 )}
 
-                {/* Action Buttons */}
+                {/* Action Buttons with Dynamic State */}
                 <div className="flex gap-3 mt-6">
                     <button
                         onClick={() => navigate('/exam')}
@@ -348,20 +419,49 @@ export default function ExamVerification() {
                         <ArrowLeft className="w-5 h-5" />
                         Back
                     </button>
-                    <button
-                        onClick={handleStartExam}
-                        disabled={loading}
-                        className="flex-1 py-3 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-400 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                    >
-                        {loading ? (
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                            <>
-                                Start Exam
-                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                            </>
-                        )}
-                    </button>
+                    {isBeforeVerification && (
+                        <button
+                            disabled
+                            className="flex-1 py-3 bg-amber-500/20 text-amber-500 border border-amber-500/40 rounded-xl font-semibold flex items-center justify-center gap-2 cursor-not-allowed"
+                        >
+                            <Clock className="w-5 h-5 animate-pulse" />
+                            Verification in {formatCountdown(secondsToVerification)}
+                        </button>
+                    )}
+                    {isVerificationOpen && (
+                        <button
+                            onClick={handleStartExam}
+                            disabled={loading}
+                            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20"
+                        >
+                            <Clock className="w-5 h-5" />
+                            Live in {formatCountdown(secondsToStart)} — Complete Verification
+                        </button>
+                    )}
+                    {isLive && (
+                        <button
+                            onClick={handleStartExam}
+                            disabled={loading}
+                            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20 group"
+                        >
+                            {loading ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    Start Exam
+                                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                </>
+                            )}
+                        </button>
+                    )}
+                    {isEnded && (
+                        <button
+                            disabled
+                            className="flex-1 py-3 bg-red-600/20 text-red-400 border border-red-500/40 rounded-xl font-semibold flex items-center justify-center gap-2 cursor-not-allowed"
+                        >
+                            Exam Ended
+                        </button>
+                    )}
                 </div>
             </div>
 

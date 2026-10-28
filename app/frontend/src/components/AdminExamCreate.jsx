@@ -385,22 +385,33 @@ export default function AdminExamCreate() {
                 }
             }
 
+            // Convert datetime-local strings to UTC ISO string to prevent timezone offset shifts
+            const toUtcIsoString = (val) => {
+                if (!val) return '';
+                const d = new Date(val);
+                return isNaN(d.getTime()) ? val : d.toISOString();
+            };
+
             let payload = {
-                title: formData.title,
-                description: formData.description,
-                examCode: formData.examCode,
-                startTime: formData.startTime,
-                endTime: formData.endTime,
-                duration: formData.duration,
-                verificationDuration: formData.verificationDuration || 15,
-                passingScore: formData.passingScore,
+                title: (formData.title || '').trim(),
+                description: (formData.description || '').trim(),
+                examCode: (formData.examCode || '').trim().toUpperCase(),
+                startTime: toUtcIsoString(formData.startTime),
+                endTime: toUtcIsoString(formData.endTime),
+                duration: Number(formData.duration),
+                verificationDuration: Number(formData.verificationDuration) || 15,
+                passingScore: Number(formData.passingScore),
                 examType: formData.examType,
-                students: formData.students,
-                requireStudentVerification: formData.requireStudentVerification,
-                requireBiometric: formData.requireBiometric,
-                requireCamera: formData.requireCamera,
-                allowRecording: formData.allowRecording,
-                autoRecord: formData.autoRecord
+                students: (formData.students || []).map(s => ({
+                    registerNumber: (s.registerNumber || '').trim().toUpperCase(),
+                    name: (s.name || '').trim(),
+                    hasAttempted: false
+                })),
+                requireStudentVerification: Boolean(formData.requireStudentVerification),
+                requireBiometric: Boolean(formData.requireBiometric),
+                requireCamera: formData.requireCamera !== false,
+                allowRecording: Boolean(formData.allowRecording),
+                autoRecord: Boolean(formData.autoRecord)
             };
 
             if (formData.examType === 'static') {
@@ -446,20 +457,23 @@ export default function AdminExamCreate() {
     const handleAddStudent = () => {
         setStudentError('');
 
-        if (!newStudent.registerNumber || !newStudent.name) {
+        const reg = (newStudent.registerNumber || '').trim().toUpperCase();
+        const name = (newStudent.name || '').trim();
+
+        if (!reg || !name) {
             setStudentError('Both register number and name are required');
             return;
         }
 
-        // Check for duplicate register number
-        if (formData.students.some(s => s.registerNumber === newStudent.registerNumber)) {
+        // Check for duplicate register number (case-insensitive)
+        if (formData.students.some(s => (s.registerNumber || '').trim().toUpperCase() === reg)) {
             setStudentError('A student with this register number already exists');
             return;
         }
 
         setFormData(prev => ({
             ...prev,
-            students: [...prev.students, { ...newStudent, hasAttempted: false }]
+            students: [...prev.students, { registerNumber: reg, name, hasAttempted: false }]
         }));
         setNewStudent({ registerNumber: '', name: '' });
     };

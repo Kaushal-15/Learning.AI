@@ -4,6 +4,7 @@ const Document = require('../models/Document');
 const fileProcessingService = require('../services/fileProcessingService');
 const quizGenerationService = require('../services/quizGenerationService');
 const mongoose = require('mongoose');
+const { computeExamState } = require('../services/examStateHelper');
 
 // Helper function to convert difficulty string to number
 const convertDifficulty = (difficulty) => {
@@ -389,38 +390,40 @@ exports.uploadQuestions = async (req, res) => {
 // Validate Exam Entry
 exports.validateEntry = async (req, res) => {
     try {
-        const { examCode, registerNumber } = req.body;
+        const rawExamCode = req.body.examCode || '';
+        const rawRegisterNumber = req.body.registerNumber || '';
+        const examCode = rawExamCode.trim().toUpperCase();
+        const registerNumber = rawRegisterNumber.trim().toUpperCase();
+
+        if (!examCode) {
+            return res.status(400).json({ success: false, message: 'Exam code is required' });
+        }
+
         const exam = await ExamMaster.findOne({ examCode });
 
         if (!exam) {
             return res.status(404).json({ success: false, message: 'Invalid Exam Code' });
         }
 
-        // STRICT TIME ENFORCEMENT (With Verification Window)
-        const now = new Date();
-        const examStart = new Date(exam.startTime);
-        const examEnd = new Date(exam.endTime);
-        const verificationStart = new Date(examStart.getTime() - (exam.verificationDuration || 15) * 60000);
+        // Compute authoritative state lazily from timestamps
+        const state = computeExamState(exam, new Date());
 
-        if (now < verificationStart) {
+        if (state.hasEnded) {
             return res.status(403).json({
                 success: false,
-                message: `Exam verification starts at ${verificationStart.toLocaleString()}. Please wait until then.`,
-                startTime: examStart,
-                verificationStart
+                examState: 'ended',
+                message: 'Exam has ended. No new sessions allowed.',
+                serverNow: state.serverNow,
+                startTime: state.startTime,
+                endTime: state.endTime
             });
         }
 
-        if (now > examEnd) {
-            return res.status(403).json({
-                success: false,
-                message: 'Exam has ended. No new sessions allowed.'
-            });
-        }
-
-        // Check student verification if enabled
+        // Check student verification if enabled and registerNumber is supplied
         if (exam.requireStudentVerification && registerNumber) {
-            const student = exam.students.find(s => s.registerNumber === registerNumber);
+            const student = (exam.students || []).find(s =>
+                (s.registerNumber || '').trim().toUpperCase() === registerNumber
+            );
             if (!student) {
                 return res.status(403).json({
                     success: false,
@@ -435,7 +438,35 @@ exports.validateEntry = async (req, res) => {
             return res.status(403).json({ success: false, message: 'You have already completed this exam' });
         }
 
-        res.status(200).json({ success: true, data: exam });
+        // If exam is scheduled (before verification window), allow student to enter and view countdown
+        const responseData = {
+            _id: exam._id,
+            title: exam.title,
+            description: exam.description,
+            examCode: exam.examCode,
+            duration: exam.duration,
+            totalQuestions: exam.totalQuestions,
+            passingScore: exam.passingScore,
+            requireStudentVerification: exam.requireStudentVerification,
+            requireBiometric: exam.requireBiometric,
+            requireCamera: exam.requireCamera,
+            examType: exam.examType,
+            isAdaptive: exam.isAdaptive,
+            startTime: state.startTime,
+            endTime: state.endTime,
+            verificationStart: state.verificationStart,
+            verificationDuration: state.verificationDuration,
+            examState: state.status,
+            serverNow: state.serverNow
+        };
+
+        res.status(200).json({
+            success: true,
+            examState: state.status,
+            serverNow: state.serverNow,
+            ...state,
+            data: responseData
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -451,25 +482,26 @@ exports.startSession = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Exam not found' });
         }
 
-        // STRICT TIMING ENFORCEMENT (With Verification Window)
-        const now = new Date();
-        const examStart = new Date(exam.startTime);
-        const examEnd = new Date(exam.endTime);
-        const verificationStart = new Date(examStart.getTime() - (exam.verificationDuration || 15) * 60000);
+        // STRICT TIMING ENFORCEMENT (Authoritative state computation)
+        const state = computeExamState(exam, new Date());
 
-        if (now < verificationStart) {
+        if (state.hasEnded) {
             return res.status(403).json({
                 success: false,
-                message: `Exam verification starts at ${verificationStart.toLocaleString()}. Please wait until then.`,
-                startTime: examStart,
-                verificationStart
+                examState: 'ended',
+                message: 'Exam has ended. No new sessions allowed.',
+                serverNow: state.serverNow
             });
         }
 
-        if (now > examEnd) {
+        if (state.status === 'scheduled') {
             return res.status(403).json({
                 success: false,
-                message: 'Exam has ended. No new sessions allowed.'
+                examState: 'scheduled',
+                message: `Exam verification starts at ${state.verificationStart}. Please wait until then.`,
+                serverNow: state.serverNow,
+                startTime: state.startTime,
+                verificationStart: state.verificationStart
             });
         }
 
@@ -484,18 +516,21 @@ exports.startSession = async (req, res) => {
         let session = await ExamSession.findOne({ userId, examId });
 
         if (!session) {
-            const { studentName, registerNumber } = req.body;
+            const studentName = (req.body.studentName || '').trim();
+            const registerNumber = (req.body.registerNumber || '').trim().toUpperCase();
 
             // Enforce student verification if enabled
             if (exam.requireStudentVerification) {
                 if (!registerNumber) {
-                    return res.status(403).json({
+                    return res.status(400).json({
                         success: false,
                         message: 'Register number is required for this exam'
                     });
                 }
 
-                const student = exam.students.find(s => s.registerNumber === registerNumber);
+                const student = (exam.students || []).find(s =>
+                    (s.registerNumber || '').trim().toUpperCase() === registerNumber
+                );
                 if (!student) {
                     return res.status(403).json({
                         success: false,
@@ -908,16 +943,24 @@ exports.submitExam = async (req, res) => {
 exports.getAdminExams = async (req, res) => {
     try {
         const exams = await ExamMaster.find().sort('-createdAt');
+        const now = new Date();
         const examStats = await Promise.all(exams.map(async (exam) => {
             const totalAttempts = await ExamAttempt.countDocuments({ examId: exam._id });
             const activeSessions = await ExamSession.countDocuments({ examId: exam._id });
+            const state = computeExamState(exam, now);
             return {
                 ...exam.toObject(),
                 totalAttempts,
-                activeSessions
+                activeSessions,
+                computedStatus: state.status,
+                serverNow: state.serverNow,
+                verificationStart: state.verificationStart,
+                isVerificationOpen: state.isVerificationOpen,
+                isLive: state.isLive,
+                hasEnded: state.hasEnded
             };
         }));
-        res.status(200).json({ success: true, data: examStats });
+        res.status(200).json({ success: true, data: examStats, serverNow: now.toISOString() });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -1145,18 +1188,30 @@ exports.getExamDetails = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Exam not found' });
         }
 
+        const state = computeExamState(exam, new Date());
+
         res.status(200).json({
             success: true,
+            serverNow: state.serverNow,
+            examState: state.status,
+            ...state,
             data: {
                 _id: exam._id,
                 title: exam.title,
                 description: exam.description,
+                examCode: exam.examCode,
                 duration: exam.duration,
                 totalQuestions: exam.totalQuestions,
                 passingScore: exam.passingScore,
-                startTime: exam.startTime,
-                endTime: exam.endTime,
-                requireStudentVerification: exam.requireStudentVerification
+                startTime: state.startTime,
+                endTime: state.endTime,
+                verificationStart: state.verificationStart,
+                verificationDuration: state.verificationDuration,
+                requireStudentVerification: exam.requireStudentVerification,
+                requireBiometric: exam.requireBiometric,
+                requireCamera: exam.requireCamera,
+                examState: state.status,
+                serverNow: state.serverNow
             }
         });
     } catch (error) {
