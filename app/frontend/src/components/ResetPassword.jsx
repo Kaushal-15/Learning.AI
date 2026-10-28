@@ -70,10 +70,17 @@ export default function ResetPassword() {
         navigate("/login");
       }, 1500);
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err.message || "Failed to reset password. Please verify the code and try again.",
-      });
+      if (err.status === 404) {
+        setMessage({
+          type: "error",
+          text: err.message || "Invalid email address. No account found with this email.",
+        });
+      } else {
+        setMessage({
+          type: "error",
+          text: err.message || "Failed to reset password. Please verify the code and try again.",
+        });
+      }
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import "../styles/DevvoraStyles.css";
@@ -130,12 +130,12 @@ export default function Signup() {
         if (data.requiresVerification) {
           setMessage({
             type: "success",
-            text: `Account created successfully! ${data.emailSent ? "We sent a 6-digit code to your email." : "Please verify your email."} Redirecting...`,
+            text: `Account created successfully! ${data.emailSent ? "We sent a 6-digit verification code to your email. (Please check your Spam/Junk folder if you don't see it)." : "Please verify your email."} Redirecting...`,
           });
           setForm({ name: "", email: "", password: "" });
           setTimeout(() => {
             navigate("/verify-email", { state: { email: form.email.trim() } });
-          }, 1500);
+          }, 1800);
           return;
         }
 

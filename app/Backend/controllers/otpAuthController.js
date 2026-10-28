@@ -22,6 +22,12 @@ exports.verifyOTP = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Check if email exists in database
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (!existingUser) {
+      return res.status(404).json({ message: 'Invalid email address. No account found with this email.' });
+    }
+
     const user = await verifyOtp(normalizedEmail, 'signup', otp.trim());
 
     // Mark as verified
@@ -38,7 +44,7 @@ exports.verifyOTP = async (req, res) => {
 
 /**
  * POST /api/auth/resend-otp
- * Resend the signup OTP. Returns a generic 200 whether or not the account exists.
+ * Resend the signup OTP. Rejects non-existent email as invalid.
  */
 exports.resendOtp = async (req, res) => {
   try {
@@ -52,14 +58,21 @@ exports.resendOtp = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
 
-    // Same response whether or not the account exists (prevents enumeration)
-    if (!user || user.isVerified) {
-      return res.status(200).json({ message: 'If an account exists, a new code has been sent.' });
+    // If mail ID is not in DB, return error stating invalid email
+    if (!user) {
+      return res.status(404).json({ message: 'Invalid email address. No account found with this email.' });
     }
 
-    await issueOtp(user, 'signup');
+    if (user.isVerified) {
+      return res.status(400).json({ message: 'This email is already verified. Please sign in.' });
+    }
 
-    res.status(200).json({ message: 'If an account exists, a new code has been sent.' });
+    await issueOtp(user, 'signup', true);
+
+    res.status(200).json({
+      message: 'A new 6-digit code has been sent. Please check your inbox and Spam/Junk folder.',
+      retryAfter: 45
+    });
   } catch (error) {
     if (error.status === 429) {
       return res.status(429).json({
@@ -74,7 +87,7 @@ exports.resendOtp = async (req, res) => {
 
 /**
  * POST /api/auth/forgot-password
- * Issue a password-reset OTP. Returns a generic 200 whether or not the account exists.
+ * Issue a password-reset OTP. Rejects non-existent email as invalid.
  */
 exports.forgotPassword = async (req, res) => {
   try {
@@ -86,16 +99,23 @@ exports.forgotPassword = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail, authProvider: 'local' });
+    const user = await User.findOne({ email: normalizedEmail });
 
-    // Same generic response regardless of existence
+    // If mail ID is not in DB, return error stating invalid email
     if (!user) {
-      return res.status(200).json({ message: 'If an account exists, a reset code has been sent.' });
+      return res.status(404).json({ message: 'Invalid email address. No account found with this email.' });
     }
 
-    await issueOtp(user, 'reset');
+    if (user.authProvider && user.authProvider !== 'local') {
+      return res.status(400).json({ message: 'This account uses Google Sign-In. Please sign in with Google.' });
+    }
 
-    res.status(200).json({ message: 'If an account exists, a reset code has been sent.' });
+    await issueOtp(user, 'reset', true);
+
+    res.status(200).json({
+      message: 'A 6-digit reset code has been sent. Please check your inbox and Spam/Junk folder.',
+      retryAfter: 45
+    });
   } catch (error) {
     if (error.status === 429) {
       return res.status(429).json({
@@ -142,6 +162,12 @@ exports.resetPassword = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if email exists
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (!existingUser) {
+      return res.status(404).json({ message: 'Invalid email address. No account found with this email.' });
+    }
 
     // Verify the reset OTP (throws on failure)
     const user = await verifyOtp(normalizedEmail, 'reset', otp.trim());

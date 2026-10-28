@@ -17,7 +17,8 @@ export default function VerifyEmail() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState(null);
-  const [countdown, setCountdown] = useState(0);
+  const [countdown, setCountdown] = useState(45); // 45 seconds initial timer
+  const [resendAttempts, setResendAttempts] = useState(0);
 
   const inputRefs = useRef([]);
 
@@ -81,7 +82,8 @@ export default function VerifyEmail() {
     e.preventDefault();
     setMessage(null);
 
-    if (!email.trim()) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setMessage({ type: "error", text: "Please provide your email address." });
       return;
     }
@@ -93,7 +95,7 @@ export default function VerifyEmail() {
 
     setLoading(true);
     try {
-      await api.verifyOtp(email.trim(), otpCode);
+      await api.verifyOtp(trimmedEmail, otpCode);
       setMessage({
         type: "success",
         text: "Email verified successfully! Redirecting to sign in...",
@@ -114,7 +116,8 @@ export default function VerifyEmail() {
   const handleResend = async () => {
     if (countdown > 0 || resending) return;
 
-    if (!email.trim()) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setMessage({ type: "error", text: "Please enter your email address first." });
       return;
     }
@@ -123,18 +126,32 @@ export default function VerifyEmail() {
     setMessage(null);
 
     try {
-      const res = await api.resendOtp(email.trim());
+      const res = await api.resendOtp(trimmedEmail);
+      const newAttempts = resendAttempts + 1;
+      setResendAttempts(newAttempts);
+
       setMessage({
         type: "success",
-        text: res.message || "A new 6-digit code has been sent to your email.",
+        text: res.message || "A new 6-digit code has been sent. Check your inbox and spam folder.",
       });
-      setCountdown(60);
+      // 45 seconds cooldown
+      setCountdown(res.retryAfter || 45);
     } catch (err) {
-      if (err.status === 429 && err.retryAfter) {
-        setCountdown(err.retryAfter);
+      if (err.status === 404) {
+        // If mail ID occurs which is not in DB
         setMessage({
           type: "error",
-          text: `Please wait ${err.retryAfter}s before requesting a new code.`,
+          text: err.message || "Invalid email address. No account found with this email.",
+        });
+      } else if (err.status === 429) {
+        const retrySecs = err.retryAfter || 300;
+        setCountdown(retrySecs);
+        if (retrySecs >= 240) {
+          setResendAttempts(3);
+        }
+        setMessage({
+          type: "error",
+          text: err.message || `Too many attempts. Blocked for ${Math.ceil(retrySecs / 60)} minutes.`,
         });
       } else {
         setMessage({
@@ -145,6 +162,13 @@ export default function VerifyEmail() {
     } finally {
       setResending(false);
     }
+  };
+
+  const formatCountdown = (seconds) => {
+    if (seconds <= 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs < 10 ? "0" : ""}${secs}s`;
   };
 
   return (
@@ -191,6 +215,28 @@ export default function VerifyEmail() {
             <span className="font-semibold text-gray-800">{email || "your email"}</span>.
           </p>
 
+          {/* SPAM / JUNK FOLDER NOTICE */}
+          <div
+            style={{
+              background: "#FFFBEB",
+              border: "1px solid #FCD34D",
+              borderRadius: "10px",
+              padding: "0.875rem 1rem",
+              marginBottom: "1.25rem",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+            }}
+          >
+            <span style={{ fontSize: "1.25rem", lineHeight: "1" }}>📬</span>
+            <div style={{ fontSize: "0.85rem", color: "#92400E", lineHeight: "1.4" }}>
+              <strong>Don't see the code in your inbox?</strong>
+              <div style={{ marginTop: "2px" }}>
+                Please check your <strong>Spam</strong> or <strong>Junk</strong> folder. It usually arrives within a few seconds.
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="auth-input-group">
               <label htmlFor="verify-email" className="auth-label">
@@ -200,7 +246,10 @@ export default function VerifyEmail() {
                 id="verify-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setMessage(null);
+                }}
                 className="auth-input"
                 placeholder="Enter your email"
                 required
@@ -268,9 +317,14 @@ export default function VerifyEmail() {
               borderTop: "1px solid #E5E7EB",
             }}
           >
-            <span style={{ fontSize: "0.875rem", color: "#6B7280" }}>
-              Didn't receive a code?
-            </span>
+            <div>
+              <span style={{ fontSize: "0.875rem", color: "#6B7280" }}>
+                Didn't receive a code?
+              </span>
+              <div style={{ fontSize: "0.75rem", color: "#9CA3AF" }}>
+                Resend attempts: {resendAttempts}/3
+              </div>
+            </div>
             <button
               type="button"
               onClick={handleResend}
@@ -285,7 +339,7 @@ export default function VerifyEmail() {
               {resending
                 ? "Sending..."
                 : countdown > 0
-                ? `Resend in ${countdown}s`
+                ? `Resend in ${formatCountdown(countdown)}`
                 : "Resend Code"}
             </button>
           </div>

@@ -26,13 +26,19 @@ export default function ForgotPassword() {
       setSent(true);
       setMessage({
         type: "success",
-        text: res.message || "If an account exists, a reset code has been sent.",
+        text: res.message || "A 6-digit reset code has been sent. Please check your inbox and Spam/Junk folder.",
       });
     } catch (err) {
-      if (err.status === 429 && err.retryAfter) {
+      if (err.status === 404) {
         setMessage({
           type: "error",
-          text: `Please wait ${err.retryAfter}s before requesting another reset code.`,
+          text: err.message || "Invalid email address. No account found with this email.",
+        });
+      } else if (err.status === 429) {
+        const retrySecs = err.retryAfter || 45;
+        setMessage({
+          type: "error",
+          text: err.message || `Please wait ${retrySecs}s before requesting another reset code.`,
         });
       } else {
         setMessage({
@@ -97,7 +103,10 @@ export default function ForgotPassword() {
                 id="forgot-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setMessage(null);
+                }}
                 className="auth-input"
                 placeholder="Enter your registered email"
                 required
@@ -126,6 +135,19 @@ export default function ForgotPassword() {
 
           {sent && (
             <div style={{ marginTop: "1.5rem" }}>
+              <div
+                style={{
+                  background: "#FFFBEB",
+                  border: "1px solid #FCD34D",
+                  borderRadius: "8px",
+                  padding: "0.75rem",
+                  marginBottom: "1rem",
+                  fontSize: "0.85rem",
+                  color: "#92400E",
+                }}
+              >
+                📬 <strong>Tip:</strong> Please check your <strong>Spam/Junk</strong> folder if you do not see the email in your inbox.
+              </div>
               <button
                 type="button"
                 onClick={() => navigate("/reset-password", { state: { email: email.trim() } })}

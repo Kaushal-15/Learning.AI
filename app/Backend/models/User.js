@@ -28,6 +28,8 @@ const userSchema = new mongoose.Schema({
     expiresAt: { type: Date },
     attempts: { type: Number, default: 0 },
     lastSentAt: { type: Date },
+    resendCount: { type: Number, default: 0 },
+    resendBlockedUntil: { type: Date },
   },
   settings: {
     theme: { type: String, default: 'light' },
