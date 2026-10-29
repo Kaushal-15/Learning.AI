@@ -76,7 +76,9 @@ export default function ExamVerification() {
     // Timings
     const startTime = new Date(exam.startTime).getTime();
     const endTime = new Date(exam.endTime).getTime();
-    const verificationDuration = Number(exam.verificationDuration) || 15;
+    const verificationDuration = Number.isFinite(Number(exam.verificationDuration)) && Number(exam.verificationDuration) >= 0
+        ? Number(exam.verificationDuration)
+        : 15;
     const verificationStart = exam.verificationStart
         ? new Date(exam.verificationStart).getTime()
         : startTime - (verificationDuration * 60000);

@@ -1,0 +1,62 @@
+
+📋  BEFORE verification window — UTC reference clock
+  ✅  status is 'scheduled' (got 'scheduled')
+  ✅  isVerificationOpen is false
+  ✅  isLive is false
+  ✅  hasEnded is false
+  ✅  secondsUntilVerification > 0
+  ✅  serverNow is ISO string
+
+📋  BEFORE verification window — IST reference clock
+  ✅  status is 'scheduled' for 14:30 IST (got 'scheduled')
+  ✅  isVerificationOpen is false at 14:30 IST
+  ✅  secondsUntilVerification > 0 at 14:30 IST
+
+📋  INSIDE verification window — UTC reference clock
+  ✅  status is 'verification-open' (got 'verification-open')
+  ✅  isVerificationOpen is true
+  ✅  isLive is false (not started yet)
+  ✅  hasEnded is false
+  ✅  secondsUntilVerification is 0
+  ✅  secondsUntilStart > 0
+
+📋  INSIDE verification window — IST reference clock
+  ✅  status is 'verification-open' for 15:20 IST (got 'verification-open')
+  ✅  isVerificationOpen is true at 15:20 IST
+
+📋  LIVE (exam in progress) — UTC reference clock
+  ✅  status is 'live' (got 'live')
+  ✅  isLive is true
+  ✅  isVerificationOpen is still true during live phase
+  ✅  hasEnded is false
+  ✅  secondsUntilStart is 0
+  ✅  secondsUntilEnd > 0
+
+📋  LIVE — IST reference clock
+  ✅  status is 'live' for 16:00 IST (got 'live')
+  ✅  isLive is true at 16:00 IST
+
+📋  ENDED — UTC reference clock
+  ✅  status is 'ended' (got 'ended')
+  ✅  isLive is false
+  ✅  hasEnded is true
+  ✅  secondsUntilEnd is 0
+
+📋  ENDED — IST reference clock
+  ✅  status is 'ended' for 16:35 IST (got 'ended')
+  ✅  hasEnded is true at 16:35 IST
+
+📋  Exact verificationStart boundary
+  ✅  status is 'verification-open' exactly at verificationStart (got 'verification-open')
+
+📋  Exact startTime boundary
+  ✅  status is 'live' exactly at startTime (got 'live')
+
+📋  Exact endTime boundary
+  ✅  status is 'live' exactly at endTime (got 'live')
+
+📋  verificationDuration = 0 (no verification window)
+  ✅  status 'scheduled' when verificationDuration=0 (got 'scheduled')
+
+──────────────────────────────────────────────────
+Results: 35 passed, 0 failed

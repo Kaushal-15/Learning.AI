@@ -22,7 +22,9 @@ function computeExamState(exam, serverNow = new Date()) {
   const now = serverNow instanceof Date ? serverNow : new Date(serverNow);
   const startTime = new Date(exam.startTime);
   const endTime = new Date(exam.endTime);
-  const verificationDuration = Number(exam.verificationDuration) || 15;
+  // Use nullish-like check: treat 0 as valid (no verification window), fall back to 15 only for null/undefined/NaN
+  const rawVd = Number(exam.verificationDuration);
+  const verificationDuration = (Number.isFinite(rawVd) && rawVd >= 0) ? rawVd : 15;
   const verificationStart = new Date(startTime.getTime() - verificationDuration * 60000);
 
   let status = 'scheduled';

@@ -539,7 +539,7 @@ exports.startSession = async (req, res) => {
             return res.status(403).json({
                 success: false,
                 examState: 'scheduled',
-                message: `Exam verification starts at ${state.verificationStart}. Please wait until then.`,
+                message: `Exam verification has not opened yet. Verification opens at ${state.verificationStart} (UTC).`,
                 serverNow: state.serverNow,
                 startTime: state.startTime,
                 verificationStart: state.verificationStart

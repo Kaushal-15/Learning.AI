@@ -69,9 +69,9 @@ export default function App() {
 
           {/* Exam Routes */}
           <Route path="/exam" element={<ExamDashboard />} />
-          <Route path="/exam/:examId/verify" element={<ExamVerification />} />
-          <Route path="/exam/:examId" element={<ExamSession />} />
-          <Route path="/exam/:examId/adaptive" element={<AdaptiveExamSession />} />
+          <Route path="/exam/:examId/verify" element={<ErrorBoundary><ExamVerification /></ErrorBoundary>} />
+          <Route path="/exam/:examId" element={<ErrorBoundary><ExamSession /></ErrorBoundary>} />
+          <Route path="/exam/:examId/adaptive" element={<ErrorBoundary><AdaptiveExamSession /></ErrorBoundary>} />
           <Route path="/exam/:examId/result" element={<ExamResult />} />
 
           {/* Admin Routes */}
