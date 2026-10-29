@@ -4,6 +4,7 @@ import {
     ArrowLeft,
     ArrowRight,
     Clock,
+    Check,
     CheckCircle,
     AlertTriangle,
     Shield,
