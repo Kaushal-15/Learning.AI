@@ -39,6 +39,15 @@ const checkHealth = async () => {
         console.log('✅ All required environment variables present');
     }
 
+    // Check Cloud Storage (S3 / R2) configuration
+    const storageService = require('./services/storageService');
+    const storageConfig = storageService.getStorageConfig();
+    if (storageConfig.isConfigured) {
+        console.log(`✅ Cloud Storage configured: Bucket [${storageConfig.bucket}], Region [${storageConfig.region}]`);
+    } else {
+        console.log('ℹ️  Cloud Storage: Not configured (STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY optional)');
+    }
+
     console.log('\n✅ Health checks passed! Starting server...\n');
     process.exit(0);
 };

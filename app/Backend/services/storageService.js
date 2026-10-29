@@ -11,38 +11,92 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 let s3ClientInstance = null;
 
-function isRecordingConfigured() {
+function cleanEnv(val) {
+  return (val || '').trim().replace(/^["']|["']$/g, '').trim();
+}
+
+/**
+ * Get sanitized storage configuration with fallback support.
+ * Primary keys match exact dashboard envs: STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET
+ */
+function getStorageConfig() {
   const isEnabledFlag = process.env.RECORDING_ENABLED !== 'false';
-  const hasCredentials = Boolean(
-    process.env.STORAGE_BUCKET &&
-    process.env.STORAGE_ACCESS_KEY_ID &&
-    process.env.STORAGE_SECRET_ACCESS_KEY
+
+  const bucket = cleanEnv(
+    process.env.STORAGE_BUCKET ||
+    process.env.AWS_BUCKET_NAME ||
+    process.env.S3_BUCKET ||
+    process.env.AWS_S3_BUCKET
   );
-  return isEnabledFlag && hasCredentials;
+
+  const accessKeyId = cleanEnv(
+    process.env.STORAGE_ACCESS_KEY_ID ||
+    process.env.AWS_ACCESS_KEY_ID
+  );
+
+  const secretAccessKey = cleanEnv(
+    process.env.STORAGE_SECRET_ACCESS_KEY ||
+    process.env.AWS_SECRET_ACCESS_KEY
+  );
+
+  const endpoint = cleanEnv(process.env.STORAGE_ENDPOINT) || undefined;
+
+  // Custom endpoint (e.g. Cloudflare R2, MinIO) supports 'auto'.
+  // Standard AWS S3 requires a valid AWS region (defaults to ap-south-1).
+  const isCustomEndpoint = Boolean(endpoint && !endpoint.includes('amazonaws.com'));
+  const fallbackRegion = isCustomEndpoint ? 'auto' : 'ap-south-1';
+
+  const region = cleanEnv(
+    process.env.STORAGE_REGION ||
+    process.env.AWS_REGION ||
+    process.env.AWS_DEFAULT_REGION ||
+    fallbackRegion
+  );
+
+  const isConfigured = isEnabledFlag && Boolean(bucket && accessKeyId && secretAccessKey);
+
+  return {
+    isConfigured,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    region,
+    endpoint,
+    isCustomEndpoint
+  };
+}
+
+function isRecordingConfigured() {
+  return getStorageConfig().isConfigured;
 }
 
 function getS3Client() {
-  if (!isRecordingConfigured()) {
+  const config = getStorageConfig();
+  if (!config.isConfigured) {
     return null;
   }
 
   if (!s3ClientInstance) {
-    const region = process.env.STORAGE_REGION || 'auto';
-    const endpoint = process.env.STORAGE_ENDPOINT || undefined;
-
     s3ClientInstance = new S3Client({
-      region,
-      endpoint,
+      region: config.region,
+      endpoint: config.endpoint,
       credentials: {
-        accessKeyId: process.env.STORAGE_ACCESS_KEY_ID,
-        secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY,
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
       },
       // Force path style is recommended for Cloudflare R2 and MinIO
-      forcePathStyle: Boolean(endpoint && !endpoint.includes('amazonaws.com')),
+      forcePathStyle: config.isCustomEndpoint,
     });
   }
 
   return s3ClientInstance;
+}
+
+/**
+ * Reset client instance (useful for testing or dynamic configuration updates)
+ */
+function resetS3Client() {
+  s3ClientInstance = null;
 }
 
 /**
@@ -59,7 +113,7 @@ async function getPresignedUploadUrl({ examId, userId, sessionId, chunkIndex, co
 
   try {
     const s3 = getS3Client();
-    const bucket = process.env.STORAGE_BUCKET;
+    const { bucket } = getStorageConfig();
     const resolvedUserId = userId || 'anonymous';
     const key = `recordings/${examId}/${resolvedUserId}/${sessionId}/${chunkIndex}.webm`;
 
@@ -101,7 +155,7 @@ async function getPresignedDownloadUrl({ key, expiresIn = 900 }) {
 
   try {
     const s3 = getS3Client();
-    const bucket = process.env.STORAGE_BUCKET;
+    const { bucket } = getStorageConfig();
 
     const command = new GetObjectCommand({
       Bucket: bucket,
@@ -141,7 +195,7 @@ async function listSessionChunks({ examId, userId, sessionId }) {
 
   try {
     const s3 = getS3Client();
-    const bucket = process.env.STORAGE_BUCKET;
+    const { bucket } = getStorageConfig();
 
     // Check with userId prefix first if available
     let prefix = userId
@@ -202,7 +256,10 @@ async function listSessionChunks({ examId, userId, sessionId }) {
 }
 
 module.exports = {
+  getStorageConfig,
   isRecordingConfigured,
+  getS3Client,
+  resetS3Client,
   getPresignedUploadUrl,
   getPresignedDownloadUrl,
   listSessionChunks,
