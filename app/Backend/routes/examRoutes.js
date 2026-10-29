@@ -13,9 +13,14 @@ const uploadSingleFile = (req, res, next) => {
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'text/plain',
             'text/csv',
-            'application/csv'
+            'application/csv',
+            'text/x-csv',
+            'application/x-csv',
+            'application/vnd.ms-excel',
+            'application/octet-stream'
         ];
-        if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
+        const hasValidExt = /\.(pdf|docx|txt|csv)$/i.test(file.originalname || '');
+        if (allowedTypes.includes(file.mimetype) || hasValidExt) {
             cb(null, true);
         } else {
             cb(new Error('Invalid file type. Only PDF, DOCX, TXT, and CSV are allowed.'), false);

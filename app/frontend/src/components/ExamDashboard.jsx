@@ -69,6 +69,8 @@ export default function ExamDashboard() {
         try {
             const trimmedCode = (examCode || '').trim().toUpperCase();
 
+            let currentExam = { ...examData };
+
             // Validate student if verification is required
             if (examData.requireStudentVerification) {
                 const validateResponse = await fetch(`${API_BASE}/exams/validate-entry`, {
@@ -90,19 +92,20 @@ export default function ExamDashboard() {
                 }
 
                 if (validateData.data) {
-                    setExamData(prev => ({
-                        ...prev,
+                    currentExam = {
+                        ...currentExam,
                         ...validateData.data,
-                        serverNow: validateData.serverNow || prev?.serverNow
-                    }));
+                        serverNow: validateData.serverNow || currentExam.serverNow
+                    };
+                    setExamData(currentExam);
                 }
             }
 
             // Navigate to verification page with student info
-            navigate(`/exam/${examData._id}/verify`, {
+            navigate(`/exam/${currentExam._id}/verify`, {
                 state: {
                     examData: {
-                        ...examData,
+                        ...currentExam,
                         examCode: trimmedCode
                     },
                     studentInfo: {

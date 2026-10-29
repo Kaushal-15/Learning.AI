@@ -124,16 +124,23 @@ export default function ExamVerification() {
             );
             const data = await response.json();
 
-            if (data.success) {
+            if (data.success && data.data) {
                 setBiometricStatus(data.data);
 
                 // If not submitted or rejected, show biometric capture
                 if (!data.data.exists || data.data.status === 'rejected') {
                     setShowBiometric(true);
                 }
+            } else {
+                // If endpoint returns no record or error, prompt student to capture
+                setBiometricStatus({ exists: false, status: 'unsubmitted' });
+                setShowBiometric(true);
             }
         } catch (err) {
             console.error('Error checking biometric status:', err);
+            // On network notice, show biometric capture if not approved
+            setBiometricStatus({ exists: false, status: 'unsubmitted' });
+            setShowBiometric(true);
         } finally {
             setCheckingBiometric(false);
         }
@@ -331,7 +338,7 @@ export default function ExamVerification() {
                     </div>
 
                     {/* Biometric Verification Status */}
-                    {examData.requireBiometric && (
+                    {secureExamData.requireBiometric && (
                         <div className="verification-card">
                             <h3 className="verification-card-title">Biometric Verification</h3>
                             {checkingBiometric ? (

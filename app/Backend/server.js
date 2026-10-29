@@ -366,6 +366,7 @@ safeMount(app, '/api/assessments', () => require('./routes/assessmentRoutes'), a
 safeMount(app, '/api/learners', () => require('./routes/learnerRoutes'), authMiddleware);
 safeMount(app, '/api/camera', () => require('./routes/cameraRoutes'), authMiddleware);
 safeMount(app, '/api/student-lists', () => require('./routes/studentListRoutes'), authMiddleware);
+safeMount(app, '/api/biometric', () => require('./routes/biometricRoutes'), authMiddleware);
 safeMount(app, '/api/performance', () => require('./routes/performanceRoutes'), authMiddleware);
 
 // ---------------------------------------------------------------------------

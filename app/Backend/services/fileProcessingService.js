@@ -27,23 +27,26 @@ const calculateDifficulty = (text) => {
  * @param {Buffer} buffer  File content as a Buffer (from multer memoryStorage).
  * @param {string} mimeType
  */
-const extractTextFromBuffer = async (buffer, mimeType) => {
+const extractTextFromBuffer = async (buffer, mimeType, originalName = '') => {
     try {
-        if (mimeType === 'application/pdf') {
+        const isPdf = mimeType === 'application/pdf' || (originalName && originalName.toLowerCase().endsWith('.pdf'));
+        const isDocx = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || (originalName && originalName.toLowerCase().endsWith('.docx'));
+
+        if (isPdf) {
             const pdf = require('pdf-parse'); // lazy-require
             const data = await pdf(buffer);
             return data.text;
-        } else if (
-            mimeType ===
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        ) {
+        } else if (isDocx) {
             const mammoth = require('mammoth'); // lazy-require
             const result = await mammoth.extractRawText({ buffer });
             return result.value;
-        } else if (mimeType === 'text/plain') {
-            return buffer.toString('utf8');
         } else {
-            throw new Error('Unsupported file type');
+            // Text, CSV, or unknown readable text — convert buffer to utf8 string
+            const text = buffer.toString('utf8');
+            if (text && text.trim().length > 0) {
+                return text;
+            }
+            throw new Error(`Unsupported or unreadable file type: ${mimeType}`);
         }
     } catch (error) {
         console.error('Error extracting text from buffer:', error);
@@ -92,7 +95,7 @@ const processDocument = async (documentId) => {
     try {
         let text;
         if (document.buffer) {
-            text = await extractTextFromBuffer(document.buffer, document.mimeType);
+            text = await extractTextFromBuffer(document.buffer, document.mimeType, document.originalName);
         } else {
             text = await extractText(document.path, document.mimeType);
         }

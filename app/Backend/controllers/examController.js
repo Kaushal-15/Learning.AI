@@ -277,9 +277,20 @@ exports.uploadQuestions = async (req, res) => {
         }
 
         // Validate file type
-        const allowedTypes = ['application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/csv', 'application/csv'];
-        if (!allowedTypes.includes(mimetype)) {
-            console.log('ERROR: Invalid file type:', mimetype);
+        const allowedTypes = [
+            'application/pdf',
+            'text/plain',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/csv',
+            'application/csv',
+            'text/x-csv',
+            'application/x-csv',
+            'application/vnd.ms-excel',
+            'application/octet-stream'
+        ];
+        const hasValidExt = /\.(pdf|docx|txt|csv)$/i.test(originalname || '');
+        if (!allowedTypes.includes(mimetype) && !hasValidExt) {
+            console.log('ERROR: Invalid file type:', mimetype, originalname);
             return res.status(400).json({
                 success: false,
                 message: 'Invalid file type. Please upload a PDF, TXT, DOCX, or CSV file.'
@@ -299,7 +310,14 @@ exports.uploadQuestions = async (req, res) => {
         console.log('File details:', { originalname, mimetype, size });
 
         // Handle CSV files directly — parse from in-memory buffer
-        if (mimetype === 'text/csv' || mimetype === 'application/csv' || originalname.endsWith('.csv')) {
+        const isCsv = mimetype === 'text/csv' ||
+                      mimetype === 'application/csv' ||
+                      mimetype === 'text/x-csv' ||
+                      mimetype === 'application/x-csv' ||
+                      mimetype === 'application/vnd.ms-excel' ||
+                      (originalname && originalname.toLowerCase().endsWith('.csv'));
+
+        if (isCsv) {
             console.log('Processing CSV file from buffer...');
             try {
                 const questions = quizGenerationService.parseCSVFromBuffer(buffer);
@@ -315,7 +333,7 @@ exports.uploadQuestions = async (req, res) => {
                 console.error('CSV processing failed:', csvError);
                 return res.status(400).json({
                     success: false,
-                    message: csvError.message
+                    message: csvError.message || 'Failed to parse CSV file'
                 });
             }
         }
