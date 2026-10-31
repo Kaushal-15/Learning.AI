@@ -16,8 +16,7 @@ const uploadSingleFile = (req, res, next) => {
             'application/csv',
             'text/x-csv',
             'application/x-csv',
-            'application/vnd.ms-excel',
-            'application/octet-stream'
+            'application/vnd.ms-excel'
         ];
         const hasValidExt = /\.(pdf|docx|txt|csv)$/i.test(file.originalname || '');
         if (allowedTypes.includes(file.mimetype) || hasValidExt) {
@@ -31,9 +30,35 @@ const uploadSingleFile = (req, res, next) => {
         storage: multer.memoryStorage(),
         fileFilter: fileFilter,
         limits: { fileSize: 4 * 1024 * 1024 } // 4 MB — Vercel body cap is ~4.5 MB
-    });
+    }).single('file');
 
-    return upload.single('file')(req, res, next);
+    upload(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE' || (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE')) {
+                return res.status(413).json({
+                    success: false,
+                    message: 'File is larger than 4 MB'
+                });
+            }
+            if (err.message && err.message.includes('Invalid file type')) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
+                });
+            }
+            if (err instanceof multer.MulterError) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
+                });
+            }
+            return res.status(400).json({
+                success: false,
+                message: err.message || 'File upload error'
+            });
+        }
+        next();
+    });
 };
 
 router.use(authMiddleware);
@@ -77,4 +102,3 @@ router.get('/:examId/synchronized/current-question', examController.getSynchroni
 router.post('/:examId/synchronized/submit-answer', examController.submitSynchronizedAnswer);
 
 module.exports = router;
-

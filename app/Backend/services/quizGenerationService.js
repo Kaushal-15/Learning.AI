@@ -8,13 +8,17 @@ const { parse } = require('csv-parse/sync');
 let aiClient = null;
 let aiProvider = 'none';
 
-const AI_TIMEOUT_MS = 30000;
+const AI_TIMEOUT_MS = 45000;
 
 const withTimeout = (promise, ms, name = 'AI request') =>
     Promise.race([
         promise,
         new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`${name} timed out after ${ms}ms`)), ms)
+            setTimeout(() => {
+                const err = new Error(`${name} timed out after ${ms}ms`);
+                err.code = 'ETIMEDOUT';
+                reject(err);
+            }, ms)
         )
     ]);
 
@@ -31,22 +35,22 @@ if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_
     console.warn('⚠️ No AI API key configured. Using content-based fallback.');
 }
 
-const generateQuestionsFromChunks = async (chunks, count, difficulty) => {
+const generateQuestionsFromChunks = async (chunks, count, difficulty, distribution = null) => {
     try {
+        const easyCount = distribution?.easy || Math.ceil(count * 0.3);
+        const mediumCount = distribution?.medium || Math.ceil(count * 0.4);
+        const hardCount = distribution?.hard || Math.max(0, count - easyCount - mediumCount);
+        const totalCount = distribution ? (easyCount + mediumCount + hardCount) : count;
+
         if (!aiClient) {
             console.warn('⚠️ No AI provider configured, using content-based fallback generator');
-            return generateContentBasedQuestions(chunks, count, difficulty);
+            return generateContentBasedQuestions(chunks, count, difficulty, distribution);
         }
 
-        // Combine chunk content
+        // Combine chunk content capped to token budget (max 8000 characters ~ 2000 tokens)
         const context = chunks.map(c => c.content).join('\n\n');
 
-        // Calculate difficulty distribution for comprehensive coverage
-        const easyCount = Math.ceil(count * 0.3);    // 30% easy
-        const mediumCount = Math.ceil(count * 0.4);  // 40% medium  
-        const hardCount = count - easyCount - mediumCount; // 30% hard
-
-        const prompt = `Generate EXACTLY ${count} UNIQUE multiple-choice questions based on the following text.
+        const prompt = `Generate EXACTLY ${totalCount} UNIQUE multiple-choice questions based on the following text.
 Generate questions across ALL difficulty levels:
 - ${easyCount} EASY questions (basic recall, definitions)
 - ${mediumCount} MEDIUM questions (understanding, application)
@@ -63,7 +67,7 @@ IMPORTANT:
 Text:
 ${context.substring(0, 8000)}
 
-Format the output as a JSON array with EXACTLY ${count} objects:
+Format the output as a JSON array with EXACTLY ${totalCount} objects:
 [
   {
     "question": "Unique question text based on the content above",
@@ -104,8 +108,18 @@ Return ONLY the JSON array, no other text or markdown.`;
                 responseText = response.text();
             }
         } catch (aiErr) {
+            if (aiErr.code === 'ETIMEDOUT' || (aiErr.message && (aiErr.message.includes('timed out') || aiErr.message.includes('timeout')))) {
+                const timeoutErr = new Error('AI question generation timed out');
+                timeoutErr.code = 'ETIMEDOUT';
+                throw timeoutErr;
+            }
+            if (aiProvider !== 'none') {
+                const providerErr = new Error(`AI service failure: ${aiErr.message}`);
+                providerErr.code = 'EAIFAIL';
+                throw providerErr;
+            }
             console.warn(`⚠️ AI call failed (${aiErr.message}), falling back to content-based generation`);
-            return generateContentBasedQuestions(chunks, count, difficulty);
+            return generateContentBasedQuestions(chunks, count, difficulty, distribution);
         }
 
         // Clean up markdown code blocks if present
@@ -117,7 +131,6 @@ Return ONLY the JSON array, no other text or markdown.`;
         questions.forEach((q, idx) => {
             // Ensure difficulty field exists
             if (!q.difficulty || !['easy', 'medium', 'hard'].includes(q.difficulty)) {
-                // Auto-assign based on position to ensure distribution
                 if (idx < easyCount) {
                     q.difficulty = 'easy';
                 } else if (idx < easyCount + mediumCount) {
@@ -148,32 +161,38 @@ Return ONLY the JSON array, no other text or markdown.`;
         });
 
         // Ensure we have the correct number of unique questions
-        if (questions.length < count) {
-            console.warn(`AI generated only ${questions.length} questions, expected ${count}. Adding content-based questions.`);
-            const additionalQuestions = generateContentBasedQuestions(chunks, count - questions.length, difficulty);
+        if (questions.length < totalCount) {
+            console.warn(`AI generated only ${questions.length} questions, expected ${totalCount}. Adding content-based questions.`);
+            const additionalQuestions = generateContentBasedQuestions(chunks, totalCount - questions.length, difficulty, distribution);
             return [...questions, ...additionalQuestions];
         }
 
         console.log(`✅ Generated ${questions.length} questions using ${aiProvider.toUpperCase()}`);
-        console.log(`📊 Distribution: ${questions.filter(q => q.difficulty === 'easy').length} easy, ${questions.filter(q => q.difficulty === 'medium').length} medium, ${questions.filter(q => q.difficulty === 'hard').length} hard`);
 
-        // Return segregated by difficulty for admin review
         const segregated = {
             easy: questions.filter(q => q.difficulty === 'easy'),
             medium: questions.filter(q => q.difficulty === 'medium'),
             hard: questions.filter(q => q.difficulty === 'hard'),
-            all: questions.slice(0, count)
+            all: questions.slice(0, totalCount)
         };
 
         return segregated;
     } catch (error) {
+        if (error.code === 'ETIMEDOUT' || error.code === 'EAIFAIL') {
+            throw error;
+        }
         console.error('Error generating questions with AI:', error.message);
         console.warn('Falling back to content-based question generation');
-        return generateContentBasedQuestions(chunks, count, difficulty);
+        return generateContentBasedQuestions(chunks, count, difficulty, distribution);
     }
 };
 
-const generateContentBasedQuestions = (chunks, count, difficulty) => {
+const generateContentBasedQuestions = (chunks, count, difficulty, distribution = null) => {
+    const easyCount = distribution?.easy || Math.ceil(count * 0.3);
+    const mediumCount = distribution?.medium || Math.ceil(count * 0.4);
+    const hardCount = distribution?.hard || Math.max(0, count - easyCount - mediumCount);
+    const totalCount = distribution ? (easyCount + mediumCount + hardCount) : count;
+
     const questions = [];
     const combinedText = chunks.map(c => c.content).join(' ');
 
@@ -181,13 +200,8 @@ const generateContentBasedQuestions = (chunks, count, difficulty) => {
     const sentences = combinedText
         .split(/[.!?]+/)
         .map(s => s.trim())
-        .filter(s => s.length > 30 && s.length < 200);
+        .filter(s => s.length > 20 && s.length < 300);
 
-    if (sentences.length === 0) {
-        return generateGenericQuestions(count);
-    }
-
-    // Extract key concepts (words that appear frequently and are meaningful)
     const words = combinedText.toLowerCase().split(/\W+/);
     const wordFreq = {};
     words.forEach(word => {
@@ -196,83 +210,40 @@ const generateContentBasedQuestions = (chunks, count, difficulty) => {
         }
     });
 
-    // Get top concepts
     const topConcepts = Object.entries(wordFreq)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, count * 3)
+        .slice(0, Math.max(30, totalCount * 3))
         .map(([word]) => word);
 
-    // Shuffle sentences for variety
-    const shuffledSentences = sentences.sort(() => Math.random() - 0.5);
+    for (let i = 0; i < totalCount; i++) {
+        const sentence = sentences[i % Math.max(1, sentences.length)] || `Core learning concepts and principles.`;
+        const concept = topConcepts[i % Math.max(1, topConcepts.length)] || `topic_${i + 1}`;
+        const keyPhrase = sentence.split(/\s+/).slice(0, 8).join(' ');
 
-    for (let i = 0; i < Math.min(count, shuffledSentences.length); i++) {
-        const sentence = shuffledSentences[i];
-        const concept = topConcepts[i] || 'concept';
-
-        // Extract a meaningful phrase from the sentence
-        const words = sentence.split(/\s+/);
-        const keyPhrase = words.slice(0, Math.min(8, words.length)).join(' ');
-
-        // Create question based on the actual content
-        const questionTypes = [
-            {
-                question: `According to the material, which statement about "${concept}" is most accurate?`,
-                options: [
-                    `${keyPhrase}...`,
-                    `${concept} is not discussed in the material`,
-                    `${concept} is only briefly mentioned`,
-                    `The material contradicts the importance of ${concept}`
-                ],
-                correctAnswer: `${keyPhrase}...`,
-                explanation: `This is directly stated in the source material.`,
-                difficulty: difficulty || 'medium'
-            },
-            {
-                question: `What is the significance of "${concept}" in the context of this material?`,
-                options: [
-                    `It is a fundamental concept explained in detail`,
-                    `It is not mentioned`,
-                    `It is only used as an example`,
-                    `It is presented as outdated`
-                ],
-                correctAnswer: `It is a fundamental concept explained in detail`,
-                explanation: `The term "${concept}" appears multiple times in the material, indicating its importance.`,
-                difficulty: difficulty || 'medium'
-            },
-            {
-                question: `Based on the text, which of the following best describes "${concept}"?`,
-                options: [
-                    sentence.substring(0, 80) + '...',
-                    `An unrelated topic`,
-                    `A deprecated approach`,
-                    `A minor detail`
-                ],
-                correctAnswer: sentence.substring(0, 80) + '...',
-                explanation: `This description is taken directly from the source material.`,
-                difficulty: difficulty || 'medium'
-            }
-        ];
-
-        const selectedType = questionTypes[i % questionTypes.length];
-        questions.push(selectedType);
-    }
-
-    // If we still don't have enough, add more generic but content-aware questions
-    while (questions.length < count) {
-        const idx = questions.length;
-        const concept = topConcepts[idx % topConcepts.length] || 'the material';
+        let diff = 'medium';
+        if (i < easyCount) {
+            diff = 'easy';
+        } else if (i < easyCount + mediumCount) {
+            diff = 'medium';
+        } else {
+            diff = 'hard';
+        }
 
         questions.push({
-            question: `Question ${idx + 1}: Which of the following is discussed in relation to ${concept}?`,
+            question: `According to the material, which statement about "${concept}" is most accurate?`,
             options: [
-                `Key concepts and principles related to ${concept}`,
-                `${concept} is not covered`,
-                `Only historical context of ${concept}`,
-                `Criticism of ${concept}`
+                `${keyPhrase}...`,
+                `${concept} is not discussed in the material`,
+                `${concept} is only briefly mentioned`,
+                `The material contradicts the importance of ${concept}`
             ],
-            correctAnswer: `Key concepts and principles related to ${concept}`,
-            explanation: `The material covers important aspects of ${concept}.`,
-            difficulty: difficulty || 'medium'
+            correctAnswer: `${keyPhrase}...`,
+            explanation: `This is directly stated in the source material.`,
+            difficulty: diff,
+            difficultyScore: diff === 'easy' ? 2 : diff === 'medium' ? 5 : 8,
+            topic: concept,
+            tags: [concept],
+            adminApproved: false
         });
     }
 
@@ -299,7 +270,7 @@ const generateGenericQuestions = (count) => {
 };
 
 const generateQuiz = async (documentId, mode, config) => {
-    // 1. Select Chunks
+    // 1. Select Chunks capped to first N chunks up to token budget
     let chunks;
     if (mode === 'static') {
         chunks = await Chunk.find({
@@ -312,13 +283,13 @@ const generateQuiz = async (documentId, mode, config) => {
         }
     } else {
         // Dynamic mode: Get a mix of difficulties
-        const basicChunks = await Chunk.find({ documentId, difficulty: 'basic' }).limit(3);
+        const basicChunks = await Chunk.find({ documentId, difficulty: 'basic' }).limit(4);
         const intermediateChunks = await Chunk.find({ documentId, difficulty: 'intermediate' }).limit(4);
-        const advancedChunks = await Chunk.find({ documentId, difficulty: 'advanced' }).limit(3);
+        const advancedChunks = await Chunk.find({ documentId, difficulty: 'advanced' }).limit(4);
         chunks = [...basicChunks, ...intermediateChunks, ...advancedChunks];
 
         if (chunks.length < 5) {
-            chunks = await Chunk.find({ documentId }).limit(10);
+            chunks = await Chunk.find({ documentId }).limit(12);
         }
     }
 
@@ -331,10 +302,17 @@ const generateQuiz = async (documentId, mode, config) => {
     console.log(`🤖 AI Provider: ${aiProvider}`);
 
     // 2. Generate Questions
-    const questionsData = await generateQuestionsFromChunks(chunks, config.questionCount, config.difficulty || 'mixed');
+    const distribution = config.easyCount && config.mediumCount && config.hardCount
+        ? { easy: config.easyCount, medium: config.mediumCount, hard: config.hardCount }
+        : null;
 
-    // 3. Format for Quiz Model - ensure unique IDs, comprehensive tagging, and difficultyTag
-    // If AI returned segregated format, use 'all' array, otherwise use as-is
+    const questionsData = await generateQuestionsFromChunks(
+        chunks,
+        config.questionCount,
+        config.difficulty || 'mixed',
+        distribution
+    );
+
     const questionsArray = questionsData.all || questionsData;
 
     return questionsArray.map((q, i) => ({
@@ -345,10 +323,10 @@ const generateQuiz = async (documentId, mode, config) => {
         explanation: q.explanation,
         topic: q.topic || 'Custom Learning',
         difficulty: q.difficulty || config.difficulty || 'medium',
-        difficultyLevel: q.difficulty || config.difficulty || 'medium', // Add explicit difficultyLevel
+        difficultyLevel: q.difficulty || config.difficulty || 'medium',
         tags: q.tags || [q.topic || 'General'],
         difficultyScore: q.difficulty === 'easy' ? 2 : q.difficulty === 'medium' ? 5 : 8,
-        adminApproved: false, // AI questions require admin approval
+        adminApproved: false,
         generatedBy: 'AI',
         status: 'unanswered'
     }));
@@ -357,25 +335,36 @@ const generateQuiz = async (documentId, mode, config) => {
 const parseCSVFromBuffer = (buffer) => {
     try {
         const fileContent = Buffer.isBuffer(buffer) ? buffer.toString('utf-8') : String(buffer);
+
+        // Check header row even if there are 0 or more data rows
+        const lines = fileContent.split(/\r?\n/).filter(line => line.trim().length > 0);
+        if (lines.length > 0) {
+            const headerCells = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
+            const required = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'correctanswer', 'difficulty'];
+            const missing = required.filter(r => !headerCells.includes(r));
+            if (missing.length > 0) {
+                throw new Error(`Missing required column: ${missing.join(', ')}`);
+            }
+        }
+
         const records = parse(fileContent, {
             columns: true,
             skip_empty_lines: true,
             trim: true
         });
 
-        // Validate headers
+        // Validate headers from parsed records
         if (records.length > 0) {
             const headers = Object.keys(records[0]).map(h => h.toLowerCase());
             const required = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'correctanswer', 'difficulty'];
             const missing = required.filter(r => !headers.includes(r));
 
             if (missing.length > 0) {
-                throw new Error(`Missing required columns: ${missing.join(', ')}`);
+                throw new Error(`Missing required column: ${missing.join(', ')}`);
             }
         }
 
         return records.map((record) => {
-            // Normalize keys to lowercase for consistent access
             const normalized = {};
             Object.keys(record).forEach(key => {
                 normalized[key.toLowerCase()] = record[key];
@@ -388,14 +377,15 @@ const parseCSVFromBuffer = (buffer) => {
                     normalized.optionb,
                     normalized.optionc,
                     normalized.optiond
-                ].filter(Boolean), // Remove empty options
+                ].filter(Boolean),
                 correctAnswer: normalized.correctanswer,
                 difficulty: normalized.difficulty ? normalized.difficulty.toLowerCase() : 'medium',
+                difficultyLevel: normalized.difficulty ? normalized.difficulty.toLowerCase() : 'medium',
                 explanation: normalized.explanation || ''
             };
         });
     } catch (error) {
-        console.error('Error parsing CSV from buffer:', error);
+        console.error('Error parsing CSV from buffer:', error.message);
         throw new Error(`Failed to parse CSV: ${error.message}`);
     }
 };

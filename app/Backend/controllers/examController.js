@@ -6,6 +6,7 @@ const quizGenerationService = require('../services/quizGenerationService');
 const mongoose = require('mongoose');
 const { computeExamState } = require('../services/examStateHelper');
 const { validateQuestionPool, getRequiredPerDifficulty } = require('../services/poolRules');
+const storageService = require('../services/storageService');
 
 // Helper function to convert difficulty string to number
 const convertDifficulty = (difficulty) => {
@@ -248,16 +249,68 @@ exports.createExam = async (req, res) => {
     }
 };
 
+const validateFileContent = (buffer, mimetype, originalname) => {
+    if (!buffer || buffer.length === 0) {
+        return { valid: false, message: 'The uploaded file is empty.' };
+    }
+
+    const name = (originalname || '').toLowerCase();
+    const isPdf = mimetype === 'application/pdf' || name.endsWith('.pdf');
+    const isDocx = mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx');
+    const isCsv = mimetype === 'text/csv' ||
+                  mimetype === 'application/csv' ||
+                  mimetype === 'text/x-csv' ||
+                  mimetype === 'application/x-csv' ||
+                  mimetype === 'application/vnd.ms-excel' ||
+                  name.endsWith('.csv');
+    const isTxt = mimetype === 'text/plain' || name.endsWith('.txt');
+
+    if (!isPdf && !isDocx && !isTxt && !isCsv) {
+        return { valid: false, message: 'Invalid file type. Only PDF, DOCX, TXT, and CSV are allowed.' };
+    }
+
+    if (isPdf) {
+        if (buffer.length < 4 || buffer.slice(0, 4).toString('ascii') !== '%PDF') {
+            return { valid: false, message: 'Invalid file type or corrupted PDF file.' };
+        }
+    } else if (isDocx) {
+        if (
+            buffer.length < 4 ||
+            buffer[0] !== 0x50 ||
+            buffer[1] !== 0x4B ||
+            (buffer[2] !== 0x03 && buffer[2] !== 0x05 && buffer[2] !== 0x07)
+        ) {
+            return { valid: false, message: 'Invalid file type or corrupted DOCX file.' };
+        }
+    } else if (isTxt || isCsv) {
+        try {
+            const decoder = new TextDecoder('utf-8', { fatal: true });
+            decoder.decode(buffer);
+        } catch {
+            return { valid: false, message: 'Invalid file content: file must be valid UTF-8 encoded text.' };
+        }
+    }
+
+    return { valid: true };
+};
+
 // Upload Questions from File
 exports.uploadQuestions = async (req, res) => {
     try {
-        console.log('=== Upload Questions Started ===');
-        console.log('File received:', req.file ? 'Yes' : 'No');
-        console.log('User object:', req.user);
-        console.log('User ID (id or _id):', req.user?.id || req.user?._id);
+        // Validate questionCount if provided
+        let questionCount = 10;
+        if (req.body.questionCount !== undefined && req.body.questionCount !== null && String(req.body.questionCount).trim() !== '') {
+            const parsed = Number(req.body.questionCount);
+            if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Question count must be an integer between 1 and 100.'
+                });
+            }
+            questionCount = parsed;
+        }
 
         if (!req.file) {
-            console.log('ERROR: No file in request');
             return res.status(400).json({
                 success: false,
                 message: 'No file uploaded. Please select a file and try again.'
@@ -265,64 +318,51 @@ exports.uploadQuestions = async (req, res) => {
         }
 
         const { originalname, mimetype, size, buffer } = req.file;
-        // JWT decode gives us { id: ... } not { _id: ... }
         const userId = req.user.id || req.user._id;
 
         if (!userId) {
-            console.log('ERROR: No user ID found in req.user');
             return res.status(401).json({
                 success: false,
                 message: 'User authentication failed. Please log in again.'
             });
         }
 
-        // Validate file type
-        const allowedTypes = [
-            'application/pdf',
-            'text/plain',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/csv',
-            'application/csv',
-            'text/x-csv',
-            'application/x-csv',
-            'application/vnd.ms-excel',
-            'application/octet-stream'
-        ];
-        const hasValidExt = /\.(pdf|docx|txt|csv)$/i.test(originalname || '');
-        if (!allowedTypes.includes(mimetype) && !hasValidExt) {
-            console.log('ERROR: Invalid file type:', mimetype, originalname);
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid file type. Please upload a PDF, TXT, DOCX, or CSV file.'
-            });
-        }
-
-        // Validate file size (4 MB matches multer limit)
+        // Validate file size (4 MB)
         const maxSize = 4 * 1024 * 1024;
         if (size > maxSize) {
-            console.log('ERROR: File too large:', size);
-            return res.status(400).json({
+            return res.status(413).json({
                 success: false,
-                message: 'File too large. Maximum is 4 MB.'
+                message: 'File is larger than 4 MB'
             });
         }
 
-        console.log('File details:', { originalname, mimetype, size });
+        // Validate file content and magic bytes
+        const validation = validateFileContent(buffer, mimetype, originalname);
+        if (!validation.valid) {
+            return res.status(400).json({
+                success: false,
+                message: validation.message
+            });
+        }
 
         // Handle CSV files directly — parse from in-memory buffer
+        const name = (originalname || '').toLowerCase();
         const isCsv = mimetype === 'text/csv' ||
                       mimetype === 'application/csv' ||
                       mimetype === 'text/x-csv' ||
                       mimetype === 'application/x-csv' ||
                       mimetype === 'application/vnd.ms-excel' ||
-                      (originalname && originalname.toLowerCase().endsWith('.csv'));
+                      name.endsWith('.csv');
 
         if (isCsv) {
-            console.log('Processing CSV file from buffer...');
             try {
                 const questions = quizGenerationService.parseCSVFromBuffer(buffer);
-                console.log('CSV Questions parsed:', questions.length);
-
+                if (!questions || questions.length === 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'No valid questions found in CSV file.'
+                    });
+                }
                 return res.status(200).json({
                     success: true,
                     data: questions,
@@ -330,7 +370,6 @@ exports.uploadQuestions = async (req, res) => {
                     message: `Successfully extracted ${questions.length} questions from the CSV.`
                 });
             } catch (csvError) {
-                console.error('CSV processing failed:', csvError);
                 return res.status(400).json({
                     success: false,
                     message: csvError.message || 'Failed to parse CSV file'
@@ -338,92 +377,139 @@ exports.uploadQuestions = async (req, res) => {
             }
         }
 
-        // Create Document record — store buffer (memoryStorage, no disk file)
-        console.log('Creating document record...');
+        // Create Document record (in-memory processing, no disk file, path optional, no buffer in MongoDB)
+        const sanitized = (originalname || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
         const document = new Document({
             userId,
-            filename: `${Date.now()}-${originalname}`,
+            filename: `${Date.now()}-${sanitized}`,
             originalName: originalname,
             mimeType: mimetype,
             size,
             path: null,
-            buffer
+            status: 'processing',
+            processed: false,
+            chunkCount: 0
         });
 
         await document.save();
-        console.log('Document saved:', document._id);
 
-        // Process document (extract text and chunk)
-        console.log('Processing document...');
+        // Stream original to S3
+        const s3Key = `documents/${userId}/${document._id}/${sanitized}`;
         try {
-            await fileProcessingService.processDocument(document._id);
-            console.log('Document processed successfully');
+            const s3Result = await storageService.uploadObject({
+                key: s3Key,
+                body: buffer,
+                contentType: mimetype
+            });
+            if (s3Result && s3Result.success) {
+                document.storageKey = s3Key;
+                await document.save();
+            }
+        } catch (s3Error) {
+            console.warn('S3 upload skipped or failed:', s3Error.message);
+        }
+
+        // Process document in memory directly from req.file.buffer
+        let processResult;
+        try {
+            processResult = await fileProcessingService.processDocument(document._id, buffer);
         } catch (processError) {
-            console.error('Document processing failed:', processError);
-            // Clean up the document record if processing fails
-            await Document.findByIdAndDelete(document._id);
-            return res.status(500).json({
+            return res.status(422).json({
                 success: false,
-                message: 'Failed to process document. Please ensure the file contains readable text and try again.',
-                error: processError.message
+                message: 'We could not read any text from this file. If it is a scanned PDF, upload a text-based PDF or a DOCX.'
             });
         }
 
-        // Generate questions
-        console.log('Generating questions...');
+        if (!processResult.success || processResult.chunkCount === 0) {
+            return res.status(422).json({
+                success: false,
+                message: processResult.message || 'We could not read any text from this file. If it is a scanned PDF, upload a text-based PDF or a DOCX.'
+            });
+        }
+
+        // Apply adaptive pool rule: at least ceil(0.6 * N) per easy/medium/hard
+        const minPerDiff = Math.ceil(0.6 * questionCount);
+        let easyCount = minPerDiff;
+        let mediumCount = minPerDiff;
+        let hardCount = minPerDiff;
+
+        // If client provided custom difficulty distribution, validate it against the adaptive rule
+        if (req.body.difficultyDistribution) {
+            let dist = req.body.difficultyDistribution;
+            if (typeof dist === 'string') {
+                try {
+                    dist = JSON.parse(dist);
+                } catch {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid difficultyDistribution JSON format.'
+                    });
+                }
+            }
+            if (typeof dist === 'object' && dist !== null) {
+                const reqEasy = Number(dist.easy || 0);
+                const reqMedium = Number(dist.medium || 0);
+                const reqHard = Number(dist.hard || 0);
+                if (reqEasy < minPerDiff || reqMedium < minPerDiff || reqHard < minPerDiff) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Adaptive exam requires at least ${minPerDiff} questions for each difficulty (Easy: ${reqEasy}/${minPerDiff}, Medium: ${reqMedium}/${minPerDiff}, Hard: ${reqHard}/${minPerDiff}).`
+                    });
+                }
+                easyCount = reqEasy;
+                mediumCount = reqMedium;
+                hardCount = reqHard;
+            }
+        }
+
+        const totalRequiredPool = easyCount + mediumCount + hardCount;
+
         const config = {
-            questionCount: 10,
-            difficulty: 'medium'
+            questionCount: totalRequiredPool,
+            targetCount: questionCount,
+            easyCount,
+            mediumCount,
+            hardCount,
+            difficulty: 'mixed'
         };
 
         let questions;
         try {
             questions = await quizGenerationService.generateQuiz(document._id, 'dynamic', config);
-            console.log('Questions generated:', questions.length);
         } catch (generateError) {
-            console.error('Question generation failed:', generateError);
-            return res.status(500).json({
+            console.error('Question generation error:', generateError.message);
+            const msg = (generateError.message || '').toLowerCase();
+            if (msg.includes('timed out') || msg.includes('timeout') || generateError.code === 'ETIMEDOUT') {
+                return res.status(504).json({
+                    success: false,
+                    message: 'AI question generation timed out. Please try with a smaller document or fewer questions.'
+                });
+            }
+            return res.status(502).json({
                 success: false,
-                message: 'Failed to generate questions from the document. Please ensure the document contains sufficient educational content.',
-                error: generateError.message
+                message: 'AI question generation service is currently unavailable. Please try again later.'
             });
         }
 
         if (!questions || questions.length === 0) {
-            console.log('WARNING: No questions generated');
             return res.status(400).json({
                 success: false,
                 message: 'No questions could be generated from this document. Please try a different file with more educational content.'
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: questions,
             documentId: document._id,
             message: `Successfully extracted ${questions.length} questions from the document.`
         });
     } catch (error) {
-        console.error('=== Upload Error ===');
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-
-        // Provide user-friendly error messages
-        let userMessage = 'File upload failed. Please try again.';
-        if (error.message.includes('ENOENT')) {
-            userMessage = 'File not found. Please select a file and try again.';
-        } else if (error.message.includes('EMFILE') || error.message.includes('ENFILE')) {
-            userMessage = 'Server is busy. Please wait a moment and try again.';
-        } else if (error.message.includes('EACCES')) {
-            userMessage = 'Permission denied. Please check file permissions and try again.';
-        } else if (error.message.includes('timeout')) {
-            userMessage = 'Upload timeout. Please try with a smaller file.';
-        }
-
-        res.status(500).json({
+        console.error('=== Upload Error ===', error.message);
+        const isProd = process.env.NODE_ENV === 'production';
+        return res.status(500).json({
             success: false,
-            message: userMessage,
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: isProd ? 'File upload failed. Please try again.' : (error.message || 'File upload failed. Please try again.')
         });
     }
 };
