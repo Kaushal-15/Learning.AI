@@ -24,7 +24,18 @@ const documentSchema = new mongoose.Schema({
     },
     path: {
         type: String,
-        required: true
+        required: false
+    },
+    storageKey: {
+        type: String
+    },
+    status: {
+        type: String,
+        enum: ['uploaded', 'processing', 'processed', 'failed'],
+        default: 'uploaded'
+    },
+    failureReason: {
+        type: String
     },
     processed: {
         type: Boolean,
