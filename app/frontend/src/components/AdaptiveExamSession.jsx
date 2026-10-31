@@ -27,6 +27,7 @@ export default function AdaptiveExamSession() {
     const [selectedAnswer, setSelectedAnswer] = useState(null);
     const [isWaiting, setIsWaiting] = useState(false);
     const [waitTime, setWaitTime] = useState(0);
+    const [collectiveStats, setCollectiveStats] = useState(null);
     const [individualStats, setIndividualStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -317,7 +318,8 @@ export default function AdaptiveExamSession() {
 
             if (data.isWaiting) {
                 setWaitTime(data.timeRemaining);
-                setIndividualStats(data.individualStats);
+                if (data.collectiveStats) setCollectiveStats(data.collectiveStats);
+                if (data.individualStats) setIndividualStats(data.individualStats);
             } else {
                 // Wait is over, fetch next question via ref
                 fetchNextQuestionRef.current?.();
@@ -333,16 +335,17 @@ export default function AdaptiveExamSession() {
         checkWaitStatusRef.current = checkWaitStatus;
     });
 
-    // Submit answer
-    const handleSubmitAnswer = async () => {
-        if (!selectedAnswer || isSubmitting) return;
+    // Submit answer (supports auto-submit on timeout as __UNANSWERED__)
+    const handleSubmitAnswer = async (forcedAnswer = null) => {
+        const answerToSubmit = forcedAnswer || selectedAnswer;
+        if (!answerToSubmit || isSubmitting) return;
 
         setIsSubmitting(true);
         // Persist answers incrementally to sessionStorage
         try {
             const stored = JSON.parse(sessionStorage.getItem(`exam_answers_${examId}`) || '{}');
             if (currentQuestion?._id) {
-                stored[currentQuestion._id] = selectedAnswer;
+                stored[currentQuestion._id] = answerToSubmit;
                 sessionStorage.setItem(`exam_answers_${examId}`, JSON.stringify(stored));
             }
         } catch (e) {}
@@ -357,7 +360,7 @@ export default function AdaptiveExamSession() {
                 credentials: 'include',
                 body: JSON.stringify({
                     questionId: currentQuestion._id,
-                    answer: selectedAnswer
+                    answer: answerToSubmit
                 })
             });
 
@@ -372,15 +375,18 @@ export default function AdaptiveExamSession() {
                 setIsWaiting(true);
                 fetchNextQuestion();
             } else {
-                // Start wait period (Adaptive)
+                // Start 10-second wait period (Adaptive)
                 setIsWaiting(true);
-                setWaitTime(data.waitTime);
-                setIndividualStats(data.individualStats);
+                setWaitTime(data.waitTime || 10);
+                if (data.collectiveStats) setCollectiveStats(data.collectiveStats);
+                if (data.individualStats) setIndividualStats(data.individualStats);
             }
 
         } catch (error) {
             console.error('Error submitting answer:', error);
-            alert('Failed to submit answer. Please try again.');
+            if (!forcedAnswer) {
+                alert(error.message || 'Failed to submit answer. Please try again.');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -407,7 +413,12 @@ export default function AdaptiveExamSession() {
         }
     }, [examId]);
 
-    // Timer countdown
+    const selectedAnswerRef = useRef(null);
+    useEffect(() => {
+        selectedAnswerRef.current = selectedAnswer;
+    }, [selectedAnswer]);
+
+    // Timer countdown (auto-submits if unanswered when time runs out)
     useEffect(() => {
         if (loading || isWaiting || examComplete) return;
 
@@ -419,9 +430,9 @@ export default function AdaptiveExamSession() {
         const timer = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
-                    // Time's up - auto submit
+                    // Time's up - auto submit selected answer or __UNANSWERED__
                     clearInterval(timer);
-                    handleSubmitAnswer();
+                    handleSubmitAnswer(selectedAnswerRef.current || '__UNANSWERED__');
                     return 0;
                 }
                 return prev - 1;
@@ -661,14 +672,17 @@ export default function AdaptiveExamSession() {
         return (
             <AdaptiveWaitScreen
                 waitTime={waitTime}
-                collectiveStats={individualStats}
-                onWaitComplete={fetchNextQuestion}
+                collectiveStats={collectiveStats}
+                onWaitComplete={() => fetchNextQuestionRef.current?.()}
             />
         );
     }
 
     return (
-        <div className={`exam-session-container ${isDarkMode ? 'dashboard-dark' : ''}`}>
+        <div
+            className={`exam-session-container ${isDarkMode ? 'dashboard-dark' : ''}`}
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        >
             {!isOnline && (
                 <div style={{
                     position: 'fixed',

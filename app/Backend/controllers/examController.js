@@ -120,6 +120,9 @@ exports.createExam = async (req, res) => {
             }
         }
 
+        const effectiveTimePerQuestion = Number(timePerQuestion || req.body.questionTimer || 30);
+        const effectiveIncreaseThreshold = Number(adaptiveSettings?.increaseThreshold || req.body.adaptabilityThreshold || 60);
+
         const exam = new ExamMaster({
             title,
             description,
@@ -137,13 +140,16 @@ exports.createExam = async (req, res) => {
             dynamicConfig: dynamicSettings || null, // Map dynamicSettings to dynamicConfig
             students: students || [],
             requireStudentVerification: requireStudentVerification || false,
-            isAdaptive: isAdaptive || false,
-            timePerQuestion: timePerQuestion || 30,
-            adaptiveSettings: adaptiveSettings || {
-                increaseThreshold: 60,
-                decreaseThreshold: 40,
+            isAdaptive: isAdaptive || examType === 'dynamic',
+            timePerQuestion: effectiveTimePerQuestion,
+            questionTimer: effectiveTimePerQuestion,
+            allowLateJoin: req.body.allowLateJoin === true,
+            syncThreshold: effectiveIncreaseThreshold,
+            adaptiveSettings: {
+                increaseThreshold: effectiveIncreaseThreshold,
+                decreaseThreshold: 35,
                 minQuestionsBeforeAdjust: 1,
-                waitTimeMin: 5,
+                waitTimeMin: 10,
                 waitTimeMax: 10
             },
             adaptiveRouting: adaptiveRouting || {
@@ -671,6 +677,14 @@ exports.startSession = async (req, res) => {
         let session = await ExamSession.findOne({ userId, examId });
 
         if (!session) {
+            // Enforce No Late Entries: Students cannot start a new attempt after exam.startTime if allowLateJoin is false
+            if (!exam.allowLateJoin && new Date() > new Date(exam.startTime)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Late entry is not permitted for this exam. The exam has already started.'
+                });
+            }
+
             const studentName = (req.body.studentName || '').trim();
             const registerNumber = (req.body.registerNumber || '').trim().toUpperCase();
 
@@ -712,7 +726,7 @@ exports.startSession = async (req, res) => {
                 }
             }
 
-            // Create new session
+            // Create new session - starts at easy difficulty for adaptive/dynamic
             const expiryTime = new Date(Date.now() + exam.duration * 60000);
 
             session = new ExamSession({
@@ -722,7 +736,9 @@ exports.startSession = async (req, res) => {
                 registerNumber,
                 startTime: new Date(),
                 expiryTime,
-                timeRemaining: exam.duration * 60
+                timeRemaining: exam.duration * 60,
+                currentDifficulty: 'easy',
+                currentQuestionNumber: 0
             });
 
             // Handle Dynamic Question Generation
@@ -731,33 +747,23 @@ exports.startSession = async (req, res) => {
                 let questions = [];
 
                 if (exam.dynamicConfig) {
-                    // Generate from Question Bank based on config
-                    const { levels, tags } = exam.dynamicConfig;
-                    const totalQuestions = exam.totalQuestions || 10;
-
-                    // Enhanced distribution across all difficulty levels - FORCE EQUAL SPLIT
-                    // This ensures we have enough questions for the adaptive engine to work effectively
-                    const easyCount = Math.ceil(totalQuestions * 0.34);    // ~33% easy
-                    const mediumCount = Math.ceil(totalQuestions * 0.33);  // ~33% medium
-                    const hardCount = totalQuestions - easyCount - mediumCount; // ~33% hard
-
+                    const { tags } = exam.dynamicConfig;
                     const query = {};
                     if (tags && tags.length > 0) {
                         query.tags = { $in: tags };
                     }
 
-                    console.log(`🎯 Generating ${totalQuestions} questions for dynamic session`);
+                    console.log(`🎯 Loading pool of dynamic questions for exam`);
 
                     let pool = await Question.find(query).lean();
                     if (!pool || pool.length === 0) {
-                        pool = await Question.find().limit(50).lean();
+                        pool = await Question.find().limit(100).lean();
                     }
 
                     if (pool && pool.length > 0) {
-                        const shuffled = [...pool].sort(() => Math.random() - 0.5);
-                        questions = shuffled.slice(0, Math.min(totalQuestions, pool.length));
+                        questions = [...pool].sort(() => Math.random() - 0.5);
                     }
-                    console.log(`📊 Retrieved: ${questions.length} dynamic questions for session`);
+                    console.log(`📊 Retrieved: ${questions.length} candidate questions for session pool`);
                 } else if (exam.documentId) {
                     // Enhanced document-based generation with comprehensive difficulty coverage
                     console.log('Generating comprehensive questions from document:', exam.documentId);
@@ -1614,63 +1620,14 @@ exports.getNextQuestion = async (req, res) => {
             nextQuestionNumber = answeredCount + 1;
         }
 
-        // Determine difficulty for next question based on ADMIN ROUTING CONFIG
-        let difficulty = session.currentDifficulty || 'easy';
-        let difficultyChangeReason = null;
-
-        // If not first question and NOT resuming, check routing config for next difficulty
-        if (nextQuestionNumber > 1 && !isResuming) {
-            // Get last answer to determine if it was correct or wrong
-            const lastAnsweredQuestionId = answeredCount > 0 ? Array.from(session.answers.keys())[answeredCount - 1] : null;
-            let wasLastCorrect = false;
-
-            if (lastAnsweredQuestionId) {
-                // Fetch last question to check correctness
-                let lastQuestion;
-                if (exam.examType === 'dynamic' || exam.isAdaptive) {
-                    lastQuestion = await Question.findById(lastAnsweredQuestionId);
-                } else {
-                    lastQuestion = await ExamQuestion.findById(lastAnsweredQuestionId);
-                }
-
-                if (lastQuestion) {
-                    const lastAnswer = session.answers.get(lastAnsweredQuestionId);
-                    wasLastCorrect = lastAnswer === lastQuestion.correctAnswer;
-                }
-            }
-
-            // Use admin routing config to determine next difficulty
-            if (exam.adaptiveRoutingConfig && exam.adaptiveRoutingConfig[difficulty]) {
-                const routingRule = exam.adaptiveRoutingConfig[difficulty];
-                const allowedNextDifficulties = wasLastCorrect ? routingRule.correct : routingRule.wrong;
-
-                if (allowedNextDifficulties && allowedNextDifficulties.length > 0) {
-                    const previousDifficulty = difficulty;
-
-                    // If multiple options, randomly select one
-                    difficulty = allowedNextDifficulties[Math.floor(Math.random() * allowedNextDifficulties.length)];
-
-                    // Record difficulty change if it changed
-                    if (difficulty !== previousDifficulty) {
-                        difficultyChangeReason = `Admin routing: ${previousDifficulty} + ${wasLastCorrect ? 'correct' : 'wrong'} → ${difficulty}`;
-                        session.difficultyHistory.push({
-                            questionNumber: nextQuestionNumber,
-                            fromDifficulty: previousDifficulty,
-                            toDifficulty: difficulty,
-                            reason: difficultyChangeReason,
-                            accuracy: session.totalAnsweredCount > 0
-                                ? (session.correctAnswersCount / session.totalAnsweredCount) * 100
-                                : 0,
-                            timestamp: new Date()
-                        });
-                        console.log(`📊 [ADAPTIVE ROUTING] ${difficultyChangeReason}`);
-                    }
-                } else {
-                    console.warn(`⚠️ [ADAPTIVE] No routing config for ${difficulty} + ${wasLastCorrect ? 'correct' : 'wrong'}, maintaining current difficulty`);
-                }
-            } else {
-                console.warn(`⚠️ [ADAPTIVE] No routing config found for exam, maintaining current difficulty: ${difficulty}`);
-            }
+        // Determine difficulty: Question 1 MUST ALWAYS start from 'easy' level
+        let difficulty = 'easy';
+        if (answeredCount === 0) {
+            difficulty = 'easy';
+            session.currentDifficulty = 'easy';
+        } else {
+            // Adaptive difficulty computed during the wait period from collective accuracy
+            difficulty = session.currentDifficulty || 'easy';
         }
 
         // Get question matching current difficulty using DIFFICULTY TAG (not numeric difficulty)
@@ -1849,14 +1806,24 @@ exports.submitAdaptiveAnswer = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Resource not found' });
         }
 
-        // Save answer
-        session.answers.set(questionId.toString(), answer);
+        // Check if question was already answered - cannot answer again
+        if (session.answers && session.answers.has(questionId.toString())) {
+            return res.status(400).json({
+                success: false,
+                message: 'This question has already been answered and cannot be answered again'
+            });
+        }
+
+        // Support answer vs unanswered (auto-submit on timeout)
+        const isUnanswered = !answer || answer === '__UNANSWERED__';
+        const recordedAnswer = isUnanswered ? '__UNANSWERED__' : answer;
+        session.answers.set(questionId.toString(), recordedAnswer);
 
         // Check if answer is correct
-        const isCorrect = answer === question.correctAnswer;
+        const isCorrect = !isUnanswered && (recordedAnswer === question.correctAnswer);
 
         // Update individual performance tracking
-        session.totalAnsweredCount += 1;
+        session.totalAnsweredCount = session.answers.size;
 
         if (isCorrect) {
             session.correctAnswersCount += 1;
@@ -1868,49 +1835,71 @@ exports.submitAdaptiveAnswer = async (req, res) => {
         }
 
         // Calculate individual accuracy
-        const accuracy = session.totalAnsweredCount > 0
+        const individualAccuracy = session.totalAnsweredCount > 0
             ? (session.correctAnswersCount / session.totalAnsweredCount) * 100
             : 0;
 
-        // Update difficulty based on Admin Routing Configuration
+        // Collect overall correct answer percentage for this question across all students in the exam
+        const allSessions = await ExamSession.find({ examId: exam._id });
+        let totalAttemptsOnQuestion = 0;
+        let correctAttemptsOnQuestion = 0;
+
+        for (const s of allSessions) {
+            if (s.answers && s.answers.has(questionId.toString())) {
+                totalAttemptsOnQuestion++;
+                const studentAns = s.answers.get(questionId.toString());
+                if (studentAns !== '__UNANSWERED__' && studentAns === question.correctAnswer) {
+                    correctAttemptsOnQuestion++;
+                }
+            }
+        }
+
+        // Include current session if not yet in query results
+        if (totalAttemptsOnQuestion === 0) {
+            totalAttemptsOnQuestion = 1;
+            if (isCorrect) correctAttemptsOnQuestion = 1;
+        }
+
+        const overallCorrectPercentage = (correctAttemptsOnQuestion / totalAttemptsOnQuestion) * 100;
+
+        // Adaptability threshold rule:
+        // ≥ threshold (configured by admin, default 60%): increase adaptability
+        // < 35%: decrease adaptability
+        // Between 35% and threshold: maintain adaptability
+        const upperThreshold = exam.adaptiveSettings?.increaseThreshold || exam.syncThreshold || 60;
+        const minLimitThreshold = 35;
         const currentLevel = session.currentDifficulty || 'easy';
-
-        // Default routing if missing
-        const routing = exam.adaptiveRouting || {
-            easy: { correct: ['easy', 'medium'], wrong: ['easy'] },
-            medium: { correct: ['medium', 'hard'], wrong: ['easy', 'medium'] },
-            hard: { correct: ['hard'], wrong: ['medium'] }
-        };
-
-        const allowedNext = routing[currentLevel] ?
-            routing[currentLevel][isCorrect ? 'correct' : 'wrong'] :
-            [currentLevel]; // Fallback to same level
-
-        // Select next difficulty randomly from allowed options
         let nextLevel = currentLevel;
-        if (allowedNext && allowedNext.length > 0) {
-            const randomIndex = Math.floor(Math.random() * allowedNext.length);
-            nextLevel = allowedNext[randomIndex];
+        let reason = '';
+
+        if (overallCorrectPercentage >= upperThreshold) {
+            if (currentLevel === 'easy') nextLevel = 'medium';
+            else if (currentLevel === 'medium') nextLevel = 'hard';
+            else nextLevel = 'hard';
+            reason = `Overall correct rate ${overallCorrectPercentage.toFixed(1)}% ≥ ${upperThreshold}% threshold → Increased to ${nextLevel}`;
+        } else if (overallCorrectPercentage < minLimitThreshold) {
+            if (currentLevel === 'hard') nextLevel = 'medium';
+            else if (currentLevel === 'medium') nextLevel = 'easy';
+            else nextLevel = 'easy';
+            reason = `Overall correct rate ${overallCorrectPercentage.toFixed(1)}% < ${minLimitThreshold}% min threshold → Decreased to ${nextLevel}`;
+        } else {
+            nextLevel = currentLevel;
+            reason = `Overall correct rate ${overallCorrectPercentage.toFixed(1)}% between ${minLimitThreshold}% and ${upperThreshold}% → Maintained at ${nextLevel}`;
         }
 
         // Update session difficulty
-        if (nextLevel !== currentLevel) {
-            session.currentDifficulty = nextLevel;
-            session.difficultyHistory.push({
-                questionNumber: session.totalAnsweredCount + 1, // For next question
-                fromDifficulty: currentLevel,
-                toDifficulty: nextLevel,
-                reason: `Routing rule (${isCorrect ? 'Correct' : 'Wrong'})`,
-                timestamp: new Date()
-            });
-        }
+        session.currentDifficulty = nextLevel;
+        session.difficultyHistory.push({
+            questionNumber: session.totalAnsweredCount + 1,
+            fromDifficulty: currentLevel,
+            toDifficulty: nextLevel,
+            reason,
+            accuracy: overallCorrectPercentage,
+            timestamp: new Date()
+        });
 
-        // Start wait period
-        const waitTime = Math.floor(
-            Math.random() * (exam.adaptiveSettings.waitTimeMax - exam.adaptiveSettings.waitTimeMin + 1) +
-            exam.adaptiveSettings.waitTimeMin
-        );
-
+        // Exact 10 seconds wait period to load next question
+        const waitTime = 10;
         session.isWaiting = true;
         session.waitEndTime = new Date(Date.now() + waitTime * 1000);
         await session.save();
@@ -1918,12 +1907,21 @@ exports.submitAdaptiveAnswer = async (req, res) => {
         res.status(200).json({
             success: true,
             isCorrect,
-            waitTime,
+            waitTime: 10,
+            collectiveStats: {
+                totalAttempts: totalAttemptsOnQuestion,
+                correctAttempts: correctAttemptsOnQuestion,
+                correctRate: Math.round(overallCorrectPercentage),
+                correctPercentage: Math.round(overallCorrectPercentage),
+                currentDifficulty: currentLevel,
+                nextDifficulty: nextLevel,
+                reason
+            },
             individualStats: {
                 totalAnswered: session.totalAnsweredCount,
                 correctAnswers: session.correctAnswersCount,
-                accuracy: accuracy.toFixed(1),
-                currentDifficulty: session.currentDifficulty,
+                accuracy: individualAccuracy.toFixed(1),
+                currentDifficulty: nextLevel,
                 consecutiveCorrect: session.consecutiveCorrect,
                 consecutiveIncorrect: session.consecutiveIncorrect
             }
@@ -1937,6 +1935,7 @@ exports.submitAdaptiveAnswer = async (req, res) => {
 // Get wait status for adaptive quiz
 exports.getWaitStatus = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const userId = req.user.id || req.user._id;
 
@@ -1945,30 +1944,43 @@ exports.getWaitStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Session not found' });
         }
 
-        if (!session.isWaiting) {
+        const now = new Date();
+        const timeRemaining = session.waitEndTime ? Math.max(0, Math.floor((session.waitEndTime - now) / 1000)) : 0;
+
+        if (!session.isWaiting || timeRemaining <= 0) {
+            if (session.isWaiting) {
+                session.isWaiting = false;
+                await session.save();
+            }
             return res.status(200).json({
                 success: true,
                 isWaiting: false,
-                message: 'Not in wait period'
+                timeRemaining: 0,
+                message: 'Wait period ended'
             });
         }
 
-        const now = new Date();
-        const timeRemaining = Math.max(0, Math.floor((session.waitEndTime - now) / 1000));
-
-        // Calculate individual accuracy
-        const accuracy = session.totalAnsweredCount > 0
-            ? (session.correctAnswersCount / session.totalAnsweredCount) * 100
-            : 0;
+        const latestHistory = (session.difficultyHistory && session.difficultyHistory.length > 0)
+            ? session.difficultyHistory[session.difficultyHistory.length - 1]
+            : null;
 
         res.status(200).json({
             success: true,
             isWaiting: true,
             timeRemaining,
+            collectiveStats: latestHistory ? {
+                totalAttempts: session.totalAnsweredCount,
+                currentDifficulty: latestHistory.fromDifficulty,
+                nextDifficulty: latestHistory.toDifficulty,
+                reason: latestHistory.reason,
+                correctRate: Math.round(latestHistory.accuracy || 0)
+            } : null,
             individualStats: {
                 totalAnswered: session.totalAnsweredCount,
                 correctAnswers: session.correctAnswersCount,
-                accuracy: accuracy.toFixed(1),
+                accuracy: session.totalAnsweredCount > 0
+                    ? ((session.correctAnswersCount / session.totalAnsweredCount) * 100).toFixed(1)
+                    : "0",
                 currentDifficulty: session.currentDifficulty,
                 consecutiveCorrect: session.consecutiveCorrect,
                 consecutiveIncorrect: session.consecutiveIncorrect

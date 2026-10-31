@@ -207,6 +207,7 @@ export default function AdminExamCreate() {
         timePerQuestion: 30,
         isSynchronized: false,
         questionTimer: 30,
+        adaptabilityThreshold: 60,
         allowLateJoin: false,
         requireBiometric: false,
         requireCamera: false,
@@ -479,6 +480,20 @@ export default function AdminExamCreate() {
                 payload.totalQuestions = totalDynamic;
                 payload.dynamicSettings = formData.dynamicConfig; // Backend expects dynamicSettings
                 payload.isAdaptive = true; // Enable adaptive mode
+                const qTime = Number(formData.questionTimer || formData.timePerQuestion || 30);
+                payload.timePerQuestion = qTime;
+                payload.questionTimer = qTime;
+                payload.allowLateJoin = Boolean(formData.allowLateJoin);
+                const thresh = Number(formData.adaptabilityThreshold || 60);
+                payload.adaptabilityThreshold = thresh;
+                payload.adaptiveSettings = {
+                    increaseThreshold: thresh,
+                    decreaseThreshold: 35,
+                    minQuestionsBeforeAdjust: 1,
+                    waitTimeMin: 10,
+                    waitTimeMax: 10
+                };
+                payload.syncThreshold = thresh;
                 payload.rawQuestions = (extractedQuestions || []).map(q => {
                     const diffStr = String(q?.difficultyLevel || q?.difficulty || 'medium').toLowerCase();
                     return {
@@ -842,70 +857,63 @@ export default function AdminExamCreate() {
                                         </div>
 
                                         <div className="form-field">
-                                            <label>
+                                            <label>Time per Question (seconds)</label>
+                                            <input
+                                                type="number"
+                                                min="10"
+                                                max="300"
+                                                value={formData.questionTimer || 30}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value) || 30;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        questionTimer: val,
+                                                        timePerQuestion: val
+                                                    }));
+                                                }}
+                                            />
+                                            <p className="field-hint">Time allowed for each question before auto-submitting as unanswered</p>
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label>Adaptability Increase Threshold (%)</label>
+                                            <input
+                                                type="number"
+                                                min="40"
+                                                max="90"
+                                                value={formData.adaptabilityThreshold || 60}
+                                                onChange={(e) => setFormData(prev => ({
+                                                    ...prev,
+                                                    adaptabilityThreshold: parseInt(e.target.value) || 60
+                                                }))}
+                                            />
+                                            <p className="field-hint">If overall correct answer percentage in the previous question is ≥ this threshold, next difficulty increases. (If &lt; 35%, difficulty decreases).</p>
+                                        </div>
+
+                                        <div className="form-field">
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={formData.isSynchronized || false}
+                                                    checked={!formData.allowLateJoin}
                                                     onChange={(e) => setFormData(prev => ({
                                                         ...prev,
-                                                        isSynchronized: e.target.checked
+                                                        allowLateJoin: !e.target.checked
                                                     }))}
                                                 />
-                                                <strong>Synchronized Mode</strong> - All students see same question at same time
+                                                <span><strong>No Late Entries:</strong> Students cannot start after exam start time</span>
                                             </label>
                                         </div>
 
-                                        {formData.isSynchronized && (
-                                            <>
-                                                <div className="form-field">
-                                                    <label>Time per Question (seconds)</label>
-                                                    <input
-                                                        type="number"
-                                                        min="10"
-                                                        max="300"
-                                                        value={formData.questionTimer || 30}
-                                                        onChange={(e) => setFormData(prev => ({
-                                                            ...prev,
-                                                            questionTimer: parseInt(e.target.value) || 30
-                                                        }))}
-                                                    />
-                                                    <p className="field-hint">All students have this much time per question</p>
-                                                </div>
-
-                                                <div className="form-field">
-                                                    <label>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={!formData.allowLateJoin}
-                                                            onChange={(e) => setFormData(prev => ({
-                                                                ...prev,
-                                                                allowLateJoin: !e.target.checked
-                                                            }))}
-                                                        />
-                                                        Prevent late joins (students cannot join after exam starts)
-                                                    </label>
-                                                </div>
-                                            </>
-                                        )}
-
                                         <div className="adaptive-info-box">
-                                            <h5>📊 Adaptive Difficulty System</h5>
+                                            <h5>📊 Dynamic Adaptive Rules</h5>
                                             <ul>
-                                                <li>✅ <strong>Increase difficulty:</strong> When {formData.isSynchronized ? 'collective' : 'individual'} accuracy ≥ 60%</li>
-                                                <li>⬇️ <strong>Decrease difficulty:</strong> When {formData.isSynchronized ? 'collective' : 'individual'} accuracy ≤ 40%</li>
-                                                <li>🎯 <strong>Starting level:</strong> Easy for all students</li>
-                                                <li>📈 <strong>Progression:</strong> Easy → Medium → Hard</li>
+                                                <li>🎯 <strong>Starting Level:</strong> All students start at <strong>Easy</strong></li>
+                                                <li>⏳ <strong>Question Timer:</strong> {formData.questionTimer || 30}s per question; auto-submits as unanswered if time expires</li>
+                                                <li>⏸️ <strong>10s Wait Period:</strong> System evaluates overall previous question correct percentage</li>
+                                                <li>✅ <strong>Increase Difficulty:</strong> When overall correct percentage ≥ {formData.adaptabilityThreshold || 60}% (Easy → Medium → Hard)</li>
+                                                <li>⬇️ <strong>Decrease Difficulty:</strong> When overall correct percentage &lt; 35% (Hard → Medium → Easy)</li>
+                                                <li>🛡️ <strong>Anti-Cheat:</strong> Snipping tools, shortcuts, and app switching strictly blocked</li>
                                             </ul>
-                                            {formData.isSynchronized ? (
-                                                <p className="info-note">
-                                                    <strong>Synchronized Mode:</strong> All students answer the same question at the same time.
-                                                    Difficulty adjusts based on collective performance (% of students who answered correctly).
-                                                </p>
-                                            ) : (
-                                                <p className="info-note">
-                                                    Each student's difficulty adjusts independently based on their own performance.
-                                                </p>
-                                            )}
                                         </div>
                                     </div>
                                 )}
