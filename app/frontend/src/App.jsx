@@ -78,9 +78,12 @@ export default function App() {
           <Route path="/admin/exams" element={<AdminExamDashboard />} />
           <Route path="/admin/exams/create" element={<AdminExamCreate />} />
           <Route path="/admin/exams/:examId/manage" element={<AdminExamManage />} />
-          <Route path="/admin/exams/:examId/students" element={<AdminStudentManagement />} />
-          <Route path="/admin/exams/:examId/monitor" element={<ExamMonitor />} />
-          <Route path="/admin/exams/:examId/analytics" element={<ExamAnalytics />} />
+          <Route path="/admin/exams/:examId" element={<AdminExamManage />} />
+          <Route path="/admin/exams/:examId/students" element={<AdminExamManage initialTab="students" />} />
+          <Route path="/admin/exams/:examId/monitor" element={<AdminExamManage initialTab="monitoring" />} />
+          <Route path="/admin/exams/:examId/analytics" element={<AdminExamManage initialTab="results" />} />
+          <Route path="/admin/exams/:examId/edit" element={<AdminExamManage initialTab="settings" />} />
+          <Route path="/admin/exams/:examId/biometrics" element={<AdminExamManage initialTab="biometric" />} />
           <Route path="/admin/biometrics" element={<AdminBiometricApproval />} />
         </Route>
       </Routes>

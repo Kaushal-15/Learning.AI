@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ChevronLeft, Users, Clock, BookOpen, Play, Pause,
     Settings, Eye, Download, RefreshCw, AlertCircle, Target, Save,
     Video, CheckCircle2, X, List, Shield, HelpCircle, Camera, Check,
-    ExternalLink, AlertTriangle
+    ExternalLink, AlertTriangle, CheckCircle, XCircle, Search, Filter, Sparkles
 } from 'lucide-react';
 import { useTheme } from "../contexts/ThemeContext";
 import StudentListManager from "./StudentListManager";
 import "../styles/DevvoraStyles.css";
 import "../styles/dashboard-glass.css";
 
-export default function AdminExamManage() {
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = `${BASE_URL}/api`;
+
+export default function AdminExamManage({ initialTab }) {
     const { examId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { isDarkMode } = useTheme();
 
     const [exam, setExam] = useState(null);
@@ -21,10 +25,15 @@ export default function AdminExamManage() {
     const [results, setResults] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [examStudents, setExamStudents] = useState([]);
+    const [verifications, setVerifications] = useState([]);
+    const [recordingsList, setRecordingsList] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState(initialTab || searchParams.get('tab') || 'overview');
     const [routingConfig, setRoutingConfig] = useState(null);
     const [statusMessage, setStatusMessage] = useState(null);
+    const [questionDifficultyFilter, setQuestionDifficultyFilter] = useState('all');
+    const [biometricSearch, setBiometricSearch] = useState('');
+    const [processingBiometricId, setProcessingBiometricId] = useState(null);
 
     // Settings form state
     const [settingsForm, setSettingsForm] = useState({
@@ -47,8 +56,22 @@ export default function AdminExamManage() {
     const [recordingError, setRecordingError] = useState(null);
     const [activeChunkUrl, setActiveChunkUrl] = useState(null);
 
-    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-    const API_BASE = `${BASE_URL}/api`;
+    // Helper function to ensure image src format
+    const getImageSrc = (base64OrUrl) => {
+        if (!base64OrUrl) return '';
+        if (base64OrUrl.startsWith('http://') || base64OrUrl.startsWith('https://') || base64OrUrl.startsWith('data:')) {
+            return base64OrUrl;
+        }
+        return `data:image/jpeg;base64,${base64OrUrl}`;
+    };
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        } else if (searchParams.get('tab')) {
+            setActiveTab(searchParams.get('tab'));
+        }
+    }, [initialTab, searchParams]);
 
     useEffect(() => {
         if (examId) {
@@ -63,7 +86,9 @@ export default function AdminExamManage() {
                 fetchExamDetails(),
                 fetchCandidates(),
                 fetchResults(),
-                fetchStudents()
+                fetchStudents(),
+                fetchBiometricVerifications(),
+                fetchExamRecordings()
             ]);
         } finally {
             setLoading(false);
@@ -133,6 +158,77 @@ export default function AdminExamManage() {
             }
         } catch (error) {
             console.error('Failed to fetch students:', error);
+        }
+    };
+
+    const fetchBiometricVerifications = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/biometric/pending/${examId}`, { credentials: 'include' });
+            const data = await res.json();
+            if (data.success) {
+                setVerifications(data.data || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch biometric verifications:', error);
+        }
+    };
+
+    const fetchExamRecordings = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/camera/exam/${examId}/recordings`, { credentials: 'include' });
+            const data = await res.json();
+            if (data.success) {
+                setRecordingsList(data.data || []);
+            }
+        } catch (error) {
+            console.warn('Failed to fetch exam recordings list:', error.message);
+        }
+    };
+
+    const handleApproveBiometric = async (id) => {
+        setProcessingBiometricId(id);
+        try {
+            const res = await fetch(`${API_BASE}/biometric/${id}/approve`, {
+                method: 'PUT',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (data.success) {
+                setVerifications(prev => prev.filter(v => v._id !== id));
+                setStatusMessage({ type: 'success', text: 'Student biometric verification approved!' });
+            } else {
+                setStatusMessage({ type: 'error', text: data.message || 'Failed to approve verification' });
+            }
+        } catch (err) {
+            setStatusMessage({ type: 'error', text: err.message || 'Error approving biometric' });
+        } finally {
+            setProcessingBiometricId(null);
+            setTimeout(() => setStatusMessage(null), 4000);
+        }
+    };
+
+    const handleRejectBiometric = async (id) => {
+        const reason = prompt('Please enter reason for rejection (e.g., face mismatch, blurry image):') || 'Image mismatch';
+        setProcessingBiometricId(id);
+        try {
+            const res = await fetch(`${API_BASE}/biometric/${id}/reject`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason }),
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (data.success) {
+                setVerifications(prev => prev.filter(v => v._id !== id));
+                setStatusMessage({ type: 'success', text: 'Biometric verification rejected.' });
+            } else {
+                setStatusMessage({ type: 'error', text: data.message || 'Failed to reject verification' });
+            }
+        } catch (err) {
+            setStatusMessage({ type: 'error', text: err.message || 'Error rejecting biometric' });
+        } finally {
+            setProcessingBiometricId(null);
+            setTimeout(() => setStatusMessage(null), 4000);
         }
     };
 
@@ -220,22 +316,22 @@ export default function AdminExamManage() {
         }
     };
 
-    const handleViewRecording = async (candidate) => {
-        const sessId = candidate.sessionId || candidate._id;
-        setSelectedRecording({ candidate, chunks: [], presignedUrls: [] });
+    const handleViewRecording = async (target) => {
+        const sessId = target.sessionId || target._id;
+        setSelectedRecording({ candidate: target, chunks: [], presignedUrls: [] });
         setActiveChunkUrl(null);
         setLoadingRecording(true);
         setRecordingError(null);
 
         try {
-            const res = await fetch(`${API_BASE}/camera/review/${sessId}?examId=${examId}&userId=${candidate.userId || ''}`, {
+            const res = await fetch(`${API_BASE}/camera/review/${sessId}?examId=${examId}&userId=${target.userId || ''}`, {
                 credentials: 'include'
             });
             const data = await res.json();
             if (res.ok && data.success) {
                 const urls = data.presignedUrls || [];
                 setSelectedRecording({
-                    candidate,
+                    candidate: target,
                     totalChunks: data.totalChunks || 0,
                     chunks: data.chunks || [],
                     presignedUrls: urls
@@ -251,6 +347,38 @@ export default function AdminExamManage() {
         } finally {
             setLoadingRecording(false);
         }
+    };
+
+    // Export completed submissions as CSV with roll number, score, accuracy, timestamp
+    const handleExportCSV = () => {
+        if (!results || results.length === 0) {
+            alert('No completed submissions available to export');
+            return;
+        }
+
+        const headers = ['Roll Number', 'Student Name', 'Score (%)', 'Accuracy (%)', 'Total Questions', 'Correct Answers', 'Time Taken (seconds)', 'Status', 'Submitted At'];
+        const rows = results.map(r => [
+            `"${r.registerNumber || 'N/A'}"`,
+            `"${(r.studentName || 'Student').replace(/"/g, '""')}"`,
+            Number(r.score || 0).toFixed(1),
+            Number(r.accuracy || r.score || 0).toFixed(1),
+            r.totalQuestions || 0,
+            r.correctAnswers || 0,
+            r.timeTaken || 0,
+            `"${r.status || 'completed'}"`,
+            `"${r.submittedAt ? new Date(r.submittedAt).toISOString() : new Date().toISOString()}"`
+        ]);
+
+        const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${(exam?.examCode || 'exam')}_results_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     const getStatusChip = (state) => {
@@ -290,6 +418,21 @@ export default function AdminExamManage() {
             </span>
         );
     };
+
+    const filteredQuestions = questions.filter(q => {
+        if (questionDifficultyFilter === 'all') return true;
+        const diff = (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard') || 'medium').toLowerCase();
+        return diff === questionDifficultyFilter;
+    });
+
+    const filteredVerifications = verifications.filter(v => {
+        if (!biometricSearch.trim()) return true;
+        const s = biometricSearch.toLowerCase();
+        return (
+            v.studentName?.toLowerCase().includes(s) ||
+            v.registerNumber?.toLowerCase().includes(s)
+        );
+    });
 
     if (loading || !exam) {
         return (
@@ -331,8 +474,6 @@ export default function AdminExamManage() {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s'
                             }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}
                         >
                             <ChevronLeft size={16} />
                             All Exams
@@ -453,10 +594,12 @@ export default function AdminExamManage() {
                 }}>
                     {[
                         { id: 'overview', label: 'Overview', icon: BookOpen },
-                        { id: 'settings', label: 'Settings', icon: Settings },
+                        { id: 'questions', label: `Questions Pool (${questions.length})`, icon: HelpCircle },
+                        { id: 'monitoring', label: `Live Monitoring (${candidates.length})`, icon: Video },
+                        { id: 'results', label: `Results & CSV (${results.length})`, icon: CheckCircle2 },
+                        { id: 'biometric', label: `Biometrics (${verifications.length})`, icon: Camera },
                         { id: 'students', label: `Students (${examStudents.length})`, icon: Users },
-                        { id: 'questions', label: `Questions (${questions.length})`, icon: HelpCircle },
-                        { id: 'monitoring', label: `Live Monitoring (${candidates.length})`, icon: Video }
+                        { id: 'settings', label: 'Settings', icon: Settings }
                     ].map(tab => {
                         const Icon = tab.icon;
                         const active = activeTab === tab.id;
@@ -595,181 +738,10 @@ export default function AdminExamManage() {
                     </div>
                 )}
 
-                {/* TAB: SETTINGS */}
-                {activeTab === 'settings' && (
-                    <div style={{ maxWidth: '850px', margin: '0 auto' }}>
-                        <form onSubmit={handleSaveSettings} style={{
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            borderRadius: '20px',
-                            padding: '2.5rem'
-                        }}>
-                            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '0 0 1.5rem 0', color: '#fff' }}>Exam Settings & Policies</h2>
-
-                            {/* Numeric Config Grid */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#a1a1aa', marginBottom: '0.5rem' }}>Duration (Minutes)</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={settingsForm.duration}
-                                        onChange={e => setSettingsForm({ ...settingsForm, duration: e.target.value })}
-                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.15)', background: 'rgba(0, 0, 0, 0.3)', color: '#fff', fontSize: '0.95rem' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#a1a1aa', marginBottom: '0.5rem' }}>Verification Duration (Minutes)</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={settingsForm.verificationDuration}
-                                        onChange={e => setSettingsForm({ ...settingsForm, verificationDuration: e.target.value })}
-                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.15)', background: 'rgba(0, 0, 0, 0.3)', color: '#fff', fontSize: '0.95rem' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#a1a1aa', marginBottom: '0.5rem' }}>Passing Score (%)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        value={settingsForm.passingScore}
-                                        onChange={e => setSettingsForm({ ...settingsForm, passingScore: e.target.value })}
-                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.15)', background: 'rgba(0, 0, 0, 0.3)', color: '#fff', fontSize: '0.95rem' }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Styled Toggle Cards */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '2.5rem' }}>
-                                {[
-                                    { key: 'requireStudentVerification', label: 'Student Pre-Registration', desc: 'Only students added to the Students tab can take this exam' },
-                                    { key: 'requireBiometric', label: 'Biometric Photo Verification', desc: 'Students must upload webcam photo and wait for admin approval' },
-                                    { key: 'requireCamera', label: 'Webcam Monitoring', desc: 'Forces candidate webcam feed to stay active during exam' },
-                                    { key: 'allowRecording', label: 'Direct S3 Video Recording', desc: 'Browser streams chunked video recordings straight to private S3 bucket' },
-                                    { key: 'autoRecord', label: 'Auto-Start Recording', desc: 'Automatically triggers recording when candidate enters session' }
-                                ].map(item => {
-                                    const checked = Boolean(settingsForm[item.key]);
-                                    return (
-                                        <div
-                                            key={item.key}
-                                            onClick={() => setSettingsForm({ ...settingsForm, [item.key]: !checked })}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                padding: '1rem 1.25rem',
-                                                borderRadius: '12px',
-                                                background: checked ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                                                border: checked ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            <div>
-                                                <div style={{ fontWeight: 600, color: checked ? '#fff' : '#d4d4d8', fontSize: '0.95rem' }}>{item.label}</div>
-                                                <div style={{ fontSize: '0.8rem', color: '#a1a1aa', marginTop: '2px' }}>{item.desc}</div>
-                                            </div>
-
-                                            {/* Custom Toggle Switch */}
-                                            <div style={{
-                                                width: '44px',
-                                                height: '24px',
-                                                borderRadius: '9999px',
-                                                backgroundColor: checked ? '#6366f1' : 'rgba(255, 255, 255, 0.15)',
-                                                position: 'relative',
-                                                transition: 'background-color 0.2s',
-                                                flexShrink: 0
-                                            }}>
-                                                <div style={{
-                                                    width: '18px',
-                                                    height: '18px',
-                                                    borderRadius: '50%',
-                                                    backgroundColor: '#fff',
-                                                    position: 'absolute',
-                                                    top: '3px',
-                                                    left: checked ? '23px' : '3px',
-                                                    transition: 'left 0.2s',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                                }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={savingSettings}
-                                style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    padding: '0.85rem 2rem',
-                                    borderRadius: '10px',
-                                    border: 'none',
-                                    backgroundColor: '#6366f1',
-                                    color: '#fff',
-                                    fontWeight: 600,
-                                    fontSize: '0.95rem',
-                                    cursor: savingSettings ? 'not-allowed' : 'pointer',
-                                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <Save size={18} />
-                                {savingSettings ? 'Saving Settings...' : 'Save All Settings'}
-                            </button>
-                        </form>
-                    </div>
-                )}
-
-                {/* TAB: STUDENTS */}
-                {activeTab === 'students' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                            <div>
-                                <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0, color: '#fff' }}>Exam Student Roster</h2>
-                                <p style={{ fontSize: '0.85rem', color: '#a1a1aa', margin: '4px 0 0 0' }}>
-                                    Manage students permitted to enter this exam. Changes apply to this exam when you click "Save Students to Exam".
-                                </p>
-                            </div>
-                            <button
-                                onClick={handleSaveStudentsToExam}
-                                disabled={savingStudents}
-                                style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    padding: '0.75rem 1.5rem',
-                                    borderRadius: '10px',
-                                    border: 'none',
-                                    backgroundColor: '#22c55e',
-                                    color: '#fff',
-                                    fontWeight: 600,
-                                    fontSize: '0.9rem',
-                                    cursor: savingStudents ? 'not-allowed' : 'pointer',
-                                    boxShadow: '0 4px 14px rgba(34, 197, 94, 0.4)'
-                                }}
-                            >
-                                <Save size={18} />
-                                {savingStudents ? 'Saving to Exam...' : 'Save Students to Exam'}
-                            </button>
-                        </div>
-
-                        <StudentListManager
-                            students={examStudents}
-                            onStudentsChange={setExamStudents}
-                            isDarkMode={isDarkMode}
-                        />
-                    </div>
-                )}
-
-                {/* TAB: QUESTIONS */}
+                {/* TAB: QUESTIONS (Dynamic MCQ Pool & Level Tags) */}
                 {activeTab === 'questions' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        {/* Pool Balance Banner */}
+                        {/* Pool Balance & Level Tag Filter Banner */}
                         <div style={{
                             padding: '1.25rem 1.75rem',
                             borderRadius: '16px',
@@ -782,49 +754,58 @@ export default function AdminExamManage() {
                             gap: '1rem'
                         }}>
                             <div>
-                                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff' }}>Question Pool ({questions.length} questions)</h3>
+                                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Sparkles size={18} style={{ color: '#6366f1' }} />
+                                    Question Pool ({questions.length} total)
+                                </h3>
                                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
                                     Exam Target: <strong>{exam.totalQuestions} questions</strong> • Type: <strong style={{ textTransform: 'capitalize' }}>{exam.examType || 'static'}</strong>
                                 </p>
                             </div>
 
-                            {/* Difficulty Badges */}
-                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            {/* Level Tag Counts & Filters */}
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 {[
-                                    { diff: 'easy', label: 'Easy', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
-                                    { diff: 'medium', label: 'Medium', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
-                                    { diff: 'hard', label: 'Hard', color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.15)' }
-                                ].map(d => {
-                                    const count = questions.filter(q => (q.difficulty || q.difficultyLevel || 'medium').toLowerCase() === d.diff).length;
-                                    return (
-                                        <div key={d.diff} style={{
+                                    { id: 'all', label: 'All', count: questions.length, color: '#a1a1aa', bg: 'rgba(255, 255, 255, 0.05)' },
+                                    { id: 'easy', label: 'Easy Level', count: questions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')).toLowerCase() === 'easy').length, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
+                                    { id: 'medium', label: 'Medium Level', count: questions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')).toLowerCase() === 'medium').length, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+                                    { id: 'hard', label: 'Hard Level', count: questions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')).toLowerCase() === 'hard').length, color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.15)' }
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setQuestionDifficultyFilter(tab.id)}
+                                        style={{
                                             padding: '6px 14px',
                                             borderRadius: '8px',
-                                            background: d.bg,
-                                            border: `1px solid ${d.color}40`,
+                                            background: questionDifficultyFilter === tab.id ? tab.color : tab.bg,
+                                            border: `1px solid ${tab.color}40`,
+                                            color: questionDifficultyFilter === tab.id ? '#ffffff' : '#d4d4d8',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '8px'
-                                        }}>
-                                            <span style={{ fontSize: '0.85rem', color: '#d4d4d8' }}>{d.label}:</span>
-                                            <strong style={{ fontSize: '1rem', color: d.color }}>{count}</strong>
-                                        </div>
-                                    );
-                                })}
+                                            gap: '6px',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        <span>{tab.label}:</span>
+                                        <strong>{tab.count}</strong>
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
                         {/* Questions List */}
-                        {questions.length === 0 ? (
+                        {filteredQuestions.length === 0 ? (
                             <div style={{ padding: '4rem 2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px' }}>
                                 <HelpCircle size={48} style={{ margin: '0 auto 1rem auto', opacity: 0.4 }} />
-                                <h4 style={{ margin: 0, color: '#d4d4d8' }}>No questions found in this exam</h4>
-                                <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.5rem' }}>Questions can be uploaded via CSV/PDF/DOCX in the Exam Creator.</p>
+                                <h4 style={{ margin: 0, color: '#d4d4d8' }}>No questions found for this filter</h4>
+                                <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.5rem' }}>Dynamic MCQ questions are automatically loaded from the question bank.</p>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {questions.map((q, idx) => {
-                                    const diff = (q.difficulty || q.difficultyLevel || 'medium').toLowerCase();
+                                {filteredQuestions.map((q, idx) => {
+                                    const diff = (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard') || 'medium').toLowerCase();
                                     const diffColor = diff === 'easy' ? '#10b981' : diff === 'hard' ? '#f43f5e' : '#f59e0b';
                                     return (
                                         <div key={idx} style={{
@@ -851,23 +832,39 @@ export default function AdminExamManage() {
                                                     }}>
                                                         {idx + 1}
                                                     </span>
-                                                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#f4f4f5', lineHeight: 1.5 }}>
-                                                        {q.question || q.content}
-                                                    </h4>
+                                                    <div>
+                                                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#f4f4f5', lineHeight: 1.5 }}>
+                                                            {q.question || q.content}
+                                                        </h4>
+                                                        {Array.isArray(q.tags) && q.tags.length > 0 && (
+                                                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                                                                {q.tags.map((t, tIdx) => (
+                                                                    <span key={tIdx} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.05)', color: '#a1a1aa' }}>
+                                                                        #{t}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <span style={{
-                                                    padding: '3px 10px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 700,
-                                                    textTransform: 'uppercase',
-                                                    background: `${diffColor}20`,
-                                                    color: diffColor,
-                                                    border: `1px solid ${diffColor}40`,
-                                                    flexShrink: 0
-                                                }}>
-                                                    {diff}
-                                                </span>
+
+                                                {/* Difficulty Level Tag for Admin */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <span style={{
+                                                        padding: '4px 12px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 800,
+                                                        letterSpacing: '0.05em',
+                                                        textTransform: 'uppercase',
+                                                        background: `${diffColor}20`,
+                                                        color: diffColor,
+                                                        border: `1px solid ${diffColor}50`,
+                                                        flexShrink: 0
+                                                    }}>
+                                                        LEVEL: {diff}
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             {/* Options Cards */}
@@ -917,28 +914,23 @@ export default function AdminExamManage() {
                     </div>
                 )}
 
-                {/* TAB: MONITORING */}
+                {/* TAB: LIVE MONITORING */}
                 {activeTab === 'monitoring' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                        {/* Live Active Candidates */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                         <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
-                                        Live Active Candidates ({candidates.length})
-                                    </h3>
-                                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
-                                        Candidates currently connected and taking this exam session.
-                                    </p>
-                                </div>
-                            </div>
+                            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
+                                Live Active Candidates ({candidates.length})
+                            </h3>
+                            <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
+                                Real-time candidate telemetry, violation counts, and direct S3 cloud recording playback.
+                            </p>
 
                             {candidates.length === 0 ? (
                                 <div style={{ padding: '3rem 2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px' }}>
                                     <Users size={40} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4 }} />
-                                    <h4 style={{ margin: 0, color: '#d4d4d8' }}>No candidates taking exam right now</h4>
-                                    <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.25rem' }}>When students enter, their real-time progress and stream will appear here.</p>
+                                    <h4 style={{ margin: 0, color: '#d4d4d8' }}>No candidates actively taking the exam right now</h4>
+                                    <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.25rem' }}>When students enter, their real-time telemetry and recording stream will show here.</p>
                                 </div>
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
@@ -960,7 +952,6 @@ export default function AdminExamManage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Violation Badge */}
                                                 <span style={{
                                                     padding: '3px 8px',
                                                     borderRadius: '6px',
@@ -978,7 +969,7 @@ export default function AdminExamManage() {
                                             <div style={{ marginBottom: '1rem' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa', marginBottom: '4px' }}>
                                                     <span>Question {(cand.currentQuestionIndex || 0) + 1} of {exam.totalQuestions}</span>
-                                                    <span>{Math.floor((cand.timeRemaining || 0) / 60)}:{((cand.timeRemaining || 0) % 60).toString().padStart(2, '0')} remaining</span>
+                                                    <span>{Math.floor((cand.timeRemaining || 0) / 60)}:{((cand.timeRemaining || 0) % 60).toString().padStart(2, '0')} left</span>
                                                 </div>
                                                 <div style={{ width: '100%', height: '6px', borderRadius: '9999px', background: 'rgba(255, 255, 255, 0.1)', overflow: 'hidden' }}>
                                                     <div style={{
@@ -990,7 +981,7 @@ export default function AdminExamManage() {
                                                 </div>
                                             </div>
 
-                                            {/* Recording View Button */}
+                                            {/* S3 Recording View Button */}
                                             <button
                                                 onClick={() => handleViewRecording(cand)}
                                                 style={{
@@ -1018,72 +1009,445 @@ export default function AdminExamManage() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
 
-                        {/* Completed Submissions Table */}
-                        <div>
-                            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem', color: '#fff' }}>
-                                Completed Submissions ({results.length})
-                            </h3>
+                {/* TAB: SUBMISSIONS & RESULTS (United with CSV Export & S3 Playback) */}
+                {activeTab === 'results' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>
+                                    Completed Submissions ({results.length})
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
+                                    All completed student attempts, scores, and proctoring video playback.
+                                </p>
+                            </div>
 
-                            {results.length === 0 ? (
-                                <div style={{ padding: '3rem 2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px' }}>
-                                    <BookOpen size={40} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4 }} />
-                                    <h4 style={{ margin: 0, color: '#d4d4d8' }}>No submissions completed yet</h4>
-                                    <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.25rem' }}>Completed results will appear here as candidates submit.</p>
-                                </div>
-                            ) : (
-                                <div style={{ overflowX: 'auto', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                                        <thead>
-                                            <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#a1a1aa' }}>
-                                                <th style={{ padding: '1rem 1.25rem' }}>Candidate</th>
-                                                <th style={{ padding: '1rem 1.25rem' }}>Register No.</th>
-                                                <th style={{ padding: '1rem 1.25rem' }}>Score</th>
-                                                <th style={{ padding: '1rem 1.25rem' }}>Time Taken</th>
-                                                <th style={{ padding: '1rem 1.25rem' }}>Status</th>
-                                                <th style={{ padding: '1rem 1.25rem' }}>Submitted At</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {results.map((res, rIdx) => {
-                                                const passed = res.score >= exam.passingScore;
-                                                return (
-                                                    <tr key={res._id || rIdx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                                                        <td style={{ padding: '1rem 1.25rem', fontWeight: 600, color: '#f4f4f5' }}>
-                                                            {res.studentName || `Student ${res.userId}`}
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.25rem' }}>
-                                                            <code style={{ color: '#818cf8', fontWeight: 700 }}>{res.registerNumber || 'N/A'}</code>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.25rem' }}>
-                                                            <span style={{
-                                                                padding: '3px 10px',
-                                                                borderRadius: '6px',
-                                                                fontWeight: 700,
-                                                                fontSize: '0.85rem',
-                                                                background: passed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                                                color: passed ? '#4ade80' : '#f87171'
-                                                            }}>
-                                                                {Number(res.score || 0).toFixed(1)}% {passed ? '(Passed)' : '(Failed)'}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.25rem', color: '#d4d4d8' }}>
-                                                            {Math.floor((res.timeTaken || 0) / 60)}:{((res.timeTaken || 0) % 60).toString().padStart(2, '0')}
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.25rem', textTransform: 'capitalize', color: '#a1a1aa' }}>
-                                                            {res.status}
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.25rem', color: '#a1a1aa', fontSize: '0.85rem' }}>
-                                                            {new Date(res.submittedAt).toLocaleString()}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                            <button
+                                onClick={handleExportCSV}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.65rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(34, 197, 94, 0.5)',
+                                    background: 'rgba(34, 197, 94, 0.2)',
+                                    color: '#4ade80',
+                                    fontWeight: 700,
+                                    fontSize: '0.9rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.25)'
+                                }}
+                            >
+                                <Download size={18} />
+                                Export Results as CSV
+                            </button>
                         </div>
+
+                        {results.length === 0 ? (
+                            <div style={{ padding: '3.5rem 2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px' }}>
+                                <CheckCircle2 size={40} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4 }} />
+                                <h4 style={{ margin: 0, color: '#d4d4d8' }}>No submissions completed yet</h4>
+                                <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.25rem' }}>Completed results will appear here in real-time as students submit.</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#a1a1aa' }}>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Candidate</th>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Roll / Reg No.</th>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Score</th>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Time Taken</th>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Status</th>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Submitted At</th>
+                                            <th style={{ padding: '1rem 1.25rem' }}>Recording</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {results.map((res, rIdx) => {
+                                            const passed = res.score >= exam.passingScore;
+                                            return (
+                                                <tr key={res._id || rIdx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                                    <td style={{ padding: '1rem 1.25rem', fontWeight: 600, color: '#f4f4f5' }}>
+                                                        {res.studentName || `Student ${res.userId}`}
+                                                    </td>
+                                                    <td style={{ padding: '1rem 1.25rem' }}>
+                                                        <code style={{ color: '#818cf8', fontWeight: 700 }}>{res.registerNumber || 'N/A'}</code>
+                                                    </td>
+                                                    <td style={{ padding: '1rem 1.25rem' }}>
+                                                        <span style={{
+                                                            padding: '3px 10px',
+                                                            borderRadius: '6px',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.85rem',
+                                                            background: passed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                                            color: passed ? '#4ade80' : '#f87171'
+                                                        }}>
+                                                            {Number(res.score || 0).toFixed(1)}% {passed ? '(Passed)' : '(Failed)'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '1rem 1.25rem', color: '#d4d4d8' }}>
+                                                        {Math.floor((res.timeTaken || 0) / 60)}:{((res.timeTaken || 0) % 60).toString().padStart(2, '0')}
+                                                    </td>
+                                                    <td style={{ padding: '1rem 1.25rem', textTransform: 'capitalize', color: '#a1a1aa' }}>
+                                                        {res.status}
+                                                    </td>
+                                                    <td style={{ padding: '1rem 1.25rem', color: '#a1a1aa', fontSize: '0.85rem' }}>
+                                                        {new Date(res.submittedAt || res.createdAt).toLocaleString()}
+                                                    </td>
+                                                    <td style={{ padding: '1rem 1.25rem' }}>
+                                                        <button
+                                                            onClick={() => handleViewRecording(res)}
+                                                            style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.4rem',
+                                                                padding: '0.4rem 0.85rem',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid rgba(99, 102, 241, 0.4)',
+                                                                background: 'rgba(99, 102, 241, 0.12)',
+                                                                color: '#818cf8',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            <Video size={14} />
+                                                            View S3 Video
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB: BIOMETRIC VERIFICATION (United inside Manage Page) */}
+                {activeTab === 'biometric' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Camera size={20} style={{ color: '#f59e0b' }} />
+                                    Biometric Verification Requests ({verifications.length})
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
+                                    Review student reference photos vs live webcam captures before granting exam entry.
+                                </p>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Search student or roll no..."
+                                    value={biometricSearch}
+                                    onChange={e => setBiometricSearch(e.target.value)}
+                                    style={{
+                                        padding: '0.55rem 1rem',
+                                        borderRadius: '8px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        color: '#fff',
+                                        fontSize: '0.85rem',
+                                        outline: 'none'
+                                    }}
+                                />
+                                <button
+                                    onClick={fetchBiometricVerifications}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        padding: '0.55rem 0.85rem',
+                                        borderRadius: '8px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        color: '#d4d4d8',
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <RefreshCw size={14} />
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        {filteredVerifications.length === 0 ? (
+                            <div style={{ padding: '3.5rem 2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px' }}>
+                                <CheckCircle size={44} style={{ margin: '0 auto 0.75rem auto', color: '#10b981', opacity: 0.8 }} />
+                                <h4 style={{ margin: 0, color: '#d4d4d8' }}>No pending biometric verifications</h4>
+                                <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                                    All candidates have either been approved or haven't submitted verification yet.
+                                </p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
+                                {filteredVerifications.map((v) => (
+                                    <div key={v._id} style={{
+                                        background: 'rgba(255, 255, 255, 0.03)',
+                                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                                        borderRadius: '16px',
+                                        padding: '1.5rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '1rem'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div>
+                                                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#fff', fontWeight: 600 }}>{v.studentName}</h4>
+                                                <div style={{ fontSize: '0.85rem', color: '#818cf8', fontWeight: 700, marginTop: '2px' }}>
+                                                    Roll No: {v.registerNumber}
+                                                </div>
+                                            </div>
+                                            {v.similarityScore !== undefined && v.similarityScore !== null && (
+                                                <span style={{
+                                                    padding: '3px 8px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 700,
+                                                    background: v.similarityScore >= 70 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                                    color: v.similarityScore >= 70 ? '#4ade80' : '#f87171',
+                                                    border: `1px solid ${v.similarityScore >= 70 ? '#22c55e' : '#ef4444'}40`
+                                                }}>
+                                                    Match: {v.similarityScore}%
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Photo Comparison */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                            <div>
+                                                <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '4px' }}>Reference Photo</div>
+                                                <img
+                                                    src={getImageSrc(v.referencePhoto)}
+                                                    alt="Reference"
+                                                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', background: '#000' }}
+                                                    onError={(e) => {
+                                                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23222" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="12" fill="%23888" text-anchor="middle" dominant-baseline="middle"%3ENo Photo%3C/text%3E%3C/svg%3E';
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '4px' }}>Live Snapshot</div>
+                                                <img
+                                                    src={getImageSrc(v.livePhoto || v.referencePhoto)}
+                                                    alt="Live Capture"
+                                                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', background: '#000' }}
+                                                    onError={(e) => {
+                                                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23222" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="12" fill="%23888" text-anchor="middle" dominant-baseline="middle"%3ENo Snapshot%3C/text%3E%3C/svg%3E';
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div style={{ fontSize: '0.75rem', color: '#71717a' }}>
+                                            Submitted: {new Date(v.createdAt).toLocaleTimeString()}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                            <button
+                                                onClick={() => handleRejectBiometric(v._id)}
+                                                disabled={processingBiometricId === v._id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.4rem',
+                                                    padding: '0.65rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                                                    background: 'rgba(239, 68, 68, 0.15)',
+                                                    color: '#f87171',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.85rem',
+                                                    cursor: processingBiometricId === v._id ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                <XCircle size={16} />
+                                                Reject
+                                            </button>
+                                            <button
+                                                onClick={() => handleApproveBiometric(v._id)}
+                                                disabled={processingBiometricId === v._id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.4rem',
+                                                    padding: '0.65rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid rgba(34, 197, 94, 0.5)',
+                                                    background: 'rgba(34, 197, 94, 0.2)',
+                                                    color: '#4ade80',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.85rem',
+                                                    cursor: processingBiometricId === v._id ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                <CheckCircle size={16} />
+                                                Approve
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB: STUDENTS */}
+                {activeTab === 'students' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>
+                                    Eligible Student Roster ({examStudents.length})
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
+                                    Only pre-registered students can access this exam when Student Verification is enabled.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleSaveStudentsToExam}
+                                disabled={savingStudents}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.65rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: '#22c55e',
+                                    color: '#ffffff',
+                                    fontWeight: 600,
+                                    fontSize: '0.9rem',
+                                    cursor: savingStudents ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 4px 14px rgba(34, 197, 94, 0.4)'
+                                }}
+                            >
+                                <Save size={18} />
+                                {savingStudents ? 'Saving to Exam...' : 'Save Students to Exam'}
+                            </button>
+                        </div>
+
+                        <StudentListManager
+                            students={examStudents}
+                            onStudentsChange={setExamStudents}
+                            isDarkMode={isDarkMode}
+                        />
+                    </div>
+                )}
+
+                {/* TAB: SETTINGS */}
+                {activeTab === 'settings' && (
+                    <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+                        <form onSubmit={handleSaveSettings} style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
+                            padding: '2rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1.75rem'
+                        }}>
+                            <div>
+                                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: '#fff' }}>Exam Configuration & Rules</h3>
+                                <p style={{ margin: 0, color: '#a1a1aa', fontSize: '0.85rem' }}>Update timing, security checks, and proctoring parameters.</p>
+                            </div>
+
+                            {/* Numbers row */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#d4d4d8', marginBottom: '0.5rem' }}>Duration (minutes)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="600"
+                                        value={settingsForm.duration}
+                                        onChange={e => setSettingsForm({ ...settingsForm, duration: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#d4d4d8', marginBottom: '0.5rem' }}>Verification Window (minutes)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="120"
+                                        value={settingsForm.verificationDuration}
+                                        onChange={e => setSettingsForm({ ...settingsForm, verificationDuration: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#d4d4d8', marginBottom: '0.5rem' }}>Passing Score (%)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        value={settingsForm.passingScore}
+                                        onChange={e => setSettingsForm({ ...settingsForm, passingScore: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Toggles */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1.25rem' }}>
+                                {[
+                                    { key: 'requireStudentVerification', label: 'Strict Student Verification', desc: 'Enforce pre-registered roll number check' },
+                                    { key: 'requireBiometric', label: 'Biometric Face Verification', desc: 'Require live photo approval by admin' },
+                                    { key: 'requireCamera', label: 'Webcam Proctoring', desc: 'Require webcam enabled for duration of exam' },
+                                    { key: 'allowRecording', label: 'S3 Video Recording', desc: 'Stream 10-second webm chunks directly to S3' }
+                                ].map(toggle => (
+                                    <label key={toggle.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', cursor: 'pointer' }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff' }}>{toggle.label}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>{toggle.desc}</div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={settingsForm[toggle.key]}
+                                            onChange={e => setSettingsForm({ ...settingsForm, [toggle.key]: e.target.checked })}
+                                            style={{ width: '18px', height: '18px', accentColor: '#6366f1', cursor: 'pointer' }}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={savingSettings}
+                                style={{
+                                    alignSelf: 'flex-end',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.75rem 1.5rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: '#6366f1',
+                                    color: '#ffffff',
+                                    fontWeight: 700,
+                                    fontSize: '0.9rem',
+                                    cursor: savingSettings ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                <Save size={18} />
+                                {savingSettings ? 'Saving Settings...' : 'Save Configuration'}
+                            </button>
+                        </form>
                     </div>
                 )}
             </main>

@@ -732,16 +732,18 @@ exports.startSession = async (req, res) => {
                         query.tags = { $in: tags };
                     }
 
-                    console.log(`🎯 Generating ${totalQuestions} questions: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard`);
+                    console.log(`🎯 Generating ${totalQuestions} questions for dynamic session`);
 
-                    const [easyQ, mediumQ, hardQ] = await Promise.all([
-                        Question.aggregate([{ $match: { ...query, difficulty: { $lte: 3 } } }, { $sample: { size: easyCount } }]),
-                        Question.aggregate([{ $match: { ...query, difficulty: { $gt: 3, $lte: 6 } } }, { $sample: { size: mediumCount } }]),
-                        Question.aggregate([{ $match: { ...query, difficulty: { $gt: 6 } } }, { $sample: { size: hardCount } }])
-                    ]);
+                    let pool = await Question.find(query).lean();
+                    if (!pool || pool.length === 0) {
+                        pool = await Question.find().limit(50).lean();
+                    }
 
-                    questions = [...easyQ, ...mediumQ, ...hardQ];
-                    console.log(`📊 Retrieved: ${easyQ.length} easy, ${mediumQ.length} medium, ${hardQ.length} hard questions`);
+                    if (pool && pool.length > 0) {
+                        const shuffled = [...pool].sort(() => Math.random() - 0.5);
+                        questions = shuffled.slice(0, Math.min(totalQuestions, pool.length));
+                    }
+                    console.log(`📊 Retrieved: ${questions.length} dynamic questions for session`);
                 } else if (exam.documentId) {
                     // Enhanced document-based generation with comprehensive difficulty coverage
                     console.log('Generating comprehensive questions from document:', exam.documentId);
@@ -1037,27 +1039,37 @@ exports.submitExam = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Session not found' });
         }
 
-        let questions = [];
-        if (exam.examType === 'dynamic' && session.questionIds?.length > 0) {
-            questions = await Question.find({ _id: { $in: session.questionIds } });
+        let correctAnswers = 0;
+        let totalQuestions = 0;
+        const userAnswers = session.answers || new Map();
+
+        // Check if question results exist from adaptive quiz
+        let qResults = [];
+        try {
+            if (typeof ExamQuestionResult?.find === "function") {
+                qResults = (await ExamQuestionResult.find({ userId, examId })) || [];
+            }
+        } catch (_) {}
+        if (qResults && qResults.length > 0) {
+            totalQuestions = qResults.length;
+            correctAnswers = qResults.filter(r => r.isCorrect).length;
         } else {
-            questions = await ExamQuestion.find({ examId });
+            let questions = [];
+            if (exam.examType === 'dynamic' && session.questionIds?.length > 0) {
+                questions = await Question.find({ _id: { $in: session.questionIds } });
+            } else {
+                questions = await ExamQuestion.find({ examId });
+            }
+            totalQuestions = questions.length;
+            questions.forEach(q => {
+                const qId = q._id.toString();
+                const correct = q.correctAnswer;
+                if (userAnswers.get(qId) === correct) {
+                    correctAnswers++;
+                }
+            });
         }
 
-        let correctAnswers = 0;
-        const userAnswers = session.answers;
-
-        questions.forEach(q => {
-            // Handle both Question model and ExamQuestion model structures
-            const qId = q._id.toString();
-            const correct = q.correctAnswer;
-
-            if (userAnswers.get(qId) === correct) {
-                correctAnswers++;
-            }
-        });
-
-        const totalQuestions = questions.length;
         const score = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
         const accuracy = score;
 
@@ -1068,6 +1080,7 @@ exports.submitExam = async (req, res) => {
         const attempt = new ExamAttempt({
             userId,
             examId,
+            sessionId: session._id,
             studentName: session.studentName,
             registerNumber: session.registerNumber,
             answers: userAnswers,
@@ -1090,7 +1103,14 @@ exports.submitExam = async (req, res) => {
             }
         }
 
-        await ExamSession.deleteOne({ _id: session._id });
+        // Preserve session with status 'submitted' rather than deleting, so recordings and telemetry stay accessible
+        session.status = 'submitted';
+        session.timeRemaining = 0;
+        if (typeof session.save === 'function') {
+            await session.save();
+        } else if (ExamSession && typeof ExamSession.updateOne === 'function') {
+            await ExamSession.updateOne({ _id: session._id }, { status: 'submitted', timeRemaining: 0 });
+        }
 
         res.status(200).json({ success: true, data: attempt });
     } catch (error) {
@@ -1625,7 +1645,7 @@ exports.getNextQuestion = async (req, res) => {
             console.log(`🔍 [ADAPTIVE] Fetched ${poolQuestions.length} available questions from DB`);
 
             // Filter by difficultyTag (not numeric difficulty)
-            const difficultyMatches = poolQuestions.filter(q => q.difficultyTag === difficulty);
+            const difficultyMatches = poolQuestions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')) === difficulty);
             console.log(`✅ [ADAPTIVE] Found ${difficultyMatches.length} questions with difficultyTag='${difficulty}'`);
 
             if (difficultyMatches.length > 0) {
@@ -1657,7 +1677,7 @@ exports.getNextQuestion = async (req, res) => {
             }
 
             // Filter by difficultyTag (not numeric difficulty)
-            query.difficultyTag = difficulty;
+            query.$or = [{ difficultyLevel: difficulty }, { difficultyTag: difficulty }];
 
             questions = await Question.find(query);
             console.log(`📊 [ADAPTIVE] Found ${questions.length} questions for difficultyTag=${difficulty} with tags`);
@@ -2356,7 +2376,7 @@ exports.submitSynchronizedAnswer = async (req, res) => {
 
 module.exports = exports;
 
-// Admin: Get single exam by ID for AdminExamManage
+// Admin: Get single exam by ID for AdminExamManage (with dynamic questions and level tags)
 exports.getAdminExamById = async (req, res) => {
     try {
         if (!await ensureDbConnected(res)) return;
@@ -2366,10 +2386,37 @@ exports.getAdminExamById = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Exam not found' });
         }
         const state = computeExamState(exam, new Date());
+
+        // Resolve questions for static, dynamic, and mixed exams
+        let questions = await ExamQuestion.find({ examId }).lean();
+        if ((!questions || questions.length === 0) && exam.dynamicConfig?.tags?.length > 0) {
+            questions = await Question.find({ tags: { $in: exam.dynamicConfig.tags } }).lean();
+        }
+        if ((!questions || questions.length === 0) && exam.documentId) {
+            questions = await Question.find({ documentId: exam.documentId }).lean();
+        }
+        if ((!questions || questions.length === 0) && exam.rawQuestions?.length > 0) {
+            questions = exam.rawQuestions;
+        }
+
+        const normalizedQuestions = (questions || []).map((q, idx) => {
+            const diff = q.difficultyLevel || q.difficultyTag || (typeof q.difficulty === 'number' ? (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard') : q.difficulty) || 'medium';
+            return {
+                ...q,
+                order: q.order !== undefined ? q.order : idx,
+                difficulty: typeof q.difficulty === 'number' ? q.difficulty : (diff === 'easy' ? 3 : diff === 'hard' ? 8 : 5),
+                difficultyLevel: diff,
+                difficultyTag: diff,
+                levelTag: diff
+            };
+        });
+
         return res.status(200).json({
             success: true,
             data: {
                 ...exam.toObject(),
+                questions: normalizedQuestions,
+                rawQuestions: normalizedQuestions,
                 computedStatus: state.status,
                 serverNow: state.serverNow,
                 verificationStart: state.verificationStart,

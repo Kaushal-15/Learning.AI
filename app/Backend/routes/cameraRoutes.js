@@ -411,9 +411,21 @@ router.get('/review/:sessionId', adminMiddleware, async (req, res) => {
         }
 
         const session = await ExamSession.findById(sessionId);
+        let recordingDoc = await CameraRecording.findOne({ sessionId });
+        let attemptDoc = null;
+
         if (session) {
             if (!examId) examId = session.examId;
             if (!userId) userId = session.userId;
+        } else if (recordingDoc) {
+            if (!examId) examId = recordingDoc.examId;
+            if (!userId) userId = recordingDoc.startedBy;
+        } else {
+            attemptDoc = await ExamAttempt.findOne({ sessionId });
+            if (attemptDoc) {
+                if (!examId) examId = attemptDoc.examId;
+                if (!userId) userId = attemptDoc.userId;
+            }
         }
 
         if (!examId) {
@@ -423,16 +435,36 @@ router.get('/review/:sessionId', adminMiddleware, async (req, res) => {
             });
         }
 
-        const result = await storageService.listSessionChunks({ examId, userId, sessionId });
-        const chunks = (result.chunks || []).map((c, i) => ({
+        let result = await storageService.listSessionChunks({ examId, userId, sessionId });
+        let chunks = (result.chunks || []).map((c, i) => ({
             ...c,
             url: c.downloadUrl,
             chunkIndex: i
         }));
 
+        // Fallback: If S3 listing returned 0 chunks, check CameraRecording videoChunks in DB
+        if (chunks.length === 0 && recordingDoc && recordingDoc.videoChunks && recordingDoc.videoChunks.length > 0) {
+            const dbChunks = await Promise.all(recordingDoc.videoChunks.map(async (vc, idx) => {
+                const key = vc.key || `recordings/${examId}/${userId}/${sessionId}/${vc.chunkNumber ?? idx}.webm`;
+                const presigned = await storageService.getPresignedDownloadUrl({ key, expiresIn: 1800 });
+                return {
+                    key,
+                    size: vc.size || 0,
+                    chunkIndex: vc.chunkNumber ?? idx,
+                    url: presigned.downloadUrl,
+                    downloadUrl: presigned.downloadUrl
+                };
+            }));
+            const valid = dbChunks.filter(c => Boolean(c.url));
+            if (valid.length > 0) {
+                chunks = valid;
+            }
+        }
+
         res.json({
             success: true,
-            ...result,
+            sessionId,
+            totalChunks: chunks.length,
             chunks,
             presignedUrls: chunks
         });
@@ -512,3 +544,39 @@ router.get('/active-recording/:sessionId', async (req, res) => {
 });
 
 module.exports = router;
+/**
+ * GET /api/camera/exam/:examId/recordings
+ * Returns all recording sessions metadata for an exam (Admin only)
+ */
+router.get('/exam/:examId/recordings', adminMiddleware, async (req, res) => {
+    try {
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+        const { examId } = req.params;
+        const cameraRecordings = await CameraRecording.find({ examId }).sort('-startedAt').lean();
+
+        const data = await Promise.all(cameraRecordings.map(async (rec) => {
+            const attempt = await ExamAttempt.findOne({ $or: [{ sessionId: rec.sessionId }, { userId: String(rec.startedBy), examId }] }).lean();
+            const session = await ExamSession.findById(rec.sessionId).lean();
+            return {
+                sessionId: rec.sessionId,
+                examId: rec.examId,
+                userId: rec.startedBy,
+                studentName: attempt?.studentName || session?.studentName || 'Student',
+                registerNumber: attempt?.registerNumber || session?.registerNumber || 'N/A',
+                status: rec.status,
+                startedAt: rec.startedAt,
+                endedAt: rec.endedAt,
+                totalChunks: rec.videoChunks?.length || 0,
+                totalSize: rec.totalSize || 0
+            };
+        }));
+
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('Error fetching exam recordings:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});

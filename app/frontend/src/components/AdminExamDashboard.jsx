@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Play, Pause, Square, BarChart2, Eye,
-    RefreshCw, Settings, Users, Trash2, X, AlertTriangle
+    RefreshCw, Settings, Users, Trash2, X, AlertTriangle, Shield
 } from 'lucide-react';
 import "../styles/DevvoraStyles.css";
 
@@ -214,7 +214,7 @@ export default function AdminExamDashboard() {
                         <div key={exam._id} className="exam-card premium-card">
                             <div className="exam-card-header">
                                 <div className="exam-info">
-                                    <h3 className="text-gray-900 dark:text-cream-100">{exam.title}</h3>
+                                    <h3 className="text-gray-900 dark:text-cream-100 cursor-pointer hover:text-orange-500 transition-colors" onClick={() => navigate(`/admin/exams/${exam._id}/manage`)} title="Click to manage exam">{exam.title}</h3>
                                     {getStatusChip(exam)}
                                 </div>
                                 <button
@@ -264,16 +264,22 @@ export default function AdminExamDashboard() {
                                 </div>
 
                                 <div className="view-controls">
-                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/students`)} title="Manage Students">
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage`)} title="United Manage Page" className="font-medium text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400">
+                                        Manage
+                                    </button>
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage?tab=students`)} title="Manage Students">
                                         <Users size={18} />
                                     </button>
-                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/monitor`)} title="Monitor Candidates">
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage?tab=monitoring`)} title="Monitor Candidates">
                                         <Eye size={18} />
                                     </button>
-                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/analytics`)} title="View Results">
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage?tab=results`)} title="Results and CSV Export">
                                         <BarChart2 size={18} />
                                     </button>
-                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/edit`)} title="Settings">
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage?tab=biometric`)} title="Biometric Verification">
+                                        <Shield size={18} />
+                                    </button>
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage?tab=settings`)} title="Settings">
                                         <Settings size={18} />
                                     </button>
                                 </div>

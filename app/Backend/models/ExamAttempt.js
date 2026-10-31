@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const examAttemptSchema = new mongoose.Schema({
     userId: { type: String, required: true },
     examId: { type: mongoose.Schema.Types.ObjectId, ref: 'ExamMaster', required: true },
+    sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'ExamSession' },
     studentName: { type: String },
     registerNumber: { type: String },
     answers: {

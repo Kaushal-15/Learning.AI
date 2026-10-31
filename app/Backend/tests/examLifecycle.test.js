@@ -81,6 +81,7 @@ describe('Exam Lifecycle & 10-Second Grace Period Enforcement', () => {
 
             const mockSession = {
                 _id: 'sess_123',
+                save: jest.fn().mockResolvedValue({}),
                 userId: 'user_123',
                 examId: 'exam_abc',
                 answers: new Map(),
@@ -92,6 +93,7 @@ describe('Exam Lifecycle & 10-Second Grace Period Enforcement', () => {
             };
 
             ExamSession.findOne.mockResolvedValue(mockSession);
+            ExamQuestionResult.find = jest.fn().mockResolvedValue([]);
             Question.find.mockResolvedValue([{ _id: 'q_1', correctAnswer: 'Option A' }]);
             ExamAttempt.prototype.save = jest.fn().mockResolvedValue({});
             ExamSession.deleteOne = jest.fn().mockResolvedValue({});

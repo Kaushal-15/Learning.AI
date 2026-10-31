@@ -259,22 +259,32 @@ export default function AdaptiveExamSession() {
             }
 
             if (data.isComplete) {
-                // Exam finished
+                // Exam finished - finalize in DB
                 setExamComplete(true);
-                setTimeout(() => {
-                    navigate(`/exam/${examId}/result`, {
-                        state: {
-                            examTitle: exam?.title || 'Adaptive Exam',
-                            examStartTime: exam?.startTime,
-                            examEndTime: exam?.endTime,
-                            studentInfo: studentInfo || {
-                                name: 'Student',
-                                registerNumber: 'N/A'
-                            },
-                            submittedAt: new Date().toISOString()
-                        }
-                    });
-                }, 2000);
+                (async () => {
+                    try {
+                        await fetch(`${API_BASE}/exams/${examId}/submit`, {
+                            method: 'POST',
+                            credentials: 'include'
+                        });
+                    } catch (err) {
+                        console.error('Error submitting completed adaptive exam:', err);
+                    }
+                    setTimeout(() => {
+                        navigate(`/exam/${examId}/result`, {
+                            state: {
+                                examTitle: exam?.title || 'Adaptive Exam',
+                                examStartTime: exam?.startTime,
+                                examEndTime: exam?.endTime,
+                                studentInfo: studentInfo || {
+                                    name: 'Student',
+                                    registerNumber: 'N/A'
+                                },
+                                submittedAt: new Date().toISOString()
+                            }
+                        });
+                    }, 1000);
+                })();
                 return;
             }
 
