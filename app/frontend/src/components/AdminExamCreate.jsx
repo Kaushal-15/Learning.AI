@@ -75,8 +75,8 @@ const QuestionPreviewCard = ({ question, index, isSelected, onToggle, source = '
                     ))}
                 </div>
                 <div className="question-meta">
-                    <span className={`difficulty-badge ${question.difficulty || 'medium'}`}>
-                        {question.difficulty || 'Medium'}
+                    <span className={`difficulty-badge ${String(question.difficultyLevel || question.difficulty || 'medium').toLowerCase()}`}>
+                        {String(question.difficultyLevel || question.difficulty || 'Medium')}
                     </span>
                     <span className="source-badge">{source}</span>
                 </div>
@@ -413,7 +413,11 @@ export default function AdminExamCreate() {
             if (formData.examType === 'static') {
                 const invalidQuestions = selectedQuestions
                     .map(idx => extractedQuestions[idx])
-                    .filter(q => !q.difficulty || !['easy', 'medium', 'hard'].includes(q.difficulty.toLowerCase()));
+                    .filter(q => {
+                        if (!q) return true;
+                        const diffStr = String(q.difficultyLevel || q.difficulty || 'medium').toLowerCase();
+                        return !['easy', 'medium', 'hard'].includes(diffStr);
+                    });
 
                 if (invalidQuestions.length > 0) {
                     setUploadError(`Error: ${invalidQuestions.length} selected questions have invalid difficulty. Difficulty must be easy, medium, or hard.`);
@@ -459,7 +463,15 @@ export default function AdminExamCreate() {
             };
 
             if (formData.examType === 'static') {
-                const finalQuestions = selectedQuestions.map(idx => extractedQuestions[idx]);
+                const finalQuestions = selectedQuestions.map(idx => {
+                    const q = extractedQuestions[idx];
+                    const diffStr = String(q?.difficultyLevel || q?.difficulty || 'medium').toLowerCase();
+                    return {
+                        ...q,
+                        difficulty: ['easy', 'medium', 'hard'].includes(diffStr) ? diffStr : 'medium',
+                        difficultyLevel: ['easy', 'medium', 'hard'].includes(diffStr) ? diffStr : 'medium'
+                    };
+                });
                 payload.totalQuestions = finalQuestions.length;
                 payload.rawQuestions = finalQuestions;
             } else if (formData.examType === 'dynamic') {
@@ -467,7 +479,14 @@ export default function AdminExamCreate() {
                 payload.totalQuestions = totalDynamic;
                 payload.dynamicSettings = formData.dynamicConfig; // Backend expects dynamicSettings
                 payload.isAdaptive = true; // Enable adaptive mode
-                payload.rawQuestions = extractedQuestions; // Include uploaded questions if any
+                payload.rawQuestions = (extractedQuestions || []).map(q => {
+                    const diffStr = String(q?.difficultyLevel || q?.difficulty || 'medium').toLowerCase();
+                    return {
+                        ...q,
+                        difficulty: ['easy', 'medium', 'hard'].includes(diffStr) ? diffStr : 'medium',
+                        difficultyLevel: ['easy', 'medium', 'hard'].includes(diffStr) ? diffStr : 'medium'
+                    };
+                });
             }
 
             const res = await fetch(`${API_BASE}/exams/create`, {

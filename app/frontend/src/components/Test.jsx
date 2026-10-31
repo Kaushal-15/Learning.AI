@@ -341,7 +341,7 @@ const testCategories = {
 };
 
 const getDifficultyColor = (difficulty) => {
-    switch (difficulty.toLowerCase()) {
+    switch (String(difficulty || '').toLowerCase()) {
         case 'easy': return 'bg-green-100 text-green-700 border-green-200';
         case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
         case 'hard': return 'bg-orange-100 text-orange-700 border-orange-200';
@@ -352,7 +352,7 @@ const getDifficultyColor = (difficulty) => {
 };
 
 const getDifficultyIcon = (difficulty) => {
-    switch (difficulty.toLowerCase()) {
+    switch (String(difficulty || '').toLowerCase()) {
         case 'easy': return <Star className="w-4 h-4" />;
         case 'medium': return <Target className="w-4 h-4" />;
         case 'hard': return <Zap className="w-4 h-4" />;
