@@ -180,6 +180,24 @@ describe('verificationDuration = 0 (no verification window)', () => {
   assert(state.status === 'scheduled', `status 'scheduled' when verificationDuration=0 (got '${state.status}')`);
 });
 
+describe('10-second submission grace period boundary', () => {
+  // Exactly at endTime (11:00:00.000Z)
+  const atEndTime = computeExamState(exam, new Date('2026-11-01T11:00:00.000Z'));
+  assert(atEndTime.isSubmissionAllowed === true, 'isSubmissionAllowed is true at endTime');
+  assert(atEndTime.hasGracePeriodExpired === false, 'hasGracePeriodExpired is false at endTime');
+
+  // Exactly at endTime + 10s grace boundary (11:00:10.000Z)
+  const atGraceBoundary = computeExamState(exam, new Date('2026-11-01T11:00:10.000Z'));
+  assert(atGraceBoundary.isSubmissionAllowed === true, 'isSubmissionAllowed is true at endTime + 10s');
+  assert(atGraceBoundary.hasGracePeriodExpired === false, 'hasGracePeriodExpired is false at endTime + 10s');
+  assert(atGraceBoundary.status === 'ended', 'status is ended during grace period');
+
+  // Past 10s grace boundary (11:00:10.001Z)
+  const pastGrace = computeExamState(exam, new Date('2026-11-01T11:00:10.001Z'));
+  assert(pastGrace.isSubmissionAllowed === false, 'isSubmissionAllowed is false past 10s grace');
+  assert(pastGrace.hasGracePeriodExpired === true, 'hasGracePeriodExpired is true past 10s grace');
+});
+
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------

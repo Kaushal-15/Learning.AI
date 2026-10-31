@@ -6,6 +6,8 @@
  * Eliminates scheduler, setTimeout, and cron dependencies.
  */
 
+const GRACE_PERIOD_MS = 10000; // 10 seconds submission grace period
+
 /**
  * Derives current lifecycle state of an exam based on serverNow.
  * States:
@@ -26,6 +28,7 @@ function computeExamState(exam, serverNow = new Date()) {
   const rawVd = Number(exam.verificationDuration);
   const verificationDuration = (Number.isFinite(rawVd) && rawVd >= 0) ? rawVd : 15;
   const verificationStart = new Date(startTime.getTime() - verificationDuration * 60000);
+  const graceEndTime = new Date(endTime.getTime() + GRACE_PERIOD_MS);
 
   let status = 'scheduled';
   if (now > endTime) {
@@ -41,6 +44,7 @@ function computeExamState(exam, serverNow = new Date()) {
   const msUntilVerification = Math.max(0, verificationStart.getTime() - now.getTime());
   const msUntilStart = Math.max(0, startTime.getTime() - now.getTime());
   const msUntilEnd = Math.max(0, endTime.getTime() - now.getTime());
+  const msUntilGraceEnd = Math.max(0, graceEndTime.getTime() - now.getTime());
 
   return {
     status,
@@ -49,18 +53,24 @@ function computeExamState(exam, serverNow = new Date()) {
     endTime: endTime.toISOString(),
     verificationStart: verificationStart.toISOString(),
     verificationDuration,
+    graceEndTime: graceEndTime.toISOString(),
     isVerificationOpen: now >= verificationStart && now <= endTime,
     isLive: now >= startTime && now <= endTime,
     hasEnded: now > endTime,
+    isSubmissionAllowed: now <= graceEndTime,
+    hasGracePeriodExpired: now > graceEndTime,
     msUntilVerification,
     msUntilStart,
     msUntilEnd,
+    msUntilGraceEnd,
     secondsUntilVerification: Math.ceil(msUntilVerification / 1000),
     secondsUntilStart: Math.ceil(msUntilStart / 1000),
     secondsUntilEnd: Math.ceil(msUntilEnd / 1000),
+    secondsUntilGraceEnd: Math.ceil(msUntilGraceEnd / 1000),
   };
 }
 
 module.exports = {
   computeExamState,
+  GRACE_PERIOD_MS,
 };

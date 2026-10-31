@@ -11,6 +11,7 @@ export default function AdminExamDashboard() {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deleteModal, setDeleteModal] = useState({ show: false, examId: null, examTitle: '' });
+    const [deleting, setDeleting] = useState(false);
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";

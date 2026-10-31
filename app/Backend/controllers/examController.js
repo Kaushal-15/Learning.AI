@@ -7,6 +7,19 @@ const mongoose = require('mongoose');
 const { computeExamState } = require('../services/examStateHelper');
 const { validateQuestionPool, getRequiredPerDifficulty } = require('../services/poolRules');
 const storageService = require('../services/storageService');
+const connectDB = require('../config/database');
+
+// Rule 1: Serverless DB readiness check
+const ensureDbConnected = async (res) => {
+    await connectDB();
+    if (mongoose.connection.readyState !== 1) {
+        if (res) {
+            res.status(503).json({ success: false, message: 'Database connection unavailable' });
+        }
+        return false;
+    }
+    return true;
+};
 
 // Helper function to convert difficulty string to number
 const convertDifficulty = (difficulty) => {
@@ -42,6 +55,7 @@ const getDifficultyLevel = (diff) => {
 // Create Exam with enhanced support for mixed questions and dynamic settings
 exports.createExam = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const {
             title, description, examCode, startTime, endTime, duration,
             verificationDuration,
@@ -515,6 +529,7 @@ exports.uploadQuestions = async (req, res) => {
 // Validate Exam Entry
 exports.validateEntry = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const rawExamCode = req.body.examCode || '';
         const rawRegisterNumber = req.body.registerNumber || '';
         const examCode = rawExamCode.trim().toUpperCase();
@@ -600,6 +615,7 @@ exports.validateEntry = async (req, res) => {
 // Start/Resume Session
 exports.startSession = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const exam = await ExamMaster.findById(examId);
 
@@ -936,6 +952,7 @@ exports.startSession = async (req, res) => {
 // Update Session (Save Answer)
 exports.updateSession = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { currentQuestionIndex, answers, timeRemaining, violation } = req.body;
 
@@ -972,6 +989,7 @@ exports.updateSession = async (req, res) => {
 // Log Proctoring Event
 exports.logEvent = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { eventType, details } = req.body;
 
@@ -993,15 +1011,31 @@ exports.logEvent = async (req, res) => {
 // Submit Exam
 exports.submitExam = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const userId = req.user.id || req.user._id;
-        const session = await ExamSession.findOne({ userId, examId });
 
+        const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        // Authoritative exam state and 10-second submission grace period check
+        const state = computeExamState(exam, new Date());
+        if (state.hasGracePeriodExpired) {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has ended and submission grace period has expired',
+                serverNow: state.serverNow,
+                endTime: state.endTime,
+                graceEndTime: state.graceEndTime
+            });
+        }
+
+        const session = await ExamSession.findOne({ userId, examId });
         if (!session) {
             return res.status(404).json({ success: false, message: 'Session not found' });
         }
-
-        const exam = await ExamMaster.findById(examId);
 
         let questions = [];
         if (exam.examType === 'dynamic' && session.questionIds?.length > 0) {
@@ -1067,6 +1101,7 @@ exports.submitExam = async (req, res) => {
 // Admin: Get all exams with summary stats
 exports.getAdminExams = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const exams = await ExamMaster.find().sort('-createdAt');
         const now = new Date();
         const examStats = await Promise.all(exams.map(async (exam) => {
@@ -1394,6 +1429,7 @@ exports.updateStudentVerification = async (req, res) => {
 // Get exam details for verification (student-facing, no questions)
 exports.getExamDetails = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const exam = await ExamMaster.findById(examId);
 
@@ -1703,11 +1739,30 @@ exports.getNextQuestion = async (req, res) => {
 // Submit answer for adaptive quiz
 exports.submitAdaptiveAnswer = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { questionId, answer } = req.body;
         const userId = req.user.id || req.user._id;
 
         const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        const state = computeExamState(exam, new Date());
+        if (state.status === 'scheduled') {
+            return res.status(403).json({ success: false, message: 'Exam has not started yet' });
+        }
+        if (state.hasGracePeriodExpired) {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has ended and submission grace period has expired',
+                serverNow: state.serverNow,
+                endTime: state.endTime,
+                graceEndTime: state.graceEndTime
+            });
+        }
+
         const session = await ExamSession.findOne({ userId, examId });
 
         // For dynamic exams, fetch from Question model
@@ -2198,11 +2253,30 @@ exports.getSynchronizedQuestion = async (req, res) => {
 // Submit answer for synchronized exam
 exports.submitSynchronizedAnswer = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { questionId, answer } = req.body;
         const userId = req.user.id || req.user._id;
 
         const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        const state = computeExamState(exam, new Date());
+        if (state.status === 'scheduled') {
+            return res.status(403).json({ success: false, message: 'Exam has not started yet' });
+        }
+        if (state.hasGracePeriodExpired) {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has ended and submission grace period has expired',
+                serverNow: state.serverNow,
+                endTime: state.endTime,
+                graceEndTime: state.graceEndTime
+            });
+        }
+
         const session = await ExamSession.findOne({ userId, examId });
         const question = await Question.findById(questionId);
 
@@ -2281,3 +2355,29 @@ exports.submitSynchronizedAnswer = async (req, res) => {
 };
 
 module.exports = exports;
+
+// Admin: Get single exam by ID for AdminExamManage
+exports.getAdminExamById = async (req, res) => {
+    try {
+        if (!await ensureDbConnected(res)) return;
+        const { examId } = req.params;
+        const exam = await ExamMaster.findById(examId);
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+        const state = computeExamState(exam, new Date());
+        return res.status(200).json({
+            success: true,
+            data: {
+                ...exam.toObject(),
+                computedStatus: state.status,
+                serverNow: state.serverNow,
+                verificationStart: state.verificationStart,
+                startTime: state.startTime,
+                endTime: state.endTime
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};

@@ -3,6 +3,20 @@ const Question = require('../models/Question');
 const ExamQuestionResult = require('../models/ExamQuestionResult');
 const SyncExamStats = require('../models/SyncExamStats');
 const mongoose = require('mongoose');
+const connectDB = require('../config/database');
+const { computeExamState } = require('../services/examStateHelper');
+
+// Rule 1: Serverless DB readiness check
+const ensureDbConnected = async (res) => {
+    await connectDB();
+    if (mongoose.connection.readyState !== 1) {
+        if (res) {
+            res.status(503).json({ success: false, message: 'Database connection unavailable' });
+        }
+        return false;
+    }
+    return true;
+};
 
 // Helper function to get next difficulty based on admin routing
 const getNextDifficulty = (currentDifficulty, isCorrect, adaptiveRouting) => {
@@ -27,6 +41,7 @@ const getNextDifficulty = (currentDifficulty, isCorrect, adaptiveRouting) => {
 // Get next question for individual adaptive exam
 exports.getNextAdaptiveQuestion = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const userId = req.user.id || req.user._id;
 
@@ -35,6 +50,24 @@ exports.getNextAdaptiveQuestion = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Exam not found or not adaptive'
+            });
+        }
+
+        // Lifecycle state check in getNextAdaptiveQuestion
+        const state = computeExamState(exam, new Date());
+        if (state.status === 'scheduled') {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has not started yet',
+                serverNow: state.serverNow,
+                startTime: state.startTime
+            });
+        }
+        if (state.hasEnded) {
+            return res.json({
+                success: true,
+                isComplete: true,
+                message: 'Exam has ended'
             });
         }
 
@@ -154,6 +187,7 @@ exports.getNextAdaptiveQuestion = async (req, res) => {
 // Submit answer for individual adaptive exam
 exports.submitAdaptiveAnswer = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { questionId, answer } = req.body;
         const userId = req.user.id || req.user._id;
@@ -163,6 +197,24 @@ exports.submitAdaptiveAnswer = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Exam not found or not adaptive'
+            });
+        }
+
+        // Authoritative lifecycle & 10s grace period check in submitAdaptiveAnswer
+        const state = computeExamState(exam, new Date());
+        if (state.status === 'scheduled') {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has not started yet'
+            });
+        }
+        if (state.hasGracePeriodExpired) {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has ended and submission grace period has expired',
+                serverNow: state.serverNow,
+                endTime: state.endTime,
+                graceEndTime: state.graceEndTime
             });
         }
 
@@ -199,7 +251,7 @@ exports.submitAdaptiveAnswer = async (req, res) => {
             userAnswer: answer,
             correctAnswer: question.correctAnswer,
             isCorrect,
-            difficulty: question.difficulty,
+            difficulty: typeof question.difficulty === 'number' ? question.difficulty : (question.difficultyLevel === 'easy' ? 3 : question.difficultyLevel === 'hard' ? 8 : 5),
             questionNumber: 0, // Will be updated below
             startedAt: new Date(),
             endedAt: new Date()
@@ -282,6 +334,8 @@ exports.submitAdaptiveAnswer = async (req, res) => {
 // Get current question for synchronized adaptive exam
 exports.getCurrentSynchronizedQuestion = async (req, res) => {
     try {
+        // EnsureDb check in getCurrentSynchronizedQuestion
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const userId = req.user.id || req.user._id;
 
@@ -290,6 +344,23 @@ exports.getCurrentSynchronizedQuestion = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Exam not found or not synchronized adaptive'
+            });
+        }
+
+        // Check authoritative lifecycle state
+        const state = computeExamState(exam, new Date());
+        if (state.status === 'scheduled') {
+            return res.json({
+                success: true,
+                isWaiting: true,
+                message: 'Exam has not started yet'
+            });
+        }
+        if (state.hasEnded) {
+            return res.json({
+                success: true,
+                isComplete: true,
+                message: 'Exam has ended'
             });
         }
 
@@ -391,6 +462,7 @@ exports.getCurrentSynchronizedQuestion = async (req, res) => {
 // Submit answer for synchronized adaptive exam
 exports.submitSynchronizedAnswer = async (req, res) => {
     try {
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { questionId, answer } = req.body;
         const userId = req.user.id || req.user._id;
@@ -400,6 +472,24 @@ exports.submitSynchronizedAnswer = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Exam not found or not synchronized adaptive'
+            });
+        }
+
+        // Authoritative lifecycle & 10s grace period check in submitSynchronizedAnswer
+        const state = computeExamState(exam, new Date());
+        if (state.status === 'scheduled') {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has not started yet'
+            });
+        }
+        if (state.hasGracePeriodExpired) {
+            return res.status(403).json({
+                success: false,
+                message: 'Exam has ended and submission grace period has expired',
+                serverNow: state.serverNow,
+                endTime: state.endTime,
+                graceEndTime: state.graceEndTime
             });
         }
 
@@ -437,7 +527,7 @@ exports.submitSynchronizedAnswer = async (req, res) => {
             userAnswer: answer,
             correctAnswer: question.correctAnswer,
             isCorrect,
-            difficulty: question.difficulty,
+            difficulty: typeof question.difficulty === 'number' ? question.difficulty : (question.difficultyLevel === 'easy' ? 3 : question.difficultyLevel === 'hard' ? 8 : 5),
             questionNumber: exam.currentQuestionNumber,
             startedAt: new Date(),
             endedAt: new Date()
@@ -500,6 +590,8 @@ exports.submitSynchronizedAnswer = async (req, res) => {
 // Admin endpoint to advance synchronized exam to next question
 exports.advanceSynchronizedExam = async (req, res) => {
     try {
+        // EnsureDb check in advanceSynchronizedExam
+        if (!await ensureDbConnected(res)) return;
         const { examId } = req.params;
         const { forceNextDifficulty } = req.body; // Admin can override difficulty
 

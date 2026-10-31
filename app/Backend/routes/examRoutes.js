@@ -74,6 +74,7 @@ router.post('/:examId/submit', examController.submitExam);
 
 // Admin Routes
 router.get('/admin/list', adminMiddleware, examController.getAdminExams);
+router.get('/admin/:examId', adminMiddleware, examController.getAdminExamById);
 router.delete('/admin/:examId', adminMiddleware, examController.deleteExam);
 router.get('/admin/:examId/candidates', adminMiddleware, examController.getExamCandidates);
 router.post('/admin/:examId/regenerate-code', adminMiddleware, examController.regenerateExamCode);

@@ -91,10 +91,19 @@ export default function AdaptiveExamSession() {
                 setTotalQuestions(location.state.exam.totalQuestions);
 
                 // Get student info from location state (passed from verification)
-                if (location.state?.studentInfo) {
-                    setStudentInfo(location.state.studentInfo);
-                    console.log('✅ Student info loaded:', location.state.studentInfo);
-                }
+                const sInfo = location.state?.studentInfo || {
+                    name: location.state.session.studentName || 'Student',
+                    registerNumber: location.state.session.registerNumber || ''
+                };
+                setStudentInfo(sInfo);
+
+                // Persist to sessionStorage for refresh resilience
+                try {
+                    sessionStorage.setItem(`exam_session_${examId}`, JSON.stringify({
+                        sessionId: location.state.session._id,
+                        studentInfo: sInfo
+                    }));
+                } catch (e) {}
 
                 // Set global exam timer from session
                 if (location.state.session.expiryTime) {
@@ -109,18 +118,32 @@ export default function AdaptiveExamSession() {
                 return;
             }
 
-            // If no state, try to start a new session
-            const sessionResponse = await fetch(`${API_BASE}/exams/${examId}/session`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({
-                    studentName: "Student",
-                    registerNumber: ""
-                })
+            // On refresh or direct resume: refetch existing session from server
+            let sessionResponse = await fetch(`${API_BASE}/exams/${examId}/session`, {
+                method: "GET",
+                credentials: "include"
             });
+            let sessionData = await sessionResponse.json();
 
-            const sessionData = await sessionResponse.json();
+            // If GET fails to find existing session, fallback to stored session info or POST
+            if (!sessionData.success || !sessionData.data) {
+                let savedInfo = null;
+                try {
+                    const raw = sessionStorage.getItem(`exam_session_${examId}`);
+                    if (raw) savedInfo = JSON.parse(raw);
+                } catch (e) {}
+
+                sessionResponse = await fetch(`${API_BASE}/exams/${examId}/session`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({
+                        studentName: savedInfo?.studentInfo?.name || "Student",
+                        registerNumber: savedInfo?.studentInfo?.registerNumber || ""
+                    })
+                });
+                sessionData = await sessionResponse.json();
+            }
 
             if (!sessionData.success || !sessionData.data) {
                 throw new Error(sessionData.message || "Invalid session data");
@@ -136,10 +159,30 @@ export default function AdaptiveExamSession() {
 
             setExam(exam);
             setSessionId(session._id);
-            // CRITICAL: FORCE ENABLE CAMERA MONITORING FOR ALL ADAPTIVE EXAMS
-            setCameraRequired(true);  // FORCE ON - matches ExamSession.jsx behavior
-            console.log('✅ Adaptive Exam (backend init) - Camera FORCED ON');
+            setCameraRequired(true);
             setTotalQuestions(exam.totalQuestions);
+
+            const recoveredStudentInfo = {
+                name: session.studentName || "Student",
+                registerNumber: session.registerNumber || ""
+            };
+            setStudentInfo(recoveredStudentInfo);
+
+            try {
+                sessionStorage.setItem(`exam_session_${examId}`, JSON.stringify({
+                    sessionId: session._id,
+                    studentInfo: recoveredStudentInfo
+                }));
+            } catch (e) {}
+
+            // Set global exam timer from session
+            if (session.expiryTime) {
+                setExamExpiryTime(new Date(session.expiryTime));
+                const now = new Date();
+                const expiry = new Date(session.expiryTime);
+                const remaining = Math.max(0, Math.floor((expiry - now) / 1000));
+                setTotalExamTime(remaining);
+            }
 
             // Check for Waiting Room
             const now = new Date();
@@ -179,12 +222,12 @@ export default function AdaptiveExamSession() {
                 setIndividualStats(data.individualStats);
             } else {
                 // Wait is over, fetch next question
-                initializeSession();
+                fetchNextQuestion();
             }
         } catch (error) {
             console.error('Error checking wait status:', error);
         }
-    }, [examId, exam, initializeSession]);
+    }, [examId, exam, fetchNextQuestion]);
 
     // Fetch next question
     const fetchNextQuestion = useCallback(async () => {
@@ -275,6 +318,14 @@ export default function AdaptiveExamSession() {
         if (!selectedAnswer || isSubmitting) return;
 
         setIsSubmitting(true);
+        // Persist answers incrementally to sessionStorage
+        try {
+            const stored = JSON.parse(sessionStorage.getItem(`exam_answers_${examId}`) || '{}');
+            if (currentQuestion?._id) {
+                stored[currentQuestion._id] = selectedAnswer;
+                sessionStorage.setItem(`exam_answers_${examId}`, JSON.stringify(stored));
+            }
+        } catch (e) {}
         try {
             const endpoint = exam?.isSynchronized
                 ? `${API_BASE}/exams/${examId}/synchronized/submit-answer`
@@ -377,7 +428,15 @@ export default function AdaptiveExamSession() {
             // Auto-submit entire exam when global timer expires
             if (remaining <= 0) {
                 setExamComplete(true);
-                setTimeout(() => {
+                (async () => {
+                    try {
+                        await fetch(`${API_BASE}/exams/${examId}/submit`, {
+                            method: 'POST',
+                            credentials: 'include'
+                        });
+                    } catch (err) {
+                        console.error('Error auto-submitting exam:', err);
+                    }
                     navigate(`/exam/${examId}/result`, {
                         state: {
                             examTitle: exam?.title || 'Adaptive Exam',
@@ -390,7 +449,7 @@ export default function AdaptiveExamSession() {
                             submittedAt: new Date().toISOString()
                         }
                     });
-                }, 1000);
+                })();
             }
         };
 
@@ -695,15 +754,25 @@ export default function AdaptiveExamSession() {
                     </div>
                 </div>
 
-                {/* Submit Button */}
-                <button
-                    className="adaptive-submit-btn"
-                    onClick={handleSubmitAnswer}
-                    disabled={!selectedAnswer || isSubmitting || timeLeft > 3}
-                >
-                    <Send size={20} />
-                    {isSubmitting ? 'Submitting...' : timeLeft > 3 ? `Wait ${timeLeft}s` : 'Submit Answer'}
-                </button>
+                {/* Submit Button (minimum 3 seconds spent on question) */}
+                {(() => {
+                    const timeSpentOnQuestion = (timePerQuestion || 30) - timeLeft;
+                    const isMinTimeMet = timeSpentOnQuestion >= 3;
+                    return (
+                        <button
+                            className="adaptive-submit-btn"
+                            onClick={handleSubmitAnswer}
+                            disabled={!selectedAnswer || isSubmitting || !isMinTimeMet}
+                        >
+                            <Send size={20} />
+                            {isSubmitting
+                                ? 'Submitting...'
+                                : !isMinTimeMet
+                                    ? `Wait ${3 - timeSpentOnQuestion}s`
+                                    : 'Submit Answer'}
+                        </button>
+                    );
+                })()}
             </div>
 
             {/* Fullscreen Warning Modal */}
