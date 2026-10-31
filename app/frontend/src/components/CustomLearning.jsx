@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Upload as UploadIcon, FileText, Zap, BarChart3 } from 'lucide-react';
+import { Trash2, Upload as UploadIcon, FileText, Zap, BarChart3, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import FileUpload from './CustomLearning/FileUpload';
 import QuizConfig from './CustomLearning/QuizConfig';
@@ -50,14 +50,10 @@ const CustomLearning = () => {
                 credentials: 'include'
             });
             const data = await response.json();
-            console.log('Quiz results response:', data);
 
-            // Handle both 'quizzes' and 'data' response formats
             const quizzes = data.quizzes || data.data || [];
-            console.log('Quizzes found:', quizzes.length);
 
             if (data.success && quizzes.length > 0) {
-                // Group quizzes by document title
                 const grouped = {};
                 quizzes.forEach(quiz => {
                     const docName = quiz.title?.replace('Custom Quiz: ', '') || 'Unknown';
@@ -66,7 +62,6 @@ const CustomLearning = () => {
                     }
                     grouped[docName].push(quiz);
                 });
-                console.log('Grouped results:', grouped);
                 setQuizResults(grouped);
             }
         } catch (error) {
@@ -99,9 +94,7 @@ const CustomLearning = () => {
     };
 
     const getDocumentResults = (docName) => {
-        const results = quizResults[docName] || [];
-        console.log(`Results for ${docName}:`, results.length);
-        return results;
+        return quizResults[docName] || [];
     };
 
     return (
@@ -132,7 +125,7 @@ const CustomLearning = () => {
                         </div>
                         <div className="cta-content">
                             <h3 className="cta-title">Upload Materials</h3>
-                            <p className="cta-description">PDF, DOCX, or TXT files (max 5MB)</p>
+                            <p className="cta-description">PDF, DOCX, or TXT files (max 4 MB)</p>
                         </div>
                     </div>
 
@@ -164,7 +157,7 @@ const CustomLearning = () => {
                             <ul className="space-y-2 text-sm text-gray-600 dark:text-[#b8a67d]">
                                 <li className="flex items-start gap-2">
                                     <span className="text-blue-500 mt-0.5">•</span>
-                                    <span>Upload PDF, DOCX, or TXT files (max 5MB)</span>
+                                    <span>Upload PDF, DOCX, or TXT files (max 4 MB)</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="text-purple-500 mt-0.5">•</span>
@@ -217,20 +210,55 @@ const CustomLearning = () => {
                                     ? Math.round(results.reduce((acc, r) => acc + (r.accuracy || 0), 0) / results.length)
                                     : 0;
 
+                                const isProcessing = doc.status === 'processing';
+                                const isFailed = doc.status === 'failed';
+                                const isReady = doc.status === 'processed' || doc.processed;
+
                                 return (
                                     <div key={doc._id} className="stat-card hover:scale-105 transition-all duration-300">
                                         <div className="flex items-start justify-between mb-3">
-                                            <div className="flex-1">
+                                            <div className="flex-1 min-w-0 pr-2">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-600 flex items-center justify-center">
+                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-600 flex items-center justify-center shrink-0">
                                                         <FileText className="w-5 h-5 text-white" />
                                                     </div>
-                                                    <h3 className="font-semibold text-gray-900 dark:text-[#f5e6d3] truncate flex-1">{doc.originalName}</h3>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-semibold text-gray-900 dark:text-[#f5e6d3] truncate" title={doc.originalName}>
+                                                            {doc.originalName}
+                                                        </h3>
+                                                        <div className="mt-1 flex items-center gap-1.5">
+                                                            {isProcessing && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-500 border border-yellow-500/30">
+                                                                    <Clock className="w-3 h-3 animate-spin" />
+                                                                    Processing
+                                                                </span>
+                                                            )}
+                                                            {isFailed && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30" title={doc.failureReason || 'Failed'}>
+                                                                    <AlertTriangle className="w-3 h-3" />
+                                                                    Failed
+                                                                </span>
+                                                            )}
+                                                            {isReady && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400 border border-green-500/30">
+                                                                    <CheckCircle2 className="w-3 h-3" />
+                                                                    Ready
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
+
+                                                {isFailed && doc.failureReason && (
+                                                    <p className="text-xs text-red-400 my-2 line-clamp-2 bg-red-500/10 p-1.5 rounded border border-red-500/20">
+                                                        {doc.failureReason}
+                                                    </p>
+                                                )}
+
                                                 <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-[#b8a67d]">
                                                     <span className="flex items-center gap-1">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                                        {doc.chunkCount} chunks
+                                                        {doc.chunkCount || 0} chunks
                                                     </span>
                                                     <span className="flex items-center gap-1">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
@@ -259,19 +287,24 @@ const CustomLearning = () => {
                                             </div>
                                             <button
                                                 onClick={() => handleDelete(doc._id)}
-                                                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all"
+                                                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all shrink-0"
                                                 title="Delete document"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
 
-                                        <div className="space-y-2">
+                                        <div className="space-y-2 mt-2">
                                             <button
                                                 onClick={() => setUploadedDocId(doc._id)}
-                                                className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg text-sm font-semibold transition-all shadow-lg shadow-blue-500/20 hover:shadow-xl hover:scale-105"
+                                                disabled={!isReady}
+                                                className={`w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+                                                    isReady
+                                                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-xl hover:scale-105'
+                                                        : 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-500/20'
+                                                }`}
                                             >
-                                                Generate Quiz
+                                                {isProcessing ? 'Processing Document...' : isFailed ? 'Document Failed' : 'Generate Quiz'}
                                             </button>
 
                                             {results.length > 0 && (

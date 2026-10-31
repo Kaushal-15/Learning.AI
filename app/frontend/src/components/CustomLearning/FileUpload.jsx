@@ -24,14 +24,18 @@ const FileUpload = ({ onUploadSuccess }) => {
             'text/plain'
         ];
 
-        if (!validTypes.includes(file.type)) {
+        const fileName = (file.name || '').toLowerCase();
+        const hasValidExt = fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.txt');
+
+        if (!validTypes.includes(file.type) && !hasValidExt) {
             setError('Invalid file type. Please upload PDF, DOCX, or TXT.');
             setFile(null);
             return;
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-            setError('File size exceeds 5MB limit.');
+        const MAX_SIZE = 4 * 1024 * 1024; // 4 MB limit
+        if (file.size > MAX_SIZE) {
+            setError('File size exceeds 4 MB limit.');
             setFile(null);
             return;
         }
@@ -125,7 +129,7 @@ const FileUpload = ({ onUploadSuccess }) => {
                     <div className="flex flex-col items-center cursor-pointer" onClick={() => fileInputRef.current.click()}>
                         <Upload className="w-12 h-12 text-gray-400 mb-2" />
                         <p className="text-gray-300 font-medium">Click to upload or drag & drop</p>
-                        <p className="text-gray-500 text-sm mt-1">PDF, DOCX, TXT (Max 5MB)</p>
+                        <p className="text-gray-500 text-sm mt-1">PDF, DOCX, TXT (Max 4 MB)</p>
                     </div>
                 )}
             </div>
