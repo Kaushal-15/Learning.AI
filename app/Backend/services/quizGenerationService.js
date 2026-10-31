@@ -22,171 +22,213 @@ const withTimeout = (promise, ms, name = 'AI request') =>
         )
     ]);
 
-if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here') {
-    aiClient = new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: AI_TIMEOUT_MS });
-    aiProvider = 'groq';
-    console.log('✅ Using Groq AI for quiz generation');
-} else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    aiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    aiProvider = 'gemini';
-    console.log('✅ Using Gemini AI for quiz generation');
-} else {
-    console.warn('⚠️ No AI API key configured. Using content-based fallback.');
+function getAIClient() {
+    if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here') {
+        if (!aiClient || aiProvider !== 'groq') {
+            aiClient = new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: AI_TIMEOUT_MS });
+            aiProvider = 'groq';
+            console.log('✅ Using Groq AI for quiz generation');
+        }
+        return { client: aiClient, provider: 'groq' };
+    }
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
+        if (!aiClient || aiProvider !== 'gemini') {
+            const { GoogleGenerativeAI } = require('@google/generative-ai');
+            aiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            aiProvider = 'gemini';
+            console.log('✅ Using Gemini AI for quiz generation');
+        }
+        return { client: aiClient, provider: 'gemini' };
+    }
+    return { client: null, provider: 'none' };
+}
+
+function extractQuestionsFromJson(text) {
+    if (!text || typeof text !== 'string') return null;
+    const clean = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+
+    // 1. Direct parse
+    try {
+        const parsed = JSON.parse(clean);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed && Array.isArray(parsed.questions)) return parsed.questions;
+    } catch { }
+
+    // 2. Bracket slice for object { "questions": [...] }
+    const firstObj = clean.indexOf('{');
+    const lastObj = clean.lastIndexOf('}');
+    if (firstObj !== -1 && lastObj > firstObj) {
+        try {
+            const obj = JSON.parse(clean.substring(firstObj, lastObj + 1));
+            if (obj && Array.isArray(obj.questions)) return obj.questions;
+        } catch { }
+    }
+
+    // 3. Bracket slice for array [...]
+    const firstArr = clean.indexOf('[');
+    const lastArr = clean.lastIndexOf(']');
+    if (firstArr !== -1 && lastArr > firstArr) {
+        try {
+            const arr = JSON.parse(clean.substring(firstArr, lastArr + 1));
+            if (Array.isArray(arr)) return arr;
+        } catch { }
+    }
+
+    return null;
 }
 
 const generateQuestionsFromChunks = async (chunks, count, difficulty, distribution = null) => {
-    try {
-        const easyCount = distribution?.easy || Math.ceil(count * 0.3);
-        const mediumCount = distribution?.medium || Math.ceil(count * 0.4);
-        const hardCount = distribution?.hard || Math.max(0, count - easyCount - mediumCount);
-        const totalCount = distribution ? (easyCount + mediumCount + hardCount) : count;
+    const easyCount = distribution?.easy || Math.ceil(count * 0.3);
+    const mediumCount = distribution?.medium || Math.ceil(count * 0.4);
+    const hardCount = distribution?.hard || Math.max(0, count - easyCount - mediumCount);
+    const totalCount = distribution ? (easyCount + mediumCount + hardCount) : count;
 
-        if (!aiClient) {
-            console.warn('⚠️ No AI provider configured, using content-based fallback generator');
-            return generateContentBasedQuestions(chunks, count, difficulty, distribution);
-        }
+    const { client, provider } = getAIClient();
 
-        // Combine chunk content capped to token budget (max 8000 characters ~ 2000 tokens)
-        const context = chunks.map(c => c.content).join('\n\n');
+    if (!client || provider === 'none') {
+        console.warn('⚠️ No AI provider configured, using content-based fallback generator');
+        return generateContentBasedQuestions(chunks, count, difficulty, distribution);
+    }
 
-        const prompt = `Generate EXACTLY ${totalCount} UNIQUE multiple-choice questions based on the following text.
+    // Combine chunk content capped to token budget (max 4000 characters ~ 1000 tokens for Groq TPM budget)
+    const context = chunks.map(c => c.content).join('\n\n');
+
+    const prompt = `Generate EXACTLY ${totalCount} UNIQUE multiple-choice questions based on the following text.
 Generate questions across ALL difficulty levels:
 - ${easyCount} EASY questions (basic recall, definitions)
 - ${mediumCount} MEDIUM questions (understanding, application)
 - ${hardCount} HARD questions (analysis, synthesis, evaluation)
 
-IMPORTANT: 
+IMPORTANT:
 - Each question MUST be completely different and unique
-- Questions should test understanding of the concepts in the text
-- DO NOT generate questions about CSS, HTML, or web development unless that's what the text is about
 - Base ALL questions on the actual content provided below
 - Cover ALL major topics and concepts from the text
-- Tag each question with appropriate difficulty level and topic
+- Respond with a JSON object containing a "questions" array
 
 Text:
-${context.substring(0, 8000)}
+${context.substring(0, 4000)}
 
-Format the output as a JSON array with EXACTLY ${totalCount} objects:
-[
-  {
-    "question": "Unique question text based on the content above",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correctAnswer": "The correct option text (must match one of the options exactly)",
-    "explanation": "Brief explanation of the answer",
-    "difficulty": "easy|medium|hard",
-    "topic": "Main topic/concept this question covers",
-    "tags": ["tag1", "tag2", "tag3"]
-  }
-]
+Respond strictly in this JSON format:
+{
+  "questions": [
+    {
+      "question": "Question text here",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option A",
+      "explanation": "Brief explanation",
+      "difficulty": "easy",
+      "topic": "Topic name",
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}`;
 
-Return ONLY the JSON array, no other text or markdown.`;
+    let responseText = '';
 
-        let responseText = '';
-
-        try {
-            if (aiProvider === 'groq') {
+    try {
+        if (provider === 'groq') {
+            const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+            try {
                 const completion = await withTimeout(
-                    aiClient.chat.completions.create({
-                        messages: [{ role: 'user', content: prompt }],
-                        model: 'llama-3.3-70b-versatile',
-                        temperature: 0.7,
-                        max_tokens: 4000,
+                    client.chat.completions.create({
+                        messages: [
+                            { role: 'system', content: 'You are an educational assistant that outputs strictly valid JSON.' },
+                            { role: 'user', content: prompt }
+                        ],
+                        model: groqModel,
+                        temperature: 0.6,
+                        max_tokens: 2500,
+                        response_format: { type: 'json_object' }
                     }),
                     AI_TIMEOUT_MS,
                     'Groq AI'
                 );
                 responseText = completion.choices[0]?.message?.content || '';
-            } else if (aiProvider === 'gemini') {
-                const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-                const model = aiClient.getGenerativeModel({ model: geminiModel });
-                const result = await withTimeout(
-                    model.generateContent(prompt),
+            } catch (firstGroqErr) {
+                // If rate limited or 70b failed, retry with high-throughput model (30,000 TPM)
+                console.warn(`Groq ${groqModel} failed (${firstGroqErr.message}), falling back to llama-3.1-8b-instant...`);
+                const completion = await withTimeout(
+                    client.chat.completions.create({
+                        messages: [
+                            { role: 'system', content: 'You are an educational assistant that outputs strictly valid JSON.' },
+                            { role: 'user', content: prompt }
+                        ],
+                        model: 'llama-3.1-8b-instant',
+                        temperature: 0.6,
+                        max_tokens: 2500,
+                        response_format: { type: 'json_object' }
+                    }),
                     AI_TIMEOUT_MS,
-                    'Gemini AI'
+                    'Groq AI (8b)'
                 );
-                const response = await result.response;
-                responseText = response.text();
+                responseText = completion.choices[0]?.message?.content || '';
             }
-        } catch (aiErr) {
-            if (aiErr.code === 'ETIMEDOUT' || (aiErr.message && (aiErr.message.includes('timed out') || aiErr.message.includes('timeout')))) {
-                const timeoutErr = new Error('AI question generation timed out');
-                timeoutErr.code = 'ETIMEDOUT';
-                throw timeoutErr;
-            }
-            console.warn(`⚠️ AI call failed (${aiErr.message}), falling back to content-based generation`);
-            try {
-                return generateContentBasedQuestions(chunks, count, difficulty, distribution);
-            } catch (fallbackErr) {
-                const providerErr = new Error(`AI service failure: ${aiErr.message}`);
-                providerErr.code = 'EAIFAIL';
-                throw providerErr;
-            }
+        } else if (provider === 'gemini') {
+            const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+            const model = client.getGenerativeModel({ model: geminiModel });
+            const result = await withTimeout(
+                model.generateContent(prompt),
+                AI_TIMEOUT_MS,
+                'Gemini AI'
+            );
+            const response = await result.response;
+            responseText = response.text();
         }
-
-        // Clean up markdown code blocks if present
-        const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const questions = JSON.parse(jsonStr);
-
-        // VALIDATE AND FIX DIFFICULTY TAGS
-        questions.forEach((q, idx) => {
-            // Ensure difficulty field exists
-            if (!q.difficulty || !['easy', 'medium', 'hard'].includes(q.difficulty)) {
-                if (idx < easyCount) {
-                    q.difficulty = 'easy';
-                } else if (idx < easyCount + mediumCount) {
-                    q.difficulty = 'medium';
-                } else {
-                    q.difficulty = 'hard';
-                }
-            }
-
-            // Ensure difficultyScore exists
-            if (!q.difficultyScore) {
-                q.difficultyScore = q.difficulty === 'easy' ? 2 :
-                    q.difficulty === 'medium' ? 5 : 8;
-            }
-
-            // Ensure tags exist
-            if (!q.tags || !Array.isArray(q.tags)) {
-                q.tags = [q.topic || 'General'];
-            }
-
-            // Ensure topic exists
-            if (!q.topic) {
-                q.topic = q.tags[0] || 'General';
-            }
-
-            // Add adminApproved flag (AI questions require admin approval)
-            q.adminApproved = false;
-        });
-
-        // Ensure we have the correct number of unique questions
-        if (questions.length < totalCount) {
-            console.warn(`AI generated only ${questions.length} questions, expected ${totalCount}. Adding content-based questions.`);
-            const additionalQuestions = generateContentBasedQuestions(chunks, totalCount - questions.length, difficulty, distribution);
-            return [...questions, ...additionalQuestions];
-        }
-
-        console.log(`✅ Generated ${questions.length} questions using ${aiProvider.toUpperCase()}`);
-
-        const segregated = {
-            easy: questions.filter(q => q.difficulty === 'easy'),
-            medium: questions.filter(q => q.difficulty === 'medium'),
-            hard: questions.filter(q => q.difficulty === 'hard'),
-            all: questions.slice(0, totalCount)
-        };
-
-        return segregated;
-    } catch (error) {
-        if (error.code === 'ETIMEDOUT' || error.code === 'EAIFAIL') {
-            throw error;
-        }
-        console.error('Error generating questions with AI:', error.message);
-        console.warn('Falling back to content-based question generation');
+    } catch (aiErr) {
+        console.warn(`⚠️ AI generation error (${aiErr.message}), falling back to content-based generation`);
         return generateContentBasedQuestions(chunks, count, difficulty, distribution);
     }
+
+    const rawQuestions = extractQuestionsFromJson(responseText);
+
+    if (!rawQuestions || !Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+        console.warn('⚠️ Could not parse questions from AI response, falling back to content-based generation');
+        return generateContentBasedQuestions(chunks, count, difficulty, distribution);
+    }
+
+    // VALIDATE AND FIX DIFFICULTY TAGS
+    rawQuestions.forEach((q, idx) => {
+        if (!q.difficulty || !['easy', 'medium', 'hard'].includes(q.difficulty)) {
+            if (idx < easyCount) {
+                q.difficulty = 'easy';
+            } else if (idx < easyCount + mediumCount) {
+                q.difficulty = 'medium';
+            } else {
+                q.difficulty = 'hard';
+            }
+        }
+
+        if (!q.difficultyScore) {
+            q.difficultyScore = q.difficulty === 'easy' ? 2 :
+                q.difficulty === 'medium' ? 5 : 8;
+        }
+
+        if (!q.tags || !Array.isArray(q.tags)) {
+            q.tags = [q.topic || 'General'];
+        }
+
+        if (!q.topic) {
+            q.topic = q.tags[0] || 'General';
+        }
+
+        q.adminApproved = false;
+    });
+
+    if (rawQuestions.length < totalCount) {
+        console.warn(`AI generated ${rawQuestions.length} questions, expected ${totalCount}. Adding content-based questions.`);
+        const extra = generateContentBasedQuestions(chunks, totalCount - rawQuestions.length, difficulty, distribution);
+        const extraList = extra.all || (Array.isArray(extra) ? extra : []);
+        return [...rawQuestions, ...extraList].slice(0, totalCount);
+    }
+
+    console.log(`✅ Generated ${rawQuestions.length} questions using ${provider.toUpperCase()}`);
+
+    return {
+        easy: rawQuestions.filter(q => q.difficulty === 'easy'),
+        medium: rawQuestions.filter(q => q.difficulty === 'medium'),
+        hard: rawQuestions.filter(q => q.difficulty === 'hard'),
+        all: rawQuestions.slice(0, totalCount)
+    };
 };
 
 const generateContentBasedQuestions = (chunks, count, difficulty, distribution = null) => {
@@ -196,7 +238,7 @@ const generateContentBasedQuestions = (chunks, count, difficulty, distribution =
     const totalCount = distribution ? (easyCount + mediumCount + hardCount) : count;
 
     const questions = [];
-    const combinedText = chunks.map(c => c.content).join(' ');
+    const combinedText = (chunks || []).map(c => c.content || '').join(' ');
 
     // Split into sentences and clean
     const sentences = combinedText
@@ -249,7 +291,12 @@ const generateContentBasedQuestions = (chunks, count, difficulty, distribution =
         });
     }
 
-    return questions;
+    return {
+        easy: questions.filter(q => q.difficulty === 'easy'),
+        medium: questions.filter(q => q.difficulty === 'medium'),
+        hard: questions.filter(q => q.difficulty === 'hard'),
+        all: questions
+    };
 };
 
 const generateGenericQuestions = (count) => {
@@ -299,9 +346,10 @@ const generateQuiz = async (documentId, mode, config) => {
         throw new Error('No content found to generate quiz');
     }
 
+    const { provider } = getAIClient();
     console.log(`📚 Generating quiz from ${chunks.length} chunks of content`);
     console.log(`🎯 Mode: ${mode}, Difficulty: ${config.difficulty}, Questions: ${config.questionCount}`);
-    console.log(`🤖 AI Provider: ${aiProvider}`);
+    console.log(`🤖 AI Provider: ${provider}`);
 
     // 2. Generate Questions
     const distribution = config.easyCount && config.mediumCount && config.hardCount
@@ -315,7 +363,7 @@ const generateQuiz = async (documentId, mode, config) => {
         distribution
     );
 
-    const questionsArray = questionsData.all || questionsData;
+    const questionsArray = questionsData.all || (Array.isArray(questionsData) ? questionsData : []);
 
     return questionsArray.map((q, i) => ({
         questionId: `${Date.now()}_${i}_${Math.random().toString(36).substring(7)}`,
@@ -392,13 +440,7 @@ const parseCSVFromBuffer = (buffer) => {
     }
 };
 
-const parseCSVQuestions = (filePath) => {
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    return parseCSVFromBuffer(fileContent);
-};
-
 module.exports = {
     generateQuiz,
-    parseCSVQuestions,
     parseCSVFromBuffer
 };

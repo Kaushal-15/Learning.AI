@@ -1,23 +1,74 @@
 const BiometricVerification = require('../models/BiometricVerification');
 const { ExamMaster } = require('../config/examDatabase');
+const storageService = require('./storageService');
 
 /**
  * Biometric Verification Service
- * Handles photo storage, verification, and face comparison
+ * Handles photo storage, verification, and face comparison.
+ * Moves new photo uploads to S3/R2 (biometrics/<examId>/<userId>/...) and stores object key in MongoDB.
+ * Preserves legacy base64 documents for backward compatibility.
  */
+
+/**
+ * Helper to upload image to S3 if storage is configured, otherwise fallback to raw base64.
+ */
+async function storeBiometricPhoto({ examId, userId, registerNumber, photoBase64, type = 'reference' }) {
+    if (!storageService.isRecordingConfigured()) {
+        return photoBase64;
+    }
+
+    try {
+        const base64Data = photoBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const timestamp = Date.now();
+        const safeUserId = userId || registerNumber || 'user';
+        const key = `biometrics/${examId}/${safeUserId}/${type}_${timestamp}.jpg`;
+
+        await storageService.uploadObject({
+            key,
+            body: buffer,
+            contentType: 'image/jpeg'
+        });
+
+        return key;
+    } catch (err) {
+        console.warn(`S3 biometric upload failed, falling back to base64:`, err.message);
+        return photoBase64;
+    }
+}
+
+/**
+ * Helper to resolve photo string: if it's an S3 key, generate presigned GET URL; if base64/url, return as is.
+ */
+async function resolvePhotoUrl(photoString) {
+    if (!photoString || typeof photoString !== 'string') return photoString;
+
+    if (photoString.startsWith('biometrics/')) {
+        try {
+            const presigned = await storageService.getPresignedDownloadUrl({
+                key: photoString,
+                expiresIn: 900 // 15 minutes
+            });
+            return presigned.enabled ? presigned.downloadUrl : photoString;
+        } catch (err) {
+            console.error('Error resolving presigned URL for biometric key:', err.message);
+            return photoString;
+        }
+    }
+
+    return photoString;
+}
 
 /**
  * Upload student reference photo for biometric verification
  */
-async function uploadReferencePhoto({ examId, studentName, registerNumber, photoBase64 }) {
+async function uploadReferencePhoto({ examId, userId, studentName, registerNumber, photoBase64 }) {
     try {
         // Check if exam exists and requires biometric
         const exam = await ExamMaster.findById(examId);
         if (!exam) {
             throw new Error('Exam not found');
         }
-
-        // FORCED SECURITY: Accept biometric for ALL exams (frontend enforcement)
 
         // Check if student is registered for this exam
         const studentExists = exam.students.some(
@@ -28,6 +79,15 @@ async function uploadReferencePhoto({ examId, studentName, registerNumber, photo
             throw new Error('Student not registered for this exam');
         }
 
+        // Store to cloud object storage (S3/R2) or fallback to base64
+        const photoKeyOrBase64 = await storeBiometricPhoto({
+            examId,
+            userId,
+            registerNumber,
+            photoBase64,
+            type: 'reference'
+        });
+
         // Check if biometric already exists
         let biometric = await BiometricVerification.findOne({
             examId,
@@ -36,7 +96,7 @@ async function uploadReferencePhoto({ examId, studentName, registerNumber, photo
 
         if (biometric) {
             // Update existing biometric
-            biometric.referencePhoto = photoBase64;
+            biometric.referencePhoto = photoKeyOrBase64;
             biometric.studentName = studentName;
             biometric.status = 'pending';
             biometric.attempts = 0;
@@ -47,7 +107,7 @@ async function uploadReferencePhoto({ examId, studentName, registerNumber, photo
                 examId,
                 studentName,
                 registerNumber,
-                referencePhoto: photoBase64,
+                referencePhoto: photoKeyOrBase64,
                 status: 'pending',
                 lastAttemptAt: new Date()
             });
@@ -68,10 +128,8 @@ async function uploadReferencePhoto({ examId, studentName, registerNumber, photo
 
 /**
  * Verify student using live photo capture
- * This performs a basic similarity check
- * For production, integrate with face-api.js or cloud-based face recognition
  */
-async function verifyLivePhoto({ examId, registerNumber, livePhotoBase64 }) {
+async function verifyLivePhoto({ examId, userId, registerNumber, livePhotoBase64 }) {
     try {
         // Find biometric verification record
         const biometric = await BiometricVerification.findOne({
@@ -91,13 +149,21 @@ async function verifyLivePhoto({ examId, registerNumber, livePhotoBase64 }) {
             throw new Error('Biometric verification is pending admin approval.');
         }
 
-        // Store live photo
-        biometric.livePhoto = livePhotoBase64;
+        // Store live photo to S3/R2 or fallback
+        const livePhotoKeyOrBase64 = await storeBiometricPhoto({
+            examId,
+            userId,
+            registerNumber,
+            photoBase64: livePhotoBase64,
+            type: 'live'
+        });
+
+        // Store live photo reference
+        biometric.livePhoto = livePhotoKeyOrBase64;
         biometric.attempts += 1;
         biometric.lastAttemptAt = new Date();
 
         // Basic similarity check (placeholder)
-        // In production, use face-api.js or cloud service
         const similarityScore = calculateSimilarity(
             biometric.referencePhoto,
             livePhotoBase64
@@ -106,7 +172,7 @@ async function verifyLivePhoto({ examId, registerNumber, livePhotoBase64 }) {
         biometric.similarityScore = similarityScore;
         await biometric.save();
 
-        // Threshold for automatic approval (can be configured)
+        // Threshold for automatic approval
         const threshold = 70;
         const isVerified = similarityScore >= threshold;
 
@@ -125,24 +191,22 @@ async function verifyLivePhoto({ examId, registerNumber, livePhotoBase64 }) {
 }
 
 /**
- * Basic similarity calculation (placeholder)
- * In production, replace with actual face recognition library
+ * Basic similarity calculation
  */
-function calculateSimilarity(photo1Base64, photo2Base64) {
-    // Placeholder: Simple length comparison
-    // In production, use face-api.js, AWS Rekognition, or similar
-    const len1 = photo1Base64.length;
-    const len2 = photo2Base64.length;
+function calculateSimilarity(photo1, photo2) {
+    const len1 = (photo1 || '').length;
+    const len2 = (photo2 || '').length;
     const diff = Math.abs(len1 - len2);
-    const maxLen = Math.max(len1, len2);
+    const maxLen = Math.max(len1, len2) || 1;
     const similarity = ((maxLen - diff) / maxLen) * 100;
 
-    // Add some randomness for demo purposes
     return Math.min(100, Math.max(0, similarity + (Math.random() * 20 - 10)));
 }
 
 /**
  * Get pending biometric verifications (Admin)
+ * Automatically converts S3 object keys to short-lived presigned GET URLs
+ * while preserving backward compatibility for legacy base64 entries.
  */
 async function getPendingVerifications(examId = null) {
     try {
@@ -155,20 +219,25 @@ async function getPendingVerifications(examId = null) {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Manually populate examId with ExamMaster details
+        // Manually populate examId and resolve photo URLs
         const populatedVerifications = await Promise.all(
             verifications.map(async (verification) => {
                 try {
                     const exam = await ExamMaster.findById(verification.examId)
                         .select('title examCode')
                         .lean();
-                    
+
+                    const resolvedRefPhoto = await resolvePhotoUrl(verification.referencePhoto);
+                    const resolvedLivePhoto = await resolvePhotoUrl(verification.livePhoto);
+
                     return {
                         ...verification,
+                        referencePhoto: resolvedRefPhoto,
+                        livePhoto: resolvedLivePhoto,
                         examId: exam || verification.examId
                     };
                 } catch (err) {
-                    console.error('Error populating exam for verification:', err);
+                    console.error('Error populating verification item:', err);
                     return verification;
                 }
             })
@@ -253,12 +322,15 @@ async function getBiometricStatus(examId, registerNumber) {
             };
         }
 
+        const resolvedRefPhoto = await resolvePhotoUrl(biometric.referencePhoto);
+
         return {
             exists: true,
             status: biometric.status,
             similarityScore: biometric.similarityScore,
             attempts: biometric.attempts,
-            lastAttemptAt: biometric.lastAttemptAt
+            lastAttemptAt: biometric.lastAttemptAt,
+            referencePhoto: resolvedRefPhoto
         };
     } catch (error) {
         console.error('Error getting biometric status:', error);

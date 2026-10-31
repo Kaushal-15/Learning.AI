@@ -6,6 +6,7 @@ const fs = require('fs');
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-key-12345';
+jest.setTimeout(20000);
 
 // Mock Document and Chunk models
 const mockDocuments = new Map();

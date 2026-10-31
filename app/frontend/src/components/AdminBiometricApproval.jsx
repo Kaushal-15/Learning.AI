@@ -24,7 +24,7 @@ export default function AdminBiometricApproval() {
     const getImageSrc = (base64String) => {
         if (!base64String) return '';
         // If already has data URL prefix, return as is
-        if (base64String.startsWith('data:')) return base64String;
+        if (base64String.startsWith('http://') || base64String.startsWith('https://') || base64String.startsWith('data:')) return base64String;
         // Otherwise, add the prefix
         return `data:image/jpeg;base64,${base64String}`;
     };

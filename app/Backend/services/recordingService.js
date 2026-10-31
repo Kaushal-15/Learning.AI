@@ -1,58 +1,58 @@
 const ExamRecording = require('../models/ExamRecording');
-const fs = require('fs').promises;
-const path = require('path');
+const storageService = require('./storageService');
 
 /**
  * Recording Service
- * Handles video recording storage and management
+ * Handles video recording management and cloud storage references.
+ * Completely eliminates local disk dependencies (no fs.mkdir / fs.appendFile / fs.stat / fs.unlink).
  */
-
-// Base directory for recordings
-const RECORDINGS_DIR = path.join(__dirname, '../uploads/recordings');
 
 /**
- * Ensure recordings directory exists
+ * Check if recording is enabled globally
  */
-async function ensureRecordingsDir() {
-    try {
-        await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-    } catch (error) {
-        console.error('Error creating recordings directory:', error);
-    }
+function isRecordingEnabled() {
+    return process.env.RECORDING_ENABLED !== 'false';
 }
 
 /**
  * Start a new recording session
  */
 async function startRecording({ examId, sessionId, studentName, registerNumber, triggeredBy, adminId }) {
+    if (!isRecordingEnabled()) {
+        return {
+            success: false,
+            enabled: false,
+            message: 'Cloud recording is disabled via RECORDING_ENABLED=false.'
+        };
+    }
+
     try {
-        await ensureRecordingsDir();
+        const keyPrefix = `recordings/${examId}/${adminId || 'session'}/${sessionId}/`;
+        const fileName = `${sessionId}.webm`;
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const fileName = `${examId}_${registerNumber}_${timestamp}.webm`;
-        const filePath = path.join(RECORDINGS_DIR, fileName);
-
-        // Create recording record
         const recording = new ExamRecording({
             examId,
             sessionId,
             studentName,
             registerNumber,
-            filePath,
+            filePath: keyPrefix,
             fileName,
             recordingStartTime: new Date(),
             triggeredBy: triggeredBy || 'admin',
             triggeredByAdmin: adminId,
-            status: 'recording'
+            status: 'recording',
+            chunksReceived: 0,
+            fileSize: 0
         });
 
         await recording.save();
 
         return {
             success: true,
+            enabled: true,
             recordingId: recording._id,
-            fileName
+            fileName,
+            keyPrefix
         };
     } catch (error) {
         console.error('Error starting recording:', error);
@@ -61,9 +61,17 @@ async function startRecording({ examId, sessionId, studentName, registerNumber, 
 }
 
 /**
- * Upload video chunk
+ * Upload video chunk metadata / tracking (direct-to-cloud replaces local disk writes)
  */
 async function uploadChunk({ recordingId, chunkData, chunkNumber }) {
+    if (!isRecordingEnabled()) {
+        return {
+            success: false,
+            enabled: false,
+            message: 'Recording disabled'
+        };
+    }
+
     try {
         const recording = await ExamRecording.findById(recordingId);
 
@@ -75,40 +83,24 @@ async function uploadChunk({ recordingId, chunkData, chunkNumber }) {
             throw new Error('Recording is not active');
         }
 
-        // Ensure directory exists
-        await ensureRecordingsDir();
-
-        // Convert base64 to buffer if needed
-        let buffer;
-        if (typeof chunkData === 'string') {
-            // Remove data URL prefix if present
-            const base64Data = chunkData.replace(/^data:video\/\w+;base64,/, '');
-            buffer = Buffer.from(base64Data, 'base64');
-        } else {
-            buffer = chunkData;
-        }
-
-        // Append chunk to file in local/traditional environments (skipped safely on serverless)
-        if (!process.env.VERCEL) {
-            try {
-                await fs.appendFile(recording.filePath, buffer);
-            } catch (fsErr) {
-                console.warn('Local file append skipped in serverless environment:', fsErr.message);
-            }
-        }
-
-        // Update chunk count
+        // Increment chunk count
         recording.chunksReceived = (recording.chunksReceived || 0) + 1;
+        if (chunkData) {
+            const chunkSize = Buffer.isBuffer(chunkData) ? chunkData.length :
+                             (typeof chunkData === 'string' ? Buffer.byteLength(chunkData, 'base64') : 0);
+            recording.fileSize = (recording.fileSize || 0) + chunkSize;
+        }
+
         await recording.save();
 
         return {
             success: true,
-            chunksReceived: recording.chunksReceived
+            chunksReceived: recording.chunksReceived,
+            fileSize: recording.fileSize
         };
     } catch (error) {
-        console.error('Error uploading chunk:', error);
+        console.error('Error updating chunk metadata:', error);
 
-        // Mark recording as failed
         try {
             await ExamRecording.findByIdAndUpdate(recordingId, {
                 status: 'failed',
@@ -133,27 +125,19 @@ async function stopRecording(recordingId) {
             throw new Error('Recording not found');
         }
 
-        // Get file stats
-        try {
-            const stats = await fs.stat(recording.filePath);
-            recording.fileSize = stats.size;
-        } catch (error) {
-            console.error('Error getting file stats:', error);
-        }
-
         recording.recordingEndTime = new Date();
         recording.status = 'completed';
 
-        // Calculate duration in seconds
+        // Calculate duration in seconds based on timestamps (no local fs stat)
         const duration = (recording.recordingEndTime - recording.recordingStartTime) / 1000;
-        recording.duration = Math.round(duration);
+        recording.duration = Math.max(0, Math.round(duration));
 
         await recording.save();
 
         return {
             success: true,
             duration: recording.duration,
-            fileSize: recording.fileSize
+            fileSize: recording.fileSize || 0
         };
     } catch (error) {
         console.error('Error stopping recording:', error);
@@ -194,7 +178,7 @@ async function getRecording(recordingId) {
 }
 
 /**
- * Delete recording
+ * Delete recording (removes DB record, no local fs.unlink)
  */
 async function deleteRecording(recordingId) {
     try {
@@ -204,14 +188,7 @@ async function deleteRecording(recordingId) {
             throw new Error('Recording not found');
         }
 
-        // Delete file
-        try {
-            await fs.unlink(recording.filePath);
-        } catch (error) {
-            console.error('Error deleting recording file:', error);
-        }
-
-        // Delete record
+        // Delete record from database
         await ExamRecording.findByIdAndDelete(recordingId);
 
         return {
@@ -242,6 +219,7 @@ async function getActiveRecording(sessionId) {
 }
 
 module.exports = {
+    isRecordingEnabled,
     startRecording,
     uploadChunk,
     stopRecording,

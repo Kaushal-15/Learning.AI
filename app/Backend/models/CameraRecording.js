@@ -31,7 +31,9 @@ const cameraRecordingSchema = new mongoose.Schema({
     videoChunks: [{
         chunkNumber: Number,
         uploadedAt: Date,
-        size: Number
+        size: Number,
+        key: String,
+        status: String
     }],
     totalSize: {
         type: Number,
@@ -40,5 +42,8 @@ const cameraRecordingSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Compound index for session telemetry
+cameraRecordingSchema.index({ sessionId: 1, status: 1 });
 
 module.exports = mongoose.model('CameraRecording', cameraRecordingSchema);

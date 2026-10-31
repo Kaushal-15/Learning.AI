@@ -1,11 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
+const connectDB = require('../config/database');
 const biometricService = require('../services/biometricService');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 
 // Apply auth middleware to all routes
 router.use(authMiddleware);
+
+// Ensure DB connection is active before queries
+router.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+        next();
+    } catch (err) {
+        return res.status(503).json({ success: false, message: 'Database unavailable' });
+    }
+});
 
 /**
  * Upload reference photo for biometric verification
@@ -22,8 +37,11 @@ router.post('/upload', async (req, res) => {
             });
         }
 
+        const userId = req.user.id || req.user._id;
+
         const result = await biometricService.uploadReferencePhoto({
             examId,
+            userId,
             studentName,
             registerNumber,
             photoBase64
@@ -58,8 +76,11 @@ router.post('/verify', async (req, res) => {
             });
         }
 
+        const userId = req.user.id || req.user._id;
+
         const result = await biometricService.verifyLivePhoto({
             examId,
+            userId,
             registerNumber,
             livePhotoBase64
         });
@@ -131,7 +152,7 @@ router.get('/pending/:examId?', adminMiddleware, async (req, res) => {
 router.put('/:biometricId/approve', adminMiddleware, async (req, res) => {
     try {
         const { biometricId } = req.params;
-        const adminId = req.user.id;
+        const adminId = req.user.id || req.user._id;
 
         const result = await biometricService.approveBiometric(biometricId, adminId);
 
@@ -156,7 +177,7 @@ router.put('/:biometricId/reject', adminMiddleware, async (req, res) => {
     try {
         const { biometricId } = req.params;
         const { reason } = req.body;
-        const adminId = req.user.id;
+        const adminId = req.user.id || req.user._id;
 
         if (!reason) {
             return res.status(400).json({

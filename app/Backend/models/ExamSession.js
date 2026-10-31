@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const examSessionSchema = new mongoose.Schema({
     userId: { type: String, required: true },
+    studentId: { type: String }, // alias/support for candidate ID
     examId: { type: mongoose.Schema.Types.ObjectId, ref: 'ExamMaster', required: true },
     studentName: { type: String },
     registerNumber: { type: String },
@@ -57,5 +58,9 @@ const examSessionSchema = new mongoose.Schema({
     cameraPermissionGranted: { type: Boolean, default: false },
     isBeingRecorded: { type: Boolean, default: false }
 }, { timestamps: true });
+
+// Compound indexes
+examSessionSchema.index({ examId: 1, userId: 1, status: 1 });
+examSessionSchema.index({ examId: 1, studentId: 1, status: 1 });
 
 module.exports = examSessionSchema;

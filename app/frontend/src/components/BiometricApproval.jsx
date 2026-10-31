@@ -16,7 +16,7 @@ export default function BiometricApproval({ examId = null }) {
     // Helper function to ensure base64 data has proper prefix
     const ensureBase64Prefix = (base64Data) => {
         if (!base64Data) return '';
-        if (base64Data.startsWith('data:image')) return base64Data;
+        if (base64Data.startsWith('http://') || base64Data.startsWith('https://') || base64Data.startsWith('data:image')) return base64Data;
         return `data:image/jpeg;base64,${base64Data}`;
     };
 

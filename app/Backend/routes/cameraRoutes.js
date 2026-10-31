@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
+const connectDB = require('../config/database');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const CameraRecording = require('../models/CameraRecording');
 const ExamRecording = require('../models/ExamRecording');
-const ExamSession = require('../models/ExamSession');
+const { ExamSession } = require('../config/examDatabase');
 const storageService = require('../services/storageService');
 
 // All camera routes require authentication
@@ -44,6 +46,11 @@ router.post('/upload-url', async (req, res) => {
         }
 
         // Verify that examId and sessionId exist and belong to the authenticated user
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+
         const session = await ExamSession.findById(sessionId);
         if (!session) {
             return res.status(404).json({
@@ -141,6 +148,147 @@ router.post('/upload-url', async (req, res) => {
 });
 
 /**
+ * POST /api/camera/chunk-metadata
+ * Records chunk metadata in MongoDB after direct-to-cloud upload.
+ * Verifies session ownership and validates/enforces the key pattern:
+ * recordings/<examId>/<userId>/<sessionId>/<chunkIndex>.webm
+ */
+router.post('/chunk-metadata', async (req, res) => {
+    try {
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+
+        const { examId, sessionId, chunkIndex, size, status, key } = req.body;
+
+        if (!examId || !sessionId || chunkIndex === undefined || chunkIndex === null) {
+            return res.status(400).json({
+                success: false,
+                message: 'examId, sessionId, and chunkIndex are required'
+            });
+        }
+
+        const chunk = Number(chunkIndex);
+        if (!Number.isInteger(chunk) || chunk < 0 || chunk > 1000000) {
+            return res.status(400).json({
+                success: false,
+                message: 'chunkIndex must be an integer between 0 and 1000000'
+            });
+        }
+
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+
+        const session = await ExamSession.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Exam session not found'
+            });
+        }
+
+        if (String(session.examId) !== String(examId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Session does not belong to the specified exam'
+            });
+        }
+
+        const currentUserId = req.user.id || req.user._id;
+        const isOwner = String(session.userId) === String(currentUserId) ||
+                        String(session.userId) === String(req.user.learnerId) ||
+                        req.user.role === 'admin';
+
+        if (!isOwner) {
+            return res.status(403).json({
+                success: false,
+                message: 'Forbidden: You do not own this exam session.'
+            });
+        }
+
+        // Canonical expected key - never trust client-supplied keys without strict verification
+        const resolvedUserId = session.userId || currentUserId;
+        const expectedKey = `recordings/${examId}/${resolvedUserId}/${sessionId}/${chunk}.webm`;
+
+        if (key && key !== expectedKey) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid key format. Expected: ${expectedKey}`
+            });
+        }
+
+        const chunkSize = Number(size) || 0;
+        const chunkStatus = status || 'uploaded';
+
+        // Update CameraRecording videoChunks array
+        const cameraRecording = await CameraRecording.findOneAndUpdate(
+            { sessionId, examId },
+            {
+                $setOnInsert: {
+                    startedBy: currentUserId,
+                    status: 'recording',
+                    startedAt: new Date()
+                },
+                $push: {
+                    videoChunks: {
+                        chunkNumber: chunk,
+                        uploadedAt: new Date(),
+                        size: chunkSize,
+                        status: chunkStatus,
+                        key: expectedKey
+                    }
+                },
+                $inc: { totalSize: chunkSize }
+            },
+            { upsert: true, new: true, runValidators: false }
+        );
+
+        // Optionally update ExamRecording tracking
+        try {
+            await ExamRecording.findOneAndUpdate(
+                { sessionId, examId },
+                {
+                    $inc: { chunksReceived: 1, fileSize: chunkSize },
+                    $setOnInsert: {
+                        studentName: session.studentName || req.user.name || 'Student',
+                        registerNumber: session.registerNumber || req.user.learnerId || 'N/A',
+                        filePath: `recordings/${examId}/${resolvedUserId}/${sessionId}/`,
+                        fileName: `${sessionId}.webm`,
+                        recordingStartTime: session.startTime || new Date(),
+                        triggeredBy: 'auto',
+                        status: 'recording'
+                    }
+                },
+                { upsert: true, new: true, runValidators: false }
+            );
+        } catch (recErr) {
+            console.warn('ExamRecording chunk metadata warning (non-fatal):', recErr.message);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Chunk metadata recorded successfully',
+            data: {
+                sessionId,
+                chunkIndex: chunk,
+                key: expectedKey,
+                size: chunkSize,
+                status: chunkStatus
+            }
+        });
+    } catch (error) {
+        console.error('Error recording chunk metadata:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+/**
  * POST /api/camera/finalize
  * Records chunk counts and marks recording completed in CameraRecording & ExamRecording
  */
@@ -153,6 +301,11 @@ router.post('/finalize', async (req, res) => {
                 success: false,
                 message: 'examId and sessionId are required'
             });
+        }
+
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
         }
 
         const session = await ExamSession.findById(sessionId);
@@ -247,6 +400,16 @@ router.get('/review/:sessionId', adminMiddleware, async (req, res) => {
         let examId = req.query.examId;
         let userId = req.query.userId;
 
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
+
         const session = await ExamSession.findById(sessionId);
         if (session) {
             if (!examId) examId = session.examId;
@@ -261,9 +424,17 @@ router.get('/review/:sessionId', adminMiddleware, async (req, res) => {
         }
 
         const result = await storageService.listSessionChunks({ examId, userId, sessionId });
+        const chunks = (result.chunks || []).map((c, i) => ({
+            ...c,
+            url: c.downloadUrl,
+            chunkIndex: i
+        }));
+
         res.json({
             success: true,
-            ...result
+            ...result,
+            chunks,
+            presignedUrls: chunks
         });
     } catch (error) {
         console.error('Error listing session chunks:', error);
@@ -316,6 +487,10 @@ router.get('/playback', adminMiddleware, async (req, res) => {
 // Check active recording status
 router.get('/active-recording/:sessionId', async (req, res) => {
     try {
+        await connectDB();
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ success: false, message: 'Database connection not ready' });
+        }
         const { sessionId } = req.params;
         
         const recording = await CameraRecording.findOne({

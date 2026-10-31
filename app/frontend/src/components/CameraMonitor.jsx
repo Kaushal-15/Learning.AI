@@ -10,6 +10,10 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
     const videoRef = useRef(null);
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
+    const queueRef = useRef([]);
+    const isProcessingRef = useRef(false);
+    const MAX_QUEUE_SIZE = 30;
+    const MAX_RETRIES = 3;
 
     const [stream, setStream] = useState(null);
     const [cameraActive, setCameraActive] = useState(false);
@@ -130,7 +134,94 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
         }
     };
 
-    // Upload video chunks directly to S3/R2 presigned URL
+    // Process chunk upload queue with exponential backoff and metadata reporting
+    const processQueue = async () => {
+        if (isProcessingRef.current || queueRef.current.length === 0) return;
+        isProcessingRef.current = true;
+
+        while (queueRef.current.length > 0) {
+            const item = queueRef.current[0];
+            let uploadSuccess = false;
+
+            try {
+                // 1. Request presigned PUT URL
+                const urlRes = await fetch(`${API_BASE}/camera/upload-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        examId,
+                        sessionId,
+                        chunkIndex: item.chunkIndex,
+                        contentType: 'video/webm'
+                    })
+                });
+
+                if (!urlRes.ok) {
+                    throw new Error(`Upload-url failed with status ${urlRes.status}`);
+                }
+
+                const urlData = await urlRes.json();
+
+                // If storage is disabled or not configured, stop queue gracefully without blocking exam
+                if (!urlData.success || !urlData.enabled || !urlData.uploadUrl) {
+                    setStorageUnavailable(true);
+                    queueRef.current = [];
+                    break;
+                }
+
+                setStorageUnavailable(false);
+
+                // 2. Direct browser-to-bucket upload via presigned PUT
+                const s3Res = await fetch(urlData.uploadUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'video/webm' },
+                    body: item.blob
+                });
+
+                if (!s3Res.ok) {
+                    throw new Error(`S3 PUT failed with status ${s3Res.status}`);
+                }
+
+                // 3. Send chunk metadata to backend after successful cloud upload
+                await fetch(`${API_BASE}/camera/chunk-metadata`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        examId,
+                        sessionId,
+                        chunkIndex: item.chunkIndex,
+                        size: item.blob.size,
+                        status: 'uploaded',
+                        key: urlData.key
+                    })
+                });
+
+                uploadSuccess = true;
+            } catch (err) {
+                console.warn(`Video chunk #${item.chunkIndex} upload attempt ${item.retries + 1} notice:`, err.message);
+            }
+
+            if (uploadSuccess) {
+                queueRef.current.shift();
+            } else {
+                item.retries += 1;
+                if (item.retries >= MAX_RETRIES) {
+                    console.warn(`Video chunk #${item.chunkIndex} exceeded ${MAX_RETRIES} retries. Continuing exam.`);
+                    queueRef.current.shift();
+                } else {
+                    // Exponential backoff: 1s, 2s, 4s... capped with jitter
+                    const backoffMs = Math.min(1000 * Math.pow(2, item.retries), 8000) + Math.random() * 500;
+                    await new Promise(r => setTimeout(r, backoffMs));
+                }
+            }
+        }
+
+        isProcessingRef.current = false;
+    };
+
+    // Queue video chunks for streaming
     const uploadChunks = async () => {
         if (chunksRef.current.length === 0) return;
 
@@ -141,43 +232,20 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
             const blob = new Blob(chunksToUpload, { type: 'video/webm' });
             const currentChunkIndex = chunkCounterRef.current++;
 
-            // 1. Request presigned PUT URL
-            const urlRes = await fetch(`${API_BASE}/camera/upload-url`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    examId,
-                    sessionId,
-                    chunkIndex: currentChunkIndex,
-                    contentType: 'video/webm'
-                })
-            });
-
-            if (!urlRes.ok) {
-                setStorageUnavailable(true);
-                return;
+            if (queueRef.current.length >= MAX_QUEUE_SIZE) {
+                console.warn('Camera upload queue full; dropping oldest chunk to protect exam responsiveness.');
+                queueRef.current.shift();
             }
 
-            const urlData = await urlRes.json();
-
-            // 2. If storage is disabled or unconfigured, skip gracefully without breaking exam
-            if (!urlData.success || !urlData.enabled || !urlData.uploadUrl) {
-                setStorageUnavailable(true);
-                return;
-            }
-
-            setStorageUnavailable(false);
-
-            // 3. Direct browser-to-bucket upload via presigned PUT
-            await fetch(urlData.uploadUrl, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'video/webm' },
-                body: blob
+            queueRef.current.push({
+                blob,
+                chunkIndex: currentChunkIndex,
+                retries: 0
             });
+
+            processQueue();
         } catch (err) {
-            console.warn('Direct cloud video chunk upload notice:', err.message);
-            setStorageUnavailable(true);
+            console.warn('Chunk queuing notice:', err.message);
         }
     };
 

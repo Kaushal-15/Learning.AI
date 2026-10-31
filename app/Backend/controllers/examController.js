@@ -283,11 +283,9 @@ const validateFileContent = (buffer, mimetype, originalname) => {
             return { valid: false, message: 'Invalid file type or corrupted DOCX file.' };
         }
     } else if (isTxt || isCsv) {
-        try {
-            const decoder = new TextDecoder('utf-8', { fatal: true });
-            decoder.decode(buffer);
-        } catch {
-            return { valid: false, message: 'Invalid file content: file must be valid UTF-8 encoded text.' };
+        const sample = buffer.slice(0, Math.min(buffer.length, 1024));
+        if (sample.includes(0x00)) {
+            return { valid: false, message: 'Invalid file content: binary files are not allowed as text or CSV.' };
         }
     }
 
