@@ -334,8 +334,22 @@ export default function AdminExamCreate() {
             const contentType = res.headers.get('content-type') || '';
             const isJson = contentType.includes('application/json');
 
-            if (res.status === 413 || res.status === 504 || !isJson) {
-                setUploadError("File too large or the server timed out. Try a smaller file or fewer questions.");
+            if (res.status === 413) {
+                setUploadError("File is larger than 4 MB. Please upload a file smaller than 4 MB.");
+                return;
+            }
+
+            if (res.status === 504) {
+                setUploadError("Question generation timed out. Try fewer questions or a smaller file.");
+                return;
+            }
+
+            if (!isJson) {
+                if (res.status === 502) {
+                    setUploadError("AI question generation service is currently unavailable (502 Bad Gateway). Please try again later or upload a CSV.");
+                } else {
+                    setUploadError(`Server error (${res.status || 'unknown'}). Please try again later.`);
+                }
                 return;
             }
 
@@ -357,7 +371,7 @@ export default function AdminExamCreate() {
             }
         } catch (error) {
             console.error("Upload error:", error);
-            setUploadError("File too large or the server timed out. Try a smaller file or fewer questions.");
+            setUploadError("Network connection error. Please check your connection and try again.");
         } finally {
             setUploading(false);
             e.target.value = '';
