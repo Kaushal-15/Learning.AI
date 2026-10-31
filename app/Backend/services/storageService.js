@@ -6,7 +6,7 @@
  * Eliminates local disk dependency and serverless memory bottlenecks.
  */
 
-const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 let s3ClientInstance = null;
@@ -86,6 +86,8 @@ function getS3Client() {
       },
       // Force path style is recommended for Cloudflare R2 and MinIO
       forcePathStyle: config.isCustomEndpoint,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
   }
 
@@ -142,18 +144,32 @@ async function getPresignedUploadUrl({ examId, userId, sessionId, chunkIndex, co
 }
 
 /**
- * Generate a short-lived presigned GET URL for reviewing/downloading recorded chunks.
+ * Generate a short-lived presigned GET URL for reviewing/downloading recorded chunks or documents.
+ * Supports both getPresignedDownloadUrl({ key, expiresIn }) and getPresignedDownloadUrl(key, expiresIn).
  * Never returns permanent or public URLs.
  */
-async function getPresignedDownloadUrl({ key, expiresIn = 900 }) {
+async function getPresignedDownloadUrl(keyOrParams, maybeExpiresIn = 900) {
   if (!isRecordingConfigured()) {
     return {
       enabled: false,
-      message: 'Cloud recording storage is disabled or not configured in environment variables.'
+      message: 'Cloud storage is disabled or not configured in environment variables.'
     };
   }
 
   try {
+    let key;
+    let expiresIn = 900;
+
+    if (typeof keyOrParams === 'object' && keyOrParams !== null) {
+      key = keyOrParams.key;
+      expiresIn = keyOrParams.expiresIn !== undefined ? keyOrParams.expiresIn : 900;
+    } else {
+      key = keyOrParams;
+      if (maybeExpiresIn !== undefined) {
+        expiresIn = maybeExpiresIn;
+      }
+    }
+
     const s3 = getS3Client();
     const { bucket } = getStorageConfig();
 
@@ -177,6 +193,88 @@ async function getPresignedDownloadUrl({ key, expiresIn = 900 }) {
       enabled: false,
       message: `Failed to generate download URL: ${err.message}`
     };
+  }
+}
+
+/**
+ * Upload an object directly to cloud storage.
+ * @param {Object} params
+ * @param {string} params.key
+ * @param {Buffer|Uint8Array|string} params.body
+ * @param {string} [params.contentType]
+ */
+async function uploadObject({ key, body, contentType = 'application/octet-stream' }) {
+  if (!isRecordingConfigured()) {
+    return {
+      enabled: false,
+      message: 'Cloud storage is disabled or not configured in environment variables.'
+    };
+  }
+
+  try {
+    const s3 = getS3Client();
+    const { bucket } = getStorageConfig();
+
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    });
+
+    await s3.send(command);
+
+    return {
+      success: true,
+      enabled: true,
+      key,
+      bucket
+    };
+  } catch (err) {
+    console.error('Storage service uploadObject failed:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Delete an object from cloud storage.
+ * @param {string} key
+ */
+async function deleteObject(key) {
+  if (!isRecordingConfigured()) {
+    return {
+      enabled: false,
+      message: 'Cloud storage is disabled or not configured in environment variables.'
+    };
+  }
+
+  try {
+    const s3 = getS3Client();
+    const { bucket } = getStorageConfig();
+
+    const command = new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    });
+
+    await s3.send(command);
+
+    return {
+      success: true,
+      enabled: true,
+      key
+    };
+  } catch (err) {
+    if (err.name === 'NoSuchKey' || err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+      return {
+        success: true,
+        enabled: true,
+        key,
+        notFound: true
+      };
+    }
+    console.error('Storage service deleteObject failed:', err.message);
+    throw err;
   }
 }
 
@@ -263,4 +361,6 @@ module.exports = {
   getPresignedUploadUrl,
   getPresignedDownloadUrl,
   listSessionChunks,
+  uploadObject,
+  deleteObject,
 };

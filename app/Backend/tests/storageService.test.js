@@ -93,5 +93,50 @@ describe('Storage Service Environment & S3 Configuration', () => {
     expect(config.isCustomEndpoint).toBe(true);
     expect(config.region).toBe('auto');
   });
+
+  test('uploadObject and deleteObject return enabled: false when storage not configured', async () => {
+    delete process.env.STORAGE_BUCKET;
+    delete process.env.AWS_BUCKET_NAME;
+
+    const uploadRes = await storageService.uploadObject({ key: 'test.txt', body: Buffer.from('hello') });
+    expect(uploadRes.enabled).toBe(false);
+
+    const deleteRes = await storageService.deleteObject('test.txt');
+    expect(deleteRes.enabled).toBe(false);
+
+    const downloadRes = await storageService.getPresignedDownloadUrl('test.txt', 300);
+    expect(downloadRes.enabled).toBe(false);
+  });
+
+  test('uploadObject and deleteObject execute commands when configured', async () => {
+    process.env.STORAGE_ACCESS_KEY_ID = 'test-key';
+    process.env.STORAGE_SECRET_ACCESS_KEY = 'test-secret';
+    process.env.STORAGE_BUCKET = 'test-bucket';
+
+    const client = storageService.getS3Client();
+    expect(client).toBeDefined();
+
+    // Mock send method on client
+    jest.spyOn(client, 'send').mockResolvedValue({});
+
+    const uploadRes = await storageService.uploadObject({
+      key: 'documents/user123/doc1/file.pdf',
+      body: Buffer.from('%PDF-1.4 test'),
+      contentType: 'application/pdf'
+    });
+    expect(uploadRes.success).toBe(true);
+    expect(uploadRes.key).toBe('documents/user123/doc1/file.pdf');
+
+    const deleteRes = await storageService.deleteObject('documents/user123/doc1/file.pdf');
+    expect(deleteRes.success).toBe(true);
+
+    // Test deleteObject handles not found gracefully
+    const notFoundError = new Error('NoSuchKey');
+    notFoundError.name = 'NoSuchKey';
+    jest.spyOn(client, 'send').mockRejectedValueOnce(notFoundError);
+    const deleteNotFoundRes = await storageService.deleteObject('documents/user123/doc1/missing.pdf');
+    expect(deleteNotFoundRes.success).toBe(true);
+    expect(deleteNotFoundRes.notFound).toBe(true);
+  });
 });
 
