@@ -275,6 +275,21 @@ export default function AdminExamCreate() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const downloadCsvTemplate = () => {
+        const headers = 'question,optionA,optionB,optionC,optionD,correctAnswer,difficulty';
+        const sampleRow = '"What is the primary function of an operating system?","Resource management","Word processing","Web browsing","Compiling code","Resource management","easy"';
+        const csvContent = `${headers}\n${sampleRow}\n`;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'questions_template.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -288,9 +303,9 @@ export default function AdminExamCreate() {
             return;
         }
 
-        const maxSize = 10 * 1024 * 1024;
+        const maxSize = 4 * 1024 * 1024; // 4 MB limit
         if (file.size > maxSize) {
-            setUploadError('File too large. Please upload a file smaller than 10MB.');
+            setUploadError('File is larger than 4 MB. Please upload a file smaller than 4 MB.');
             return;
         }
 
@@ -298,21 +313,35 @@ export default function AdminExamCreate() {
         const uploadData = new FormData();
         uploadData.append('file', file);
 
-        // Pass configuration for AI generation if applicable
-        if (formData.questionSource === 'ai') {
+        if (formData.targetQuestionCount) {
             uploadData.append('questionCount', formData.targetQuestionCount);
         }
 
         try {
+            const token = document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const res = await fetch(`${API_BASE}/exams/admin/upload-questions`, {
                 method: 'POST',
+                headers,
                 body: uploadData,
                 credentials: 'include'
             });
 
+            const contentType = res.headers.get('content-type') || '';
+            const isJson = contentType.includes('application/json');
+
+            if (res.status === 413 || res.status === 504 || !isJson) {
+                setUploadError("File too large or the server timed out. Try a smaller file or fewer questions.");
+                return;
+            }
+
             const data = await res.json();
 
-            if (data.success) {
+            if (res.ok && data.success) {
                 setExtractedQuestions(data.data);
                 setSelectedQuestions(data.data.map((_, idx) => idx)); // Auto-select all
                 setFormData(prev => ({
@@ -328,7 +357,7 @@ export default function AdminExamCreate() {
             }
         } catch (error) {
             console.error("Upload error:", error);
-            setUploadError('Failed to upload file. Please try again.');
+            setUploadError("File too large or the server timed out. Try a smaller file or fewer questions.");
         } finally {
             setUploading(false);
             e.target.value = '';
@@ -871,7 +900,7 @@ export default function AdminExamCreate() {
                                             <h4>{uploading ? "Processing Document..." : "Upload Study Material"}</h4>
                                             <p>Upload a PDF, TXT, or DOCX file for AI analysis</p>
                                             <p className="upload-info">
-                                                Supported formats: PDF, TXT, DOCX • Max size: 10MB
+                                                Supported formats: PDF, TXT, DOCX • Max size: 4 MB
                                             </p>
                                             <input
                                                 type="file"
@@ -891,9 +920,28 @@ export default function AdminExamCreate() {
                                 {formData.questionSource === 'csv' && (
                                     <div className="csv-config-section">
                                         <div className="info-box">
-                                            <p><strong>CSV Format:</strong> Your CSV must have these columns:</p>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p><strong>CSV Format:</strong> Your CSV must have these columns:</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={downloadCsvTemplate}
+                                                    className="download-template-btn"
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '600',
+                                                        color: '#6366f1',
+                                                        background: 'rgba(99, 102, 241, 0.12)',
+                                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    📥 Download CSV template
+                                                </button>
+                                            </div>
                                             <code>question, optionA, optionB, optionC, optionD, correctAnswer, difficulty</code>
-                                            <p className="sub-text">Difficulty values: easy, medium, hard</p>
+                                            <p className="sub-text">Difficulty values: easy, medium, hard (One row per question)</p>
                                         </div>
 
                                         <div className={`upload-zone ${uploading ? 'uploading' : ''}`}>
@@ -903,7 +951,7 @@ export default function AdminExamCreate() {
                                             <h4>{uploading ? "Parsing CSV..." : "Upload Question CSV"}</h4>
                                             <p>Upload a CSV file with your questions</p>
                                             <p className="upload-info">
-                                                Supported format: CSV • Max size: 10MB
+                                                Supported format: CSV • Max size: 4 MB
                                             </p>
                                             <input
                                                 type="file"
