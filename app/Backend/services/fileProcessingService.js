@@ -135,7 +135,8 @@ const processDocument = async (documentId, buffer = null) => {
             throw new Error('No file buffer or path available for processing');
         }
 
-        const usableText = (text || '').trim();
+        // Remove pdf-parse page markers e.g. "-- 1 of 1 --"
+        const usableText = (text || '').replace(/--\s*\d+\s+of\s+\d+\s*--/gi, '').trim();
         if (!usableText) {
             document.status = 'failed';
             document.failureReason = 'We could not read any text from this file. If it is a scanned PDF, upload a text-based PDF or a DOCX.';
