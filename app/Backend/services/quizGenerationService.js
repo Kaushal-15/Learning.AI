@@ -98,7 +98,8 @@ Return ONLY the JSON array, no other text or markdown.`;
                 );
                 responseText = completion.choices[0]?.message?.content || '';
             } else if (aiProvider === 'gemini') {
-                const model = aiClient.getGenerativeModel({ model: "gemini-pro" });
+                const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+                const model = aiClient.getGenerativeModel({ model: geminiModel });
                 const result = await withTimeout(
                     model.generateContent(prompt),
                     AI_TIMEOUT_MS,
@@ -113,13 +114,14 @@ Return ONLY the JSON array, no other text or markdown.`;
                 timeoutErr.code = 'ETIMEDOUT';
                 throw timeoutErr;
             }
-            if (aiProvider !== 'none') {
+            console.warn(`⚠️ AI call failed (${aiErr.message}), falling back to content-based generation`);
+            try {
+                return generateContentBasedQuestions(chunks, count, difficulty, distribution);
+            } catch (fallbackErr) {
                 const providerErr = new Error(`AI service failure: ${aiErr.message}`);
                 providerErr.code = 'EAIFAIL';
                 throw providerErr;
             }
-            console.warn(`⚠️ AI call failed (${aiErr.message}), falling back to content-based generation`);
-            return generateContentBasedQuestions(chunks, count, difficulty, distribution);
         }
 
         // Clean up markdown code blocks if present
