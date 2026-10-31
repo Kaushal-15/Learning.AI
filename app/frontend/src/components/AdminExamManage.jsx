@@ -419,10 +419,20 @@ export default function AdminExamManage({ initialTab }) {
         );
     };
 
+    const getQuestionDifficulty = (q) => {
+        if (!q) return 'medium';
+        if (typeof q.difficultyLevel === 'string') return q.difficultyLevel.toLowerCase();
+        if (typeof q.difficultyTag === 'string') return q.difficultyTag.toLowerCase();
+        if (typeof q.difficulty === 'string') return q.difficulty.toLowerCase();
+        if (typeof q.difficulty === 'number') {
+            return q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard';
+        }
+        return 'medium';
+    };
+
     const filteredQuestions = questions.filter(q => {
         if (questionDifficultyFilter === 'all') return true;
-        const diff = (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard') || 'medium').toLowerCase();
-        return diff === questionDifficultyFilter;
+        return getQuestionDifficulty(q) === questionDifficultyFilter;
     });
 
     const filteredVerifications = verifications.filter(v => {
@@ -910,9 +920,9 @@ export default function AdminExamManage({ initialTab }) {
                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 {[
                                     { id: 'all', label: 'All', count: questions.length, color: '#a1a1aa', bg: 'rgba(255, 255, 255, 0.05)' },
-                                    { id: 'easy', label: 'Easy Level', count: questions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')).toLowerCase() === 'easy').length, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
-                                    { id: 'medium', label: 'Medium Level', count: questions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')).toLowerCase() === 'medium').length, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
-                                    { id: 'hard', label: 'Hard Level', count: questions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')).toLowerCase() === 'hard').length, color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.15)' }
+                                    { id: 'easy', label: 'Easy Level', count: questions.filter(q => getQuestionDifficulty(q) === 'easy').length, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
+                                    { id: 'medium', label: 'Medium Level', count: questions.filter(q => getQuestionDifficulty(q) === 'medium').length, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+                                    { id: 'hard', label: 'Hard Level', count: questions.filter(q => getQuestionDifficulty(q) === 'hard').length, color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.15)' }
                                 ].map(tab => (
                                     <button
                                         key={tab.id}
@@ -948,7 +958,7 @@ export default function AdminExamManage({ initialTab }) {
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {filteredQuestions.map((q, idx) => {
-                                    const diff = (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard') || 'medium').toLowerCase();
+                                    const diff = getQuestionDifficulty(q);
                                     const diffColor = diff === 'easy' ? '#10b981' : diff === 'hard' ? '#f43f5e' : '#f59e0b';
                                     return (
                                         <div key={idx} style={{

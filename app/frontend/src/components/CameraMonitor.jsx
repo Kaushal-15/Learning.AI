@@ -23,6 +23,16 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [storageUnavailable, setStorageUnavailable] = useState(false);
     const chunkCounterRef = useRef(0);
+    const cameraActiveRef = useRef(false);
+    const permissionDeniedRef = useRef(false);
+
+    useEffect(() => {
+        cameraActiveRef.current = cameraActive;
+    }, [cameraActive]);
+
+    useEffect(() => {
+        permissionDeniedRef.current = permissionDenied;
+    }, [permissionDenied]);
 
     // Start camera
     const startCamera = async () => {
@@ -88,16 +98,35 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
         }
     };
 
+    const getSupportedMimeType = () => {
+        const types = [
+            'video/webm;codecs=vp8',
+            'video/webm',
+            'video/mp4',
+            'video/webm;codecs=vp9'
+        ];
+        if (typeof MediaRecorder === 'undefined') return '';
+        for (const t of types) {
+            try {
+                if (MediaRecorder.isTypeSupported(t)) {
+                    return t;
+                }
+            } catch (e) {}
+        }
+        return '';
+    };
+
     // Start recording
     const startRecording = (recId) => {
-        if (!stream || !MediaRecorder.isTypeSupported('video/webm')) {
-            console.error('MediaRecorder not supported');
+        const mimeType = getSupportedMimeType();
+        if (!stream || !mimeType) {
+            console.warn('MediaRecorder or supported MIME type not available in this browser');
             return;
         }
 
         try {
             const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp8',
+                mimeType,
                 videoBitsPerSecond: 250000 // 250 kbps for smaller file size
             });
 
@@ -281,9 +310,9 @@ export default function CameraMonitor({ sessionId, examId, isRequired = false, o
             console.log('📸 Auto-starting camera (isRequired=true)');
             startCamera();
 
-            // AUTO-RESTART: Check camera status every 5 seconds
+            // AUTO-RESTART: Check camera status every 5 seconds using refs to prevent stale closure
             checkInterval = setInterval(() => {
-                if (!cameraActive && isRequired && !permissionDenied) {
+                if (!cameraActiveRef.current && isRequired && !permissionDeniedRef.current) {
                     console.warn('⚠️ Camera stopped - attempting auto-restart...');
                     startCamera();
                 }

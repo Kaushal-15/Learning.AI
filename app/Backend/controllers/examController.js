@@ -1701,8 +1701,19 @@ exports.getNextQuestion = async (req, res) => {
 
             console.log(`🔍 [ADAPTIVE] Fetched ${poolQuestions.length} available questions from DB`);
 
-            // Filter by difficultyTag (not numeric difficulty)
-            const difficultyMatches = poolQuestions.filter(q => (q.difficultyLevel || q.difficultyTag || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard')) === difficulty);
+            // Filter by difficulty (case-insensitive)
+            const getQuestionDiff = (q) => {
+                if (!q) return 'medium';
+                if (typeof q.difficultyLevel === 'string') return q.difficultyLevel.toLowerCase();
+                if (typeof q.difficultyTag === 'string') return q.difficultyTag.toLowerCase();
+                if (typeof q.difficulty === 'string') return q.difficulty.toLowerCase();
+                if (typeof q.difficulty === 'number') {
+                    return q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard';
+                }
+                return 'medium';
+            };
+            const targetDiff = (difficulty || 'easy').toLowerCase();
+            const difficultyMatches = poolQuestions.filter(q => getQuestionDiff(q) === targetDiff);
             console.log(`✅ [ADAPTIVE] Found ${difficultyMatches.length} questions with difficultyTag='${difficulty}'`);
 
             if (difficultyMatches.length > 0) {
@@ -1858,7 +1869,10 @@ exports.submitAdaptiveAnswer = async (req, res) => {
         }
 
         // Check if question was already answered - cannot answer again
-        if (session.answers && session.answers.has(questionId.toString())) {
+        const hasAnswered = session.answers instanceof Map
+            ? session.answers.has(questionId.toString())
+            : (session.answers && session.answers[questionId.toString()] !== undefined);
+        if (hasAnswered) {
             return res.status(400).json({
                 success: false,
                 message: 'This question has already been answered and cannot be answered again'
@@ -1868,7 +1882,12 @@ exports.submitAdaptiveAnswer = async (req, res) => {
         // Support answer vs unanswered (auto-submit on timeout)
         const isUnanswered = !answer || answer === '__UNANSWERED__';
         const recordedAnswer = isUnanswered ? '__UNANSWERED__' : answer;
-        session.answers.set(questionId.toString(), recordedAnswer);
+        if (session.answers instanceof Map) {
+            session.answers.set(questionId.toString(), recordedAnswer);
+        } else {
+            session.answers = new Map(Object.entries(session.answers || {}));
+            session.answers.set(questionId.toString(), recordedAnswer);
+        }
 
         // Check if answer is correct
         const isCorrect = !isUnanswered && (recordedAnswer === question.correctAnswer);
@@ -1896,9 +1915,14 @@ exports.submitAdaptiveAnswer = async (req, res) => {
         let correctAttemptsOnQuestion = 0;
 
         for (const s of allSessions) {
-            if (s.answers && s.answers.has(questionId.toString())) {
+            const sHasAnswered = s.answers instanceof Map
+                ? s.answers.has(questionId.toString())
+                : (s.answers && s.answers[questionId.toString()] !== undefined);
+            if (sHasAnswered) {
                 totalAttemptsOnQuestion++;
-                const studentAns = s.answers.get(questionId.toString());
+                const studentAns = s.answers instanceof Map
+                    ? s.answers.get(questionId.toString())
+                    : s.answers[questionId.toString()];
                 if (studentAns !== '__UNANSWERED__' && studentAns === question.correctAnswer) {
                     correctAttemptsOnQuestion++;
                 }

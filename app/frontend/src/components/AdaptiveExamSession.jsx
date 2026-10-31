@@ -24,6 +24,7 @@ export default function AdaptiveExamSession() {
     const [difficulty, setDifficulty] = useState('easy');
     const [timePerQuestion, setTimePerQuestion] = useState(30);
     const [timeLeft, setTimeLeft] = useState(30);
+    const [questionExpiryTime, setQuestionExpiryTime] = useState(null);
     const [selectedAnswer, setSelectedAnswer] = useState(null);
     const [isWaiting, setIsWaiting] = useState(false);
     const [waitTime, setWaitTime] = useState(0);
@@ -229,6 +230,7 @@ export default function AdaptiveExamSession() {
     // Forward refs to prevent circular callback dependencies and Temporal Dead Zone (TDZ) ReferenceError
     const checkWaitStatusRef = useRef(null);
     const fetchNextQuestionRef = useRef(null);
+    const handleSubmitAnswerRef = useRef(null);
 
     // Fetch next question (defined first)
     const fetchNextQuestion = useCallback(async () => {
@@ -253,21 +255,17 @@ export default function AdaptiveExamSession() {
             }
 
             if (data.isWaiting) {
-                // Still in wait period
+                // Still in wait period on server
                 setIsWaiting(true);
-                if (exam?.isSynchronized) {
-                    setWaitTime(data.waitTimeRemaining || 10);
-                    // Poll again after 1 second for synchronized
-                    setTimeout(() => fetchNextQuestionRef.current?.(), 1000);
-                } else {
-                    checkWaitStatusRef.current?.();
-                }
+                setWaitTime(data.waitTimeRemaining || data.timeRemaining || 10);
+                setTimeout(() => fetchNextQuestionRef.current?.(), 1000);
                 return;
             }
 
             if (data.isComplete) {
                 // Exam finished - finalize in DB
                 setExamComplete(true);
+                setQuestionExpiryTime(null);
                 (async () => {
                     try {
                         await fetch(`${API_BASE}/exams/${examId}/submit`, {
@@ -306,16 +304,19 @@ export default function AdaptiveExamSession() {
                 setQuestionNumber(data.data.questionNumber);
                 setTotalQuestions(data.data.totalQuestions);
                 setDifficulty(data.data.difficulty);
-                setTimeLeft(data.data.timeRemaining);
-                // Synchronized doesn't send timePerQuestion in data.data, use exam setting or default
+                const qTime = data.data.timeRemaining || exam?.questionTimer || 30;
                 setTimePerQuestion(exam.questionTimer || 30);
+                setTimeLeft(qTime);
+                setQuestionExpiryTime(new Date(Date.now() + qTime * 1000));
             } else {
                 setCurrentQuestion(data.data.question);
                 setQuestionNumber(data.data.questionNumber);
                 setTotalQuestions(data.data.totalQuestions);
                 setDifficulty(data.data.difficulty);
-                setTimePerQuestion(data.data.timePerQuestion || 30);
-                setTimeLeft(data.data.timePerQuestion || 30);
+                const qTime = data.data.timePerQuestion || exam?.questionTimer || exam?.timePerQuestion || 30;
+                setTimePerQuestion(qTime);
+                setTimeLeft(qTime);
+                setQuestionExpiryTime(new Date(Date.now() + qTime * 1000));
             }
 
             setSelectedAnswer(null);
@@ -346,6 +347,7 @@ export default function AdaptiveExamSession() {
                 setWaitTime(data.timeRemaining);
                 if (data.collectiveStats) setCollectiveStats(data.collectiveStats);
                 if (data.individualStats) setIndividualStats(data.individualStats);
+                setTimeout(() => fetchNextQuestionRef.current?.(), 1000);
             } else {
                 // Wait is over, fetch next question via ref
                 fetchNextQuestionRef.current?.();
@@ -359,14 +361,18 @@ export default function AdaptiveExamSession() {
     useEffect(() => {
         fetchNextQuestionRef.current = fetchNextQuestion;
         checkWaitStatusRef.current = checkWaitStatus;
+        handleSubmitAnswerRef.current = handleSubmitAnswer;
     });
 
     // Submit answer (supports auto-submit on timeout as __UNANSWERED__)
     const handleSubmitAnswer = async (forcedAnswer = null) => {
-        const answerToSubmit = forcedAnswer || selectedAnswer;
+        const isForced = typeof forcedAnswer === 'string' && forcedAnswer.length > 0;
+        const answerToSubmit = isForced ? forcedAnswer : selectedAnswer;
         if (!answerToSubmit || isSubmitting) return;
 
         setIsSubmitting(true);
+        setQuestionExpiryTime(null); // Stop question timer during submission
+
         // Persist answers incrementally to sessionStorage
         try {
             const stored = JSON.parse(sessionStorage.getItem(`exam_answers_${examId}`) || '{}');
@@ -393,13 +399,18 @@ export default function AdaptiveExamSession() {
             const data = await res.json();
 
             if (!data.success) {
+                if (data.message && data.message.includes('already been answered')) {
+                    setIsWaiting(true);
+                    setWaitTime(10);
+                    return;
+                }
                 throw new Error(data.message);
             }
 
             if (exam?.isSynchronized) {
                 // For synchronized, just go to waiting state and poll
                 setIsWaiting(true);
-                fetchNextQuestion();
+                setTimeout(() => fetchNextQuestionRef.current?.(), 1000);
             } else {
                 // Start 10-second wait period (Adaptive)
                 setIsWaiting(true);
@@ -410,7 +421,7 @@ export default function AdaptiveExamSession() {
 
         } catch (error) {
             console.error('Error submitting answer:', error);
-            if (!forcedAnswer) {
+            if (!isForced) {
                 alert(error.message || 'Failed to submit answer. Please try again.');
             }
         } finally {
@@ -439,34 +450,37 @@ export default function AdaptiveExamSession() {
         }
     }, [examId]);
 
+    // Stable camera status callback
+    const handleCameraStatus = useCallback((status) => {
+        // Status handled silently to avoid unnecessary re-renders
+    }, []);
+
     const selectedAnswerRef = useRef(null);
     useEffect(() => {
         selectedAnswerRef.current = selectedAnswer;
     }, [selectedAnswer]);
 
-    // Timer countdown (auto-submits if unanswered when time runs out)
+    // Precise Question Timer countdown based on real timestamp
     useEffect(() => {
-        if (loading || isWaiting || examComplete) return;
+        if (!questionExpiryTime || loading || isWaiting || examComplete || isWaitingRoom) return;
 
-        // Ensure timeLeft is valid
-        if (timeLeft === null || timeLeft === undefined) {
-            setTimeLeft(timePerQuestion || 30);
-        }
+        const updateQuestionTimer = () => {
+            const now = new Date();
+            const remaining = Math.max(0, Math.ceil((questionExpiryTime - now) / 1000));
+            setTimeLeft(remaining);
 
-        const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    // Time's up - auto submit selected answer or __UNANSWERED__
-                    clearInterval(timer);
-                    handleSubmitAnswer(selectedAnswerRef.current || '__UNANSWERED__');
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+            if (remaining <= 0) {
+                console.log('⏰ Question time expired! Auto-submitting answer or __UNANSWERED__');
+                setQuestionExpiryTime(null);
+                const ans = selectedAnswerRef.current || '__UNANSWERED__';
+                handleSubmitAnswerRef.current?.(ans);
+            }
+        };
 
-        return () => clearInterval(timer);
-    }, [loading, isWaiting, examComplete, timePerQuestion]);
+        updateQuestionTimer();
+        const interval = setInterval(updateQuestionTimer, 500);
+        return () => clearInterval(interval);
+    }, [questionExpiryTime, loading, isWaiting, examComplete, isWaitingRoom]);
 
     // Global exam timer - tracks total exam duration
     useEffect(() => {
@@ -602,12 +616,12 @@ export default function AdaptiveExamSession() {
         return () => clearInterval(timer);
     }, [isWaitingRoom]);
 
-    // Start fetching questions once exam is loaded and NOT waiting room
+    // Start fetching initial question once exam is loaded and NOT waiting room
     useEffect(() => {
-        if (exam && !loading && !isWaiting && !examComplete && !isWaitingRoom) {
+        if (exam && !loading && !isWaiting && !examComplete && !isWaitingRoom && !currentQuestion) {
             fetchNextQuestion();
         }
-    }, [exam, loading, isWaiting, examComplete, fetchNextQuestion, isWaitingRoom]);
+    }, [exam, loading, isWaiting, examComplete, fetchNextQuestion, isWaitingRoom, currentQuestion]);
 
     // Format time
     const formatTime = (seconds) => {
@@ -834,7 +848,7 @@ export default function AdaptiveExamSession() {
                     return (
                         <button
                             className="adaptive-submit-btn"
-                            onClick={handleSubmitAnswer}
+                            onClick={() => handleSubmitAnswer()}
                             disabled={!selectedAnswer || isSubmitting || !isMinTimeMet}
                         >
                             <Send size={20} />
@@ -911,7 +925,7 @@ export default function AdaptiveExamSession() {
                     sessionId={sessionId}
                     examId={examId}
                     isRequired={true}
-                    onCameraStatus={(status) => console.log('📹 Adaptive Exam Camera status:', status)}
+                    onCameraStatus={handleCameraStatus}
                 />
             )}
             {!sessionId && console.log('⚠️ Camera not rendering - session is null')}
