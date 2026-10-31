@@ -35,7 +35,7 @@ const convertDifficulty = (difficulty) => {
         'advanced': 8
     };
 
-    return diffMap[difficulty.toLowerCase()] || 5;
+    return diffMap[String(difficulty).toLowerCase()] || 5;
 };
 
 // Helper function to get difficulty level string

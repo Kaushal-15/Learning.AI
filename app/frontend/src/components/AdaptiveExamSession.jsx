@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ArrowLeft, Clock, Send, Target, TrendingUp, Shield, AlertTriangle } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
@@ -205,31 +205,11 @@ export default function AdaptiveExamSession() {
         }
     }, [examId, navigate, location.state]);
 
-    // Check wait status (Adaptive only)
-    const checkWaitStatus = useCallback(async () => {
-        if (exam?.isSynchronized) return; // Synchronized handled in fetchNextQuestion
+    // Forward refs to prevent circular callback dependencies and Temporal Dead Zone (TDZ) ReferenceError
+    const checkWaitStatusRef = useRef(null);
+    const fetchNextQuestionRef = useRef(null);
 
-        try {
-            const res = await fetch(`${API_BASE}/exams/${examId}/adaptive/wait-status`, {
-                credentials: 'include'
-            });
-            const data = await res.json();
-
-            if (!data.success) return;
-
-            if (data.isWaiting) {
-                setWaitTime(data.timeRemaining);
-                setIndividualStats(data.individualStats);
-            } else {
-                // Wait is over, fetch next question
-                fetchNextQuestion();
-            }
-        } catch (error) {
-            console.error('Error checking wait status:', error);
-        }
-    }, [examId, exam, fetchNextQuestion]);
-
-    // Fetch next question
+    // Fetch next question (defined first)
     const fetchNextQuestion = useCallback(async () => {
         try {
             const endpoint = exam?.isSynchronized
@@ -251,9 +231,9 @@ export default function AdaptiveExamSession() {
                 if (exam?.isSynchronized) {
                     setWaitTime(data.waitTimeRemaining || 10);
                     // Poll again after 1 second for synchronized
-                    setTimeout(fetchNextQuestion, 1000);
+                    setTimeout(() => fetchNextQuestionRef.current?.(), 1000);
                 } else {
-                    checkWaitStatus();
+                    checkWaitStatusRef.current?.();
                 }
                 return;
             }
@@ -292,7 +272,7 @@ export default function AdaptiveExamSession() {
             if (exam?.isSynchronized) {
                 if (data.data.hasAnswered) {
                     setIsWaiting(true);
-                    setTimeout(fetchNextQuestion, 1000);
+                    setTimeout(() => fetchNextQuestionRef.current?.(), 1000);
                     return;
                 }
                 setCurrentQuestion(data.data.question);
@@ -321,7 +301,37 @@ export default function AdaptiveExamSession() {
                 alert('Failed to load question. Please try again.');
             }
         }
-    }, [examId, navigate, exam, checkWaitStatus]);
+    }, [examId, navigate, exam]);
+
+    // Check wait status (Adaptive only)
+    const checkWaitStatus = useCallback(async () => {
+        if (exam?.isSynchronized) return; // Synchronized handled in fetchNextQuestion
+
+        try {
+            const res = await fetch(`${API_BASE}/exams/${examId}/adaptive/wait-status`, {
+                credentials: 'include'
+            });
+            const data = await res.json();
+
+            if (!data.success) return;
+
+            if (data.isWaiting) {
+                setWaitTime(data.timeRemaining);
+                setIndividualStats(data.individualStats);
+            } else {
+                // Wait is over, fetch next question via ref
+                fetchNextQuestionRef.current?.();
+            }
+        } catch (error) {
+            console.error('Error checking wait status:', error);
+        }
+    }, [examId, exam]);
+
+    // Keep forward refs synchronized without triggering re-renders
+    useEffect(() => {
+        fetchNextQuestionRef.current = fetchNextQuestion;
+        checkWaitStatusRef.current = checkWaitStatus;
+    });
 
     // Submit answer
     const handleSubmitAnswer = async () => {
