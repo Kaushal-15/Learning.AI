@@ -4,7 +4,7 @@ const customLearningController = require('../controllers/customLearningControlle
 const { uploadLimiter, quizGenLimiter } = require('../middleware/customRateLimit');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Lazy-require multer middleware to avoid top-level load
+// Multer middleware with translated error handling
 const uploadSingleFile = (req, res, next) => {
     const multer = require('multer');
     const fileFilter = (r, file, cb) => {
@@ -24,9 +24,35 @@ const uploadSingleFile = (req, res, next) => {
         storage: multer.memoryStorage(),
         fileFilter: fileFilter,
         limits: { fileSize: 4 * 1024 * 1024 } // 4 MB — Vercel body cap is ~4.5 MB
-    });
+    }).single('file');
 
-    return upload.single('file')(req, res, next);
+    upload(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE' || (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE')) {
+                return res.status(413).json({
+                    success: false,
+                    message: 'File is larger than 4 MB'
+                });
+            }
+            if (err.message && err.message.includes('Invalid file type')) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
+                });
+            }
+            if (err instanceof multer.MulterError) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
+                });
+            }
+            return res.status(400).json({
+                success: false,
+                message: err.message || 'File upload error'
+            });
+        }
+        next();
+    });
 };
 
 // Routes
