@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { ArrowLeft, Clock, Send, Target, TrendingUp, Shield, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Clock, Send, Target, TrendingUp, Shield, AlertTriangle, Users } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import AdaptiveWaitScreen from "./AdaptiveWaitScreen";
 import CameraMonitor from "./CameraMonitor";
@@ -115,6 +115,20 @@ export default function AdaptiveExamSession() {
                     setTotalExamTime(remaining);
                 }
 
+                // Check for 30-Second Joining Lobby or Scheduled Start
+                const navNow = new Date();
+                const navJoinEnd = location.state.exam.joinWindowEndTime ? new Date(location.state.exam.joinWindowEndTime) : null;
+                const navStart = new Date(location.state.exam.startTime);
+                const navTargetStart = (navJoinEnd && navJoinEnd > navNow) ? navJoinEnd : navStart;
+
+                if (navNow < navTargetStart) {
+                    setIsWaitingRoom(true);
+                    setTimeToStart(Math.max(0, Math.ceil((navTargetStart - navNow) / 1000)));
+                } else {
+                    setIsWaitingRoom(false);
+                    setTimeToStart(0);
+                }
+
                 setLoading(false);
                 return;
             }
@@ -185,12 +199,18 @@ export default function AdaptiveExamSession() {
                 setTotalExamTime(remaining);
             }
 
-            // Check for Waiting Room
+            // Check for 30-Second Joining Lobby or Scheduled Start
             const now = new Date();
+            const joinEnd = exam.joinWindowEndTime ? new Date(exam.joinWindowEndTime) : null;
             const start = new Date(exam.startTime);
-            if (now < start) {
+            const targetStart = (joinEnd && joinEnd > now) ? joinEnd : start;
+
+            if (now < targetStart) {
                 setIsWaitingRoom(true);
-                setTimeToStart(Math.floor((start - now) / 1000));
+                setTimeToStart(Math.max(0, Math.ceil((targetStart - now) / 1000)));
+            } else {
+                setIsWaitingRoom(false);
+                setTimeToStart(0);
             }
 
             setLoading(false);
@@ -224,6 +244,12 @@ export default function AdaptiveExamSession() {
 
             if (!data.success) {
                 throw new Error(data.message);
+            }
+
+            if (data.isWaitingRoom) {
+                setIsWaitingRoom(true);
+                setTimeToStart(data.timeRemaining || data.waitTimeRemaining || 30);
+                return;
             }
 
             if (data.isWaiting) {
@@ -617,22 +643,35 @@ export default function AdaptiveExamSession() {
                     </div>
 
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-cream-100 mb-2">
-                        Exam Starts In
+                        Please Wait — Joining Lobby Active
                     </h1>
+                    <p className="text-sm text-gray-600 dark:text-cream-200 mb-6">
+                        Giving all students 30 seconds to join. The quiz will begin simultaneously for everyone once the countdown finishes.
+                    </p>
 
-                    <div className="text-5xl font-mono font-bold text-blue-600 dark:text-blue-400 mb-8 tracking-wider">
+                    <div className="text-6xl font-mono font-bold text-blue-600 dark:text-blue-400 mb-8 tracking-wider">
                         {formatTime(timeToStart)}
                     </div>
 
+                    <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4 text-left mb-4">
+                        <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-2">
+                            <Users size={18} />
+                            Synchronized Start for All Students
+                        </h3>
+                        <p className="text-xs text-blue-700 dark:text-blue-200">
+                            Question 1 starts at <strong>Easy</strong> difficulty for all students at the same second. Keep this window open.
+                        </p>
+                    </div>
+
                     <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-xl p-4 text-left">
-                        <h3 className="font-bold text-yellow-800 dark:text-yellow-300 mb-2 flex items-center gap-2">
-                            <Target size={20} />
+                        <h3 className="font-bold text-yellow-800 dark:text-yellow-300 mb-1 flex items-center gap-2">
+                            <Target size={18} />
                             Adaptive Exam Mode
                         </h3>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-200 mb-2">
-                            This exam adapts to your performance. Difficulty will adjust based on your answers.
+                        <p className="text-xs text-yellow-700 dark:text-yellow-200 mb-2">
+                            Difficulty adjusts based on the overall percentage of correct answers on each question.
                         </p>
-                        <div className="font-bold text-red-800 dark:text-red-300 flex items-center gap-2 mt-4">
+                        <div className="font-bold text-red-800 dark:text-red-300 flex items-center gap-2 mt-2 text-xs">
                             <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
                             PROCTORING ACTIVE
                         </div>

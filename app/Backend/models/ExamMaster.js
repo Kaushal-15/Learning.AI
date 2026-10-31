@@ -77,6 +77,7 @@ const examMasterSchema = new mongoose.Schema({
     isQuestionActive: { type: Boolean, default: false }, // Is question currently active
     isInWaitPeriod: { type: Boolean, default: false }, // Between questions (analyzing)
     waitPeriodEndTime: { type: Date },
+    joinWindowEndTime: { type: Date }, // 30-second joining lobby before exam starts for everyone
     allowLateJoin: { type: Boolean, default: false }, // Allow join after start
     examStartedAt: { type: Date }, // When exam actually started
 

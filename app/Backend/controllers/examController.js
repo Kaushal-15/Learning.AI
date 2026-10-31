@@ -676,15 +676,44 @@ exports.startSession = async (req, res) => {
 
         let session = await ExamSession.findOne({ userId, examId });
 
-        if (!session) {
-            // Enforce No Late Entries: Students cannot start a new attempt after exam.startTime if allowLateJoin is false
-            if (!exam.allowLateJoin && new Date() > new Date(exam.startTime)) {
+        const now = new Date();
+        const isDynamicOrAdaptive = exam.isAdaptive || exam.examType === 'dynamic';
+
+        // 30-second joining lobby for dynamic/adaptive quiz
+        if (isDynamicOrAdaptive) {
+            const startTime = new Date(exam.startTime);
+            if (now >= startTime) {
+                // Exam is live: trigger 30-second joining window if not already active
+                if (!exam.joinWindowEndTime) {
+                    exam.joinWindowEndTime = new Date(now.getTime() + 30 * 1000);
+                    await exam.save();
+                }
+            } else {
+                // Pre-start / verification phase: joining window ends 30s after startTime
+                if (!exam.joinWindowEndTime) {
+                    exam.joinWindowEndTime = new Date(startTime.getTime() + 30 * 1000);
+                    await exam.save();
+                }
+            }
+
+            // Enforce No Late Entries: if 30-second joining window has elapsed and student has no existing session
+            if (!session && !exam.allowLateJoin && exam.joinWindowEndTime && now > new Date(exam.joinWindowEndTime)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Late entry is not permitted for this exam. The 30-second joining window has closed.'
+                });
+            }
+        } else {
+            // For static exams:
+            if (!session && !exam.allowLateJoin && now > new Date(exam.startTime)) {
                 return res.status(403).json({
                     success: false,
                     message: 'Late entry is not permitted for this exam. The exam has already started.'
                 });
             }
+        }
 
+        if (!session) {
             const studentName = (req.body.studentName || '').trim();
             const registerNumber = (req.body.registerNumber || '').trim().toUpperCase();
 
@@ -861,16 +890,19 @@ exports.startSession = async (req, res) => {
         let questions = [];
         if (exam.examType === 'dynamic') {
             if (session.questionIds && session.questionIds.length > 0) {
-                questions = await Question.find({ _id: { $in: session.questionIds } }).lean();
+                const qQuery = Question.find({ _id: { $in: session.questionIds } });
+                questions = await (typeof qQuery.lean === 'function' ? qQuery.lean() : qQuery);
             }
             if (!questions || questions.length === 0) {
                 const query = {};
                 if (exam.dynamicConfig?.tags && exam.dynamicConfig.tags.length > 0) {
                     query.tags = { $in: exam.dynamicConfig.tags };
                 }
-                let pool = await Question.find(query).lean();
+                const pQuery = Question.find(query);
+                let pool = await (typeof pQuery.lean === 'function' ? pQuery.lean() : pQuery);
                 if (!pool || pool.length === 0) {
-                    pool = await Question.find().limit(50).lean();
+                    const lQuery = Question.find().limit(50);
+                    pool = await (typeof lQuery.lean === 'function' ? lQuery.lean() : lQuery);
                 }
                 if (pool && pool.length > 0) {
                     const shuffled = [...pool].sort(() => Math.random() - 0.5);
@@ -881,7 +913,8 @@ exports.startSession = async (req, res) => {
             }
         } else {
             // Static
-            questions = await ExamQuestion.find({ examId }).sort('order').lean();
+            const sQuery = ExamQuestion.find({ examId }).sort('order');
+            questions = await (typeof sQuery.lean === 'function' ? sQuery.lean() : sQuery);
         }
 
         // Ensure questions exist
@@ -979,7 +1012,12 @@ exports.startSession = async (req, res) => {
                     passingScore: exam.passingScore,
                     proctoringConfig: exam.proctoringConfig,
                     controls: exam.controls,
-                    timePerQuestion: exam.timePerQuestion
+                    timePerQuestion: exam.timePerQuestion,
+                    isAdaptive: exam.isAdaptive,
+                    examType: exam.examType,
+                    startTime: exam.startTime,
+                    endTime: exam.endTime,
+                    joinWindowEndTime: exam.joinWindowEndTime
                 },
                 session: {
                     ...session.toObject(),
@@ -1583,6 +1621,19 @@ exports.getNextQuestion = async (req, res) => {
             // Wait period over, clear waiting state
             session.isWaiting = false;
             session.waitEndTime = null;
+        }
+
+        // Check if 30-second joining lobby is active for dynamic quiz
+        if ((exam.isAdaptive || exam.examType === 'dynamic') && exam.joinWindowEndTime && new Date() < new Date(exam.joinWindowEndTime)) {
+            const timeRemaining = Math.max(0, Math.ceil((new Date(exam.joinWindowEndTime) - new Date()) / 1000));
+            return res.status(200).json({
+                success: true,
+                isWaitingRoom: true,
+                isWaiting: true,
+                waitTimeRemaining: timeRemaining,
+                timeRemaining,
+                message: 'Joining lobby active. Please wait for the quiz to begin for all students.'
+            });
         }
 
         // Check if exam is complete

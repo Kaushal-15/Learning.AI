@@ -285,3 +285,77 @@ describe('Exam Controller - submitAdaptiveAnswer Collective Adaptability', () =>
         }));
     });
 });
+
+describe('Exam Controller - 30-Second Joining Window & Late Entry Block', () => {
+    let req, res;
+
+    beforeEach(() => {
+        req = {
+            params: { examId: 'exam123' },
+            body: { studentName: 'Alice', registerNumber: 'REG101' },
+            user: { id: 'user_alice' }
+        };
+        res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+        jest.clearAllMocks();
+        Object.defineProperty(mongoose.connection, 'readyState', {
+            value: 1,
+            writable: true,
+            configurable: true
+        });
+    });
+
+    it('should initialize 30-second joinWindowEndTime when dynamic exam starts', async () => {
+        const now = new Date();
+        const mockExam = {
+            _id: 'exam123',
+            examType: 'dynamic',
+            isAdaptive: true,
+            startTime: new Date(now.getTime() - 5000), // Live 5 seconds ago
+            endTime: new Date(now.getTime() + 600000),
+            duration: 30,
+            totalQuestions: 5,
+            allowLateJoin: false,
+            save: jest.fn().mockResolvedValue({})
+        };
+
+        ExamMaster.findById.mockResolvedValue(mockExam);
+        ExamSession.findOne.mockResolvedValue(null); // First student joining
+
+        await examController.startSession(req, res);
+
+        expect(mockExam.joinWindowEndTime).toBeDefined();
+        const diffSeconds = (new Date(mockExam.joinWindowEndTime).getTime() - now.getTime()) / 1000;
+        expect(diffSeconds).toBeGreaterThanOrEqual(25);
+        expect(diffSeconds).toBeLessThanOrEqual(35);
+    });
+
+    it('should reject late entry if student has no session and 30-second joining window has elapsed', async () => {
+        const now = new Date();
+        const mockExam = {
+            _id: 'exam123',
+            examType: 'dynamic',
+            isAdaptive: true,
+            startTime: new Date(now.getTime() - 60000), // Started 1 min ago
+            endTime: new Date(now.getTime() + 600000),
+            duration: 30,
+            totalQuestions: 5,
+            allowLateJoin: false,
+            joinWindowEndTime: new Date(now.getTime() - 10000), // Closed 10s ago
+            save: jest.fn().mockResolvedValue({})
+        };
+
+        ExamMaster.findById.mockResolvedValue(mockExam);
+        ExamSession.findOne.mockResolvedValue(null); // Late student with no session
+
+        await examController.startSession(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: false,
+            message: expect.stringContaining('30-second joining window has closed')
+        }));
+    });
+});
