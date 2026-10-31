@@ -222,18 +222,32 @@ exports.createExam = async (req, res) => {
                 console.log(`Saving ${examQuestions.length} questions to Question Bank for dynamic exam...`);
 
                 // Convert exam questions to Question Bank format
-                const questionBankDocs = examQuestions.map(q => ({
-                    content: q.content,
-                    options: q.options,
-                    correctAnswer: q.correctAnswer,
-                    explanation: q.explanation || '',
-                    category: q.category || ['General'],
-                    difficulty: q.difficulty || 5,
-                    difficultyLevel: q.difficultyLevel || getDifficultyLevel(q.difficulty),
-                    adminApproved: true, // Auto-approve questions uploaded by admin
-                    tags: q.category || ['General'],
-                    generatedBy: 'AI' // AI generates questions from uploaded files
-                }));
+                const questionBankDocs = examQuestions.map(q => {
+                    const rawOpts = Array.isArray(q.options) ? q.options : [];
+                    let options = rawOpts.map(o => String(o || '').trim().replace(/^[A-Da-d][.)\-:]\s*/, '').trim()).filter(Boolean);
+                    while (options.length < 4) options.push(`Alternative concept ${options.length + 1}`);
+                    options = options.slice(0, 4);
+
+                    let correctAnswer = String(q.correctAnswer || '').trim().replace(/^[A-Da-d][.)\-:]\s*/, '').trim();
+                    if (!options.includes(correctAnswer)) correctAnswer = options[0];
+
+                    const diffLevel = q.difficultyLevel || getDifficultyLevel(q.difficulty) || 'medium';
+                    const diffNum = typeof q.difficulty === 'number' ? q.difficulty : (diffLevel === 'easy' ? 2 : diffLevel === 'hard' ? 8 : 5);
+                    const cats = Array.isArray(q.category) && q.category.length > 0 ? q.category : [q.topic || 'General'];
+
+                    return {
+                        content: q.content || q.question || 'Standard conceptual question',
+                        options,
+                        correctAnswer,
+                        explanation: (q.explanation && q.explanation.length >= 10) ? q.explanation : `The correct answer is "${correctAnswer}".`,
+                        category: cats,
+                        difficulty: diffNum,
+                        difficultyLevel: diffLevel,
+                        adminApproved: true,
+                        tags: cats,
+                        generatedBy: 'AI'
+                    };
+                });
 
                 // Save to Question Bank
                 const savedQuestions = await Question.insertMany(questionBankDocs);
@@ -757,16 +771,32 @@ exports.startSession = async (req, res) => {
 
                     if (generated && generated.length > 0) {
                         // Save generated questions to Question Bank with proper tagging
-                        const questionDocs = generated.map(q => ({
-                            content: q.question,
-                            options: q.options,
-                            correctAnswer: q.correctAnswer,
-                            explanation: q.explanation || 'AI Generated',
-                            category: q.tags || [q.topic || 'General'],
-                            difficulty: q.difficultyScore || convertDifficulty(q.difficulty),
-                            tags: q.tags || [q.topic || 'General'],
-                            generatedBy: 'AI'
-                        }));
+                        const questionDocs = generated.map(q => {
+                            const rawOpts = Array.isArray(q.options) ? q.options : [];
+                            let options = rawOpts.map(o => String(o || '').trim().replace(/^[A-Da-d][.)\-:]\s*/, '').trim()).filter(Boolean);
+                            while (options.length < 4) options.push(`Alternative concept ${options.length + 1}`);
+                            options = options.slice(0, 4);
+
+                            let correctAnswer = String(q.correctAnswer || '').trim().replace(/^[A-Da-d][.)\-:]\s*/, '').trim();
+                            if (!options.includes(correctAnswer)) correctAnswer = options[0];
+
+                            const diffLevel = q.difficultyLevel || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard') || 'medium';
+                            const diffNum = q.difficultyScore || (diffLevel === 'easy' ? 2 : diffLevel === 'hard' ? 8 : 5);
+                            const cats = Array.isArray(q.tags) && q.tags.length > 0 ? q.tags : [q.topic || 'General'];
+
+                            return {
+                                content: q.content || q.question || 'Standard question text',
+                                options,
+                                correctAnswer,
+                                explanation: (q.explanation && q.explanation.length >= 10) ? q.explanation : `The correct answer is "${correctAnswer}".`,
+                                category: cats,
+                                difficulty: diffNum,
+                                difficultyLevel: diffLevel,
+                                tags: cats,
+                                generatedBy: 'AI',
+                                adminApproved: true
+                            };
+                        });
 
                         // Insert questions into database
                         const savedQuestions = await Question.insertMany(questionDocs);
@@ -825,12 +855,27 @@ exports.startSession = async (req, res) => {
         let questions = [];
         if (exam.examType === 'dynamic') {
             if (session.questionIds && session.questionIds.length > 0) {
-                questions = await Question.find({ _id: { $in: session.questionIds } });
-                // Shuffle if needed, or keep order
+                questions = await Question.find({ _id: { $in: session.questionIds } }).lean();
+            }
+            if (!questions || questions.length === 0) {
+                const query = {};
+                if (exam.dynamicConfig?.tags && exam.dynamicConfig.tags.length > 0) {
+                    query.tags = { $in: exam.dynamicConfig.tags };
+                }
+                let pool = await Question.find(query).lean();
+                if (!pool || pool.length === 0) {
+                    pool = await Question.find().limit(50).lean();
+                }
+                if (pool && pool.length > 0) {
+                    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+                    questions = shuffled.slice(0, Math.min(exam.totalQuestions || 10, pool.length));
+                    session.questionIds = questions.map(q => q._id);
+                    await session.save();
+                }
             }
         } else {
             // Static
-            questions = await ExamQuestion.find({ examId }).sort('order');
+            questions = await ExamQuestion.find({ examId }).sort('order').lean();
         }
 
         // Ensure questions exist
@@ -885,14 +930,15 @@ exports.startSession = async (req, res) => {
                         const mediumCount = Math.ceil(questionCount * 0.33);
                         const hardCount = questionCount - easyCount - mediumCount;
 
-                        const [easyQ, mediumQ, hardQ] = await Promise.all([
-                            Question.aggregate([{ $match: { ...query, difficulty: { $lte: 3 } } }, { $sample: { size: easyCount } }]),
-                            Question.aggregate([{ $match: { ...query, difficulty: { $gt: 3, $lte: 6 } } }, { $sample: { size: mediumCount } }]),
-                            Question.aggregate([{ $match: { ...query, difficulty: { $gt: 6 } } }, { $sample: { size: hardCount } }])
-                        ]);
-
-                        newQuestions = [...easyQ, ...mediumQ, ...hardQ];
-                        console.log(`Self-healing fetched ${newQuestions.length} questions (${easyQ.length} easy, ${mediumQ.length} medium, ${hardQ.length} hard)`);
+                        let pool = await Question.find(query).lean();
+                        if (!pool || pool.length === 0) {
+                            pool = await Question.find().limit(50).lean();
+                        }
+                        if (pool && pool.length > 0) {
+                            const shuffled = [...pool].sort(() => Math.random() - 0.5);
+                            newQuestions = shuffled.slice(0, Math.min(questionCount, pool.length));
+                        }
+                        console.log(`Self-healing fetched ${newQuestions.length} questions from Question Bank`);
                     }
 
                     if (newQuestions.length > 0) {
@@ -936,10 +982,13 @@ exports.startSession = async (req, res) => {
                 questions: questions.map(q => ({
                     _id: q._id, // Use actual Question ID
                     content: q.content || q.question, // Handle both models
+                    question: q.content || q.question,
                     options: q.options,
                     // Hide correct answer
                     difficulty: q.difficulty,
-                    category: q.category
+                    difficultyLevel: q.difficultyLevel || (q.difficulty <= 3 ? 'easy' : q.difficulty <= 6 ? 'medium' : 'hard'),
+                    category: q.category,
+                    tags: q.tags || q.category
                 }))
             }
         });
@@ -1744,9 +1793,12 @@ exports.getNextQuestion = async (req, res) => {
                 timePerQuestion: timeRemaining, // Send remaining time
                 question: {
                     _id: question._id,
-                    content: question.content,
+                    content: question.content || question.question,
+                    question: question.content || question.question,
                     options: question.options,
-                    order: question.order
+                    order: question.order,
+                    difficulty: difficulty,
+                    difficultyLevel: difficulty
                 }
             }
         });

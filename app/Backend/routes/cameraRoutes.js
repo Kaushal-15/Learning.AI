@@ -446,7 +446,7 @@ router.get('/review/:sessionId', adminMiddleware, async (req, res) => {
         if (chunks.length === 0 && recordingDoc && recordingDoc.videoChunks && recordingDoc.videoChunks.length > 0) {
             const dbChunks = await Promise.all(recordingDoc.videoChunks.map(async (vc, idx) => {
                 const key = vc.key || `recordings/${examId}/${userId}/${sessionId}/${vc.chunkNumber ?? idx}.webm`;
-                const presigned = await storageService.getPresignedDownloadUrl({ key, expiresIn: 1800 });
+                const presigned = await storageService.getPresignedDownloadUrl({ key, expiresIn: 86400 }); // 24 hours
                 return {
                     key,
                     size: vc.size || 0,
@@ -493,7 +493,7 @@ router.get('/playback', adminMiddleware, async (req, res) => {
             });
         }
 
-        const presigned = await storageService.getPresignedDownloadUrl({ key, expiresIn: 900 });
+        const presigned = await storageService.getPresignedDownloadUrl({ key, expiresIn: 86400 }); // 24 hours
         if (!presigned.enabled) {
             return res.status(503).json({
                 success: false,
@@ -543,7 +543,6 @@ router.get('/active-recording/:sessionId', async (req, res) => {
     }
 });
 
-module.exports = router;
 /**
  * GET /api/camera/exam/:examId/recordings
  * Returns all recording sessions metadata for an exam (Admin only)
@@ -580,3 +579,6 @@ router.get('/exam/:examId/recordings', adminMiddleware, async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+
+
+module.exports = router;

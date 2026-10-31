@@ -735,6 +735,149 @@ export default function AdminExamManage({ initialTab }) {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Direct Biometric Verification Section in Overview */}
+                        <div style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
+                            padding: '1.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1.25rem'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff' }}>
+                                        <Camera size={18} style={{ color: '#f59e0b' }} />
+                                        Biometric Verification Approvals
+                                        <span style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 700,
+                                            background: verifications.length > 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                                            color: verifications.length > 0 ? '#fbbf24' : '#4ade80'
+                                        }}>
+                                            {verifications.length > 0 ? `${verifications.length} Pending Approval` : 'All Approved'}
+                                        </span>
+                                    </h3>
+                                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
+                                        Verify candidate registration photo vs live webcam snapshot before granting entry.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setActiveTab('biometric')}
+                                    style={{
+                                        padding: '6px 14px',
+                                        borderRadius: '8px',
+                                        background: 'rgba(99, 102, 241, 0.15)',
+                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                        color: '#818cf8',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Open Full Biometric Tab →
+                                </button>
+                            </div>
+
+                            {verifications.length === 0 ? (
+                                <div style={{ padding: '1.5rem', textAlign: 'center', background: 'rgba(34, 197, 94, 0.05)', borderRadius: '12px', border: '1px solid rgba(34, 197, 94, 0.15)' }}>
+                                    <p style={{ margin: 0, color: '#4ade80', fontSize: '0.9rem', fontWeight: 500 }}>
+                                        ✅ All candidate biometric verification requests have been processed. No pending approvals.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                                    {verifications.slice(0, 3).map((v) => (
+                                        <div key={v._id} style={{
+                                            background: 'rgba(255, 255, 255, 0.02)',
+                                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                                            borderRadius: '12px',
+                                            padding: '1rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.75rem'
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>{v.studentName}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: '#818cf8', fontWeight: 700 }}>Roll: {v.registerNumber}</div>
+                                                </div>
+                                                {v.similarityScore !== undefined && v.similarityScore !== null && (
+                                                    <span style={{
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 700,
+                                                        background: v.similarityScore >= 70 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                                        color: v.similarityScore >= 70 ? '#4ade80' : '#f87171'
+                                                    }}>
+                                                        Match: {v.similarityScore}%
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.7rem', color: '#a1a1aa', marginBottom: '2px' }}>Reference Photo</div>
+                                                    <img
+                                                        src={getImageSrc(v.referencePhoto)}
+                                                        alt="Reference"
+                                                        style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px', background: '#000' }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.7rem', color: '#a1a1aa', marginBottom: '2px' }}>Live Snapshot</div>
+                                                    <img
+                                                        src={getImageSrc(v.livePhoto || v.referencePhoto)}
+                                                        alt="Live"
+                                                        style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px', background: '#000' }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                                <button
+                                                    onClick={() => handleRejectBiometric(v._id)}
+                                                    disabled={processingBiometricId === v._id}
+                                                    style={{
+                                                        padding: '0.45rem',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                                        background: 'rgba(239, 68, 68, 0.15)',
+                                                        color: '#f87171',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.8rem',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    Reject
+                                                </button>
+                                                <button
+                                                    onClick={() => handleApproveBiometric(v._id)}
+                                                    disabled={processingBiometricId === v._id}
+                                                    style={{
+                                                        padding: '0.45rem',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid rgba(34, 197, 94, 0.5)',
+                                                        background: 'rgba(34, 197, 94, 0.2)',
+                                                        color: '#4ade80',
+                                                        fontWeight: 700,
+                                                        fontSize: '0.8rem',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    Approve
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -917,13 +1060,50 @@ export default function AdminExamManage({ initialTab }) {
                 {/* TAB: LIVE MONITORING */}
                 {activeTab === 'monitoring' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                        {/* 24-Hour Recording Retention Banner */}
+                        <div style={{
+                            padding: '1.1rem 1.5rem',
+                            borderRadius: '14px',
+                            background: 'rgba(99, 102, 241, 0.08)',
+                            border: '1px solid rgba(99, 102, 241, 0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <Clock size={20} style={{ color: '#818cf8', flexShrink: 0 }} />
+                                <div>
+                                    <div style={{ fontWeight: 600, color: '#f4f4f5', fontSize: '0.95rem' }}>
+                                        S3 Screen Recorded Video Chunks: Available for 24 Hours
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
+                                        Video chunks uploaded to S3/R2 object storage remain active with 24-hour presigned URLs (86,400s) for proctoring audit and compliance.
+                                    </div>
+                                </div>
+                            </div>
+                            <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                background: 'rgba(34, 197, 94, 0.15)',
+                                color: '#4ade80',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                border: '1px solid rgba(34, 197, 94, 0.3)',
+                                letterSpacing: '0.05em'
+                            }}>
+                                24H RETENTION ACTIVE
+                            </span>
+                        </div>
+
                         <div>
                             <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
                                 Live Active Candidates ({candidates.length})
                             </h3>
                             <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.85rem', color: '#a1a1aa' }}>
-                                Real-time candidate telemetry, violation counts, and direct S3 cloud recording playback.
+                                Real-time candidate telemetry, violation counts, and direct S3 cloud recording playback (24-hour presigned URLs).
                             </p>
 
                             {candidates.length === 0 ? (

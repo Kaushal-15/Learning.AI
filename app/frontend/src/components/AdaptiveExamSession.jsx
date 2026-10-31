@@ -745,7 +745,7 @@ export default function AdaptiveExamSession() {
                 {/* Question Card */}
                 <div className="adaptive-question-card">
                     <h2 className="adaptive-question-text">
-                        {currentQuestion ? currentQuestion.content : "Loading question..."}
+                        {currentQuestion ? (currentQuestion.content || currentQuestion.question) : "Loading question..."}
                     </h2>
 
                     <div className="adaptive-options-grid">

@@ -264,8 +264,11 @@ export default function AdminExamDashboard() {
                                 </div>
 
                                 <div className="view-controls">
-                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage`)} title="United Manage Page" className="font-medium text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400">
-                                        Manage
+                                    <button onClick={() => navigate(`/admin/exams/${exam._id}/manage`)} title="Manage Exam & Biometric Approvals" className="font-medium text-xs px-2.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-1 shadow-sm">
+                                        <span>Manage</span>
+                                        <span className="text-[10px] bg-black/20 dark:bg-white/20 px-1 py-0.5 rounded font-mono flex items-center gap-0.5">
+                                            <Shield size={10} /> Biometrics
+                                        </span>
                                     </button>
                                     <button onClick={() => navigate(`/admin/exams/${exam._id}/manage?tab=students`)} title="Manage Students">
                                         <Users size={18} />

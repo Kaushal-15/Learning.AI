@@ -327,7 +327,7 @@ async function listSessionChunks({ examId, userId, sessionId }) {
 
     const chunks = await Promise.all(
       sessionContents.map(async (item) => {
-        const { downloadUrl } = await getPresignedDownloadUrl({ key: item.Key, expiresIn: 1800 });
+        const { downloadUrl } = await getPresignedDownloadUrl({ key: item.Key, expiresIn: 86400 }); // 24 hours
         return {
           key: item.Key,
           size: item.Size,
