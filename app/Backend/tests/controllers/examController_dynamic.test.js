@@ -284,6 +284,44 @@ describe('Exam Controller - submitAdaptiveAnswer Collective Adaptability', () =>
             message: expect.stringContaining('already been answered')
         }));
     });
+
+    it('should reject early answer submission before the final 3 seconds of the question timer', async () => {
+        const now = new Date();
+        const mockExam = {
+            _id: 'exam123',
+            examType: 'dynamic',
+            isAdaptive: true,
+            startTime: new Date(now.getTime() - 60000),
+            endTime: new Date(now.getTime() + 3600000),
+            timePerQuestion: 30,
+            save: jest.fn().mockResolvedValue(true)
+        };
+        // Question started only 5 seconds ago (25s remaining, well before final 3s)
+        const mockSession = {
+            userId: 'user123',
+            examId: 'exam123',
+            questionStartTime: new Date(now.getTime() - 5000),
+            answers: new Map(),
+            save: jest.fn().mockResolvedValue(true)
+        };
+        const mockQuestion = {
+            _id: 'q1',
+            correctAnswer: 'Paris'
+        };
+
+        ExamMaster.findById.mockResolvedValue(mockExam);
+        ExamSession.findOne.mockResolvedValue(mockSession);
+        Question.findById.mockResolvedValue(mockQuestion);
+
+        req.body.answer = 'Paris';
+        await examController.submitAdaptiveAnswer(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: false,
+            message: expect.stringContaining('before the final 3 seconds')
+        }));
+    });
 });
 
 describe('Exam Controller - 30-Second Joining Window & Late Entry Block', () => {

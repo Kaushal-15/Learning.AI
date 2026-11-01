@@ -908,7 +908,7 @@ export default function AdminExamCreate() {
                                             <h5>📊 Dynamic Adaptive Rules</h5>
                                             <ul>
                                                 <li>🎯 <strong>Starting Level:</strong> All students start at <strong>Easy</strong></li>
-                                                <li>⏳ <strong>Question Timer:</strong> {formData.questionTimer || 30}s per question; auto-submits as unanswered if time expires</li>
+                                                <li>⏳ <strong>Question Timer:</strong> {formData.questionTimer || 30}s per question; submission opens only in the final 3s (auto-submits selected answer)</li>
                                                 <li>⏸️ <strong>10s Wait Period:</strong> System evaluates overall previous question correct percentage</li>
                                                 <li>✅ <strong>Increase Difficulty:</strong> When overall correct percentage ≥ {formData.adaptabilityThreshold || 60}% (Easy → Medium → Hard)</li>
                                                 <li>⬇️ <strong>Decrease Difficulty:</strong> When overall correct percentage &lt; 35% (Hard → Medium → Easy)</li>

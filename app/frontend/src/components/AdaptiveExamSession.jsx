@@ -53,6 +53,40 @@ export default function AdaptiveExamSession() {
     const [violations, setViolations] = useState(0);
     const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
+    const hasAutoSubmittedRef = useRef(false);
+    const isSubmittingRef = useRef(false);
+    const timeLeftRef = useRef(30);
+    const selectedAnswerRef = useRef(null);
+    const handleSubmitAnswerRef = useRef(null);
+
+    useEffect(() => {
+        isSubmittingRef.current = isSubmitting;
+    }, [isSubmitting]);
+
+    useEffect(() => {
+        timeLeftRef.current = timeLeft;
+    }, [timeLeft]);
+
+    useEffect(() => {
+        selectedAnswerRef.current = selectedAnswer;
+    }, [selectedAnswer]);
+
+    // Option selection handler with auto-submit in final 3 seconds
+    const handleSelectOption = (option) => {
+        if (isSubmitting || isWaiting || examComplete) return;
+        setSelectedAnswer(option);
+        selectedAnswerRef.current = option;
+
+        // If timer is already at 3 seconds or less, auto-submit immediately!
+        const currentRemaining = timeLeftRef.current;
+        if (currentRemaining <= 3 && !hasAutoSubmittedRef.current && !isSubmittingRef.current) {
+            console.log('⚡ Option selected during final 3s window: AUTO-SUBMITTING:', option);
+            hasAutoSubmittedRef.current = true;
+            setQuestionExpiryTime(null);
+            handleSubmitAnswerRef.current?.(option);
+        }
+    };
+
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);
@@ -73,12 +107,12 @@ export default function AdaptiveExamSession() {
             if (['1', '2', '3', '4'].includes(e.key)) optionIndex = parseInt(e.key, 10) - 1;
             else if (['A', 'B', 'C', 'D'].includes(key)) optionIndex = key.charCodeAt(0) - 65;
             if (optionIndex >= 0 && optionIndex < currentQuestion.options.length) {
-                setSelectedAnswer(currentQuestion.options[optionIndex]);
+                handleSelectOption(currentQuestion.options[optionIndex]);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentQuestion]);
+    }, [currentQuestion, isSubmitting, isWaiting, examComplete]);
 
     // Initialize session if needed
     const initializeSession = useCallback(async () => {
@@ -230,7 +264,6 @@ export default function AdaptiveExamSession() {
     // Forward refs to prevent circular callback dependencies and Temporal Dead Zone (TDZ) ReferenceError
     const checkWaitStatusRef = useRef(null);
     const fetchNextQuestionRef = useRef(null);
-    const handleSubmitAnswerRef = useRef(null);
 
     // Fetch next question (defined first)
     const fetchNextQuestion = useCallback(async () => {
@@ -320,6 +353,8 @@ export default function AdaptiveExamSession() {
             }
 
             setSelectedAnswer(null);
+            selectedAnswerRef.current = null;
+            hasAutoSubmittedRef.current = false;
             setIsWaiting(false);
             setLoading(false);
         } catch (error) {
@@ -370,6 +405,14 @@ export default function AdaptiveExamSession() {
         const answerToSubmit = isForced ? forcedAnswer : selectedAnswer;
         if (!answerToSubmit || isSubmitting) return;
 
+        // Strict rule: no student can submit before the final 3 seconds
+        const currentRemaining = timeLeftRef.current;
+        if (!isForced && currentRemaining > 3) {
+            console.warn('Blocked premature submission: submission only allowed during the final 3 seconds');
+            return;
+        }
+
+        hasAutoSubmittedRef.current = true;
         setIsSubmitting(true);
         setQuestionExpiryTime(null); // Stop question timer during submission
 
@@ -455,11 +498,6 @@ export default function AdaptiveExamSession() {
         // Status handled silently to avoid unnecessary re-renders
     }, []);
 
-    const selectedAnswerRef = useRef(null);
-    useEffect(() => {
-        selectedAnswerRef.current = selectedAnswer;
-    }, [selectedAnswer]);
-
     // Precise Question Timer countdown based on real timestamp
     useEffect(() => {
         if (!questionExpiryTime || loading || isWaiting || examComplete || isWaitingRoom) return;
@@ -468,9 +506,23 @@ export default function AdaptiveExamSession() {
             const now = new Date();
             const remaining = Math.max(0, Math.ceil((questionExpiryTime - now) / 1000));
             setTimeLeft(remaining);
+            timeLeftRef.current = remaining;
 
-            if (remaining <= 0) {
+            // 1. Timer reached the final 3 seconds (remaining <= 3):
+            // If an option has been selected, AUTO-SUBMIT IT!
+            if (remaining <= 3 && remaining > 0 && selectedAnswerRef.current && !hasAutoSubmittedRef.current && !isSubmittingRef.current) {
+                console.log('⚡ Timer reached last 3 seconds with selected answer: AUTO-SUBMITTING:', selectedAnswerRef.current);
+                hasAutoSubmittedRef.current = true;
+                setQuestionExpiryTime(null);
+                handleSubmitAnswerRef.current?.(selectedAnswerRef.current);
+                return;
+            }
+
+            // 2. Timer fully expired (remaining <= 0):
+            // Auto-submit selected answer or __UNANSWERED__
+            if (remaining <= 0 && !hasAutoSubmittedRef.current && !isSubmittingRef.current) {
                 console.log('⏰ Question time expired! Auto-submitting answer or __UNANSWERED__');
+                hasAutoSubmittedRef.current = true;
                 setQuestionExpiryTime(null);
                 const ans = selectedAnswerRef.current || '__UNANSWERED__';
                 handleSubmitAnswerRef.current?.(ans);
@@ -830,7 +882,7 @@ export default function AdaptiveExamSession() {
                             <div
                                 key={index}
                                 className={`adaptive-option ${selectedAnswer === option ? 'selected' : ''}`}
-                                onClick={() => setSelectedAnswer(option)}
+                                onClick={() => handleSelectOption(option)}
                             >
                                 <div className="option-letter">
                                     {String.fromCharCode(65 + index)}
@@ -841,22 +893,25 @@ export default function AdaptiveExamSession() {
                     </div>
                 </div>
 
-                {/* Submit Button (minimum 3 seconds spent on question) */}
+                {/* Submit Button (Only unlocked during final 3 seconds; auto-submits if option selected) */}
                 {(() => {
-                    const timeSpentOnQuestion = (timePerQuestion || 30) - timeLeft;
-                    const isMinTimeMet = timeSpentOnQuestion >= 3;
+                    const isUnlocked = timeLeft <= 3;
+                    const secondsUntilUnlock = Math.max(0, timeLeft - 3);
                     return (
                         <button
                             className="adaptive-submit-btn"
                             onClick={() => handleSubmitAnswer()}
-                            disabled={!selectedAnswer || isSubmitting || !isMinTimeMet}
+                            disabled={!isUnlocked || !selectedAnswer || isSubmitting}
+                            title={!isUnlocked ? `Submission unlocks in ${secondsUntilUnlock}s` : 'Submit your answer'}
                         >
                             <Send size={20} />
                             {isSubmitting
                                 ? 'Submitting...'
-                                : !isMinTimeMet
-                                    ? `Wait ${3 - timeSpentOnQuestion}s`
-                                    : 'Submit Answer'}
+                                : !isUnlocked
+                                    ? `Locked (Wait ${secondsUntilUnlock}s)`
+                                    : selectedAnswer
+                                        ? 'Submit Answer'
+                                        : 'Select an Option'}
                         </button>
                     );
                 })()}

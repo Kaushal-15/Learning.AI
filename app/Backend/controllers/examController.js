@@ -1868,6 +1868,21 @@ exports.submitAdaptiveAnswer = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Resource not found' });
         }
 
+        // Server-side lockout: Reject answer submissions before the final 3 seconds of the question timer
+        const isUnanswered = !answer || answer === '__UNANSWERED__';
+        if (session.questionStartTime && exam.timePerQuestion && !isUnanswered) {
+            const elapsedSeconds = (Date.now() - new Date(session.questionStartTime).getTime()) / 1000;
+            // The student can only submit when only 3 seconds remain in timePerQuestion.
+            // Minimum elapsed seconds: (timePerQuestion - 3) with a 2-second grace for network/clock tolerance
+            const minElapsedAllowed = Math.max(0, exam.timePerQuestion - 5);
+            if (elapsedSeconds < minElapsedAllowed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Question cannot be submitted before the final 3 seconds. Please wait for the timer.'
+                });
+            }
+        }
+
         // Check if question was already answered - cannot answer again
         const hasAnswered = session.answers instanceof Map
             ? session.answers.has(questionId.toString())
@@ -1880,7 +1895,6 @@ exports.submitAdaptiveAnswer = async (req, res) => {
         }
 
         // Support answer vs unanswered (auto-submit on timeout)
-        const isUnanswered = !answer || answer === '__UNANSWERED__';
         const recordedAnswer = isUnanswered ? '__UNANSWERED__' : answer;
         if (session.answers instanceof Map) {
             session.answers.set(questionId.toString(), recordedAnswer);
@@ -2441,6 +2455,21 @@ exports.submitSynchronizedAnswer = async (req, res) => {
 
         if (!exam || !session || !question) {
             return res.status(404).json({ success: false, message: 'Resource not found' });
+        }
+
+        // Server-side lockout: Reject answer submissions before the final 3 seconds of the question timer
+        const isUnanswered = !answer || answer === '__UNANSWERED__';
+        if (session.questionStartTime && exam.timePerQuestion && !isUnanswered) {
+            const elapsedSeconds = (Date.now() - new Date(session.questionStartTime).getTime()) / 1000;
+            // The student can only submit when only 3 seconds remain in timePerQuestion.
+            // Minimum elapsed seconds: (timePerQuestion - 3) with a 2-second grace for network/clock tolerance
+            const minElapsedAllowed = Math.max(0, exam.timePerQuestion - 5);
+            if (elapsedSeconds < minElapsedAllowed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Question cannot be submitted before the final 3 seconds. Please wait for the timer.'
+                });
+            }
         }
 
         if (!exam.isQuestionActive) {
